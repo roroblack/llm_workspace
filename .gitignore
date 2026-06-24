@@ -1,0 +1,8 @@
+.venv/
+**/.venv/
+.idea/
+**/.idea/
+__pycache__/
+*.pyc
+.git_backup/
+**/.git_backup/
