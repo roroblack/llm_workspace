@@ -1,5 +1,0 @@
-konlpy
-jpype1
-wordcloud
-torch
-pandas
