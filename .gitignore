@@ -7,3 +7,4 @@ __pycache__/
 .git_backup/
 **/.git_backup/
 test_konlpy_project/
+word_embed_project/
