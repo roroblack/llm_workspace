@@ -1,0 +1,26 @@
+# python version 3.11
+
+konlpy
+jpype1
+wordcloud
+torch
+
+# data 
+pandas >= 2.2.0
+numpy >= 1.26.0
+openpyxl >= 3.1.0
+
+# ml
+scikit-learn >= 1.4.0
+gensim >= 4.3.0
+scipy >= 1.11.0
+
+ # 자연어 처리
+nltk >= 3.8.1
+konlpy >= 0.6.0
+JPype1 >= 1.5.0
+lxml >= 5.0.0
+
+# 시각화 / 진행률 표시
+matplotlib >= 3.8.0
+tqdm >= 4.66.0
