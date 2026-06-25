@@ -6,3 +6,4 @@ __pycache__/
 *.pyc
 .git_backup/
 **/.git_backup/
+test_konlpy_project/
