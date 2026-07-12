@@ -46,7 +46,19 @@ def build_index(docs_dir: Path | None = None, out_dir: Path | None = None) -> di
     store = FAISS.from_documents(chunks, get_embeddings())
     out_dir.mkdir(parents=True, exist_ok=True)
     store.save_local(str(out_dir))
+    # 인덱스가 어떤 임베딩 모델로 만들어졌는지 기록(모델 변경 시 재빌드 판단용)
+    (out_dir / ".embedding_model").write_text(settings.ST_EMBEDDING_MODEL, encoding="utf-8")
     return {"docs": len(docs), "chunks": len(chunks), "out_dir": str(out_dir)}
+
+
+def index_is_current(out_dir: Path | None = None) -> bool:
+    """디스크 인덱스가 현재 임베딩 모델과 일치하고 완전한지 확인한다."""
+    settings = get_settings()
+    out_dir = out_dir or settings.VECTOR_DIR
+    if not ((out_dir / "index.faiss").exists() and (out_dir / "index.pkl").exists()):
+        return False
+    marker = out_dir / ".embedding_model"
+    return marker.exists() and marker.read_text(encoding="utf-8").strip() == settings.ST_EMBEDDING_MODEL
 
 
 if __name__ == "__main__":

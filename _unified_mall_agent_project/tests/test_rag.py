@@ -47,6 +47,19 @@ def test_embeddings_object():
     assert get_embeddings() is not None
 
 
+def test_index_is_current_detects_model_change():
+    from app.rag.build_index import index_is_current
+
+    s = get_settings()
+    assert index_is_current() is True  # 방금 빌드됨
+    orig = s.ST_EMBEDDING_MODEL
+    try:
+        s.ST_EMBEDDING_MODEL = "some/other-model"
+        assert index_is_current() is False  # 모델 바뀌면 stale 감지
+    finally:
+        s.ST_EMBEDDING_MODEL = orig
+
+
 def test_search_returns_relevant_with_source_and_distance():
     results = service.search("에이전트 무한루프를 어떻게 막나요?", k=3)
     assert len(results) >= 1

@@ -34,10 +34,10 @@ async def lifespan(_app: FastAPI):
     # RAG 인덱스가 없으면 1회 빌드 (있으면 그대로 사용 — 인덱싱/서비스 분리)
     from app.core.config import get_settings
 
-    vec_dir = get_settings().VECTOR_DIR
-    if not ((vec_dir / "index.faiss").exists() and (vec_dir / "index.pkl").exists()):
-        from app.rag.build_index import build_index
+    # RAG 인덱스가 없거나 임베딩 모델이 바뀌었으면 재빌드 (stale 인덱스 방지)
+    from app.rag.build_index import build_index, index_is_current
 
+    if not index_is_current():
         build_index()
     yield
 
