@@ -64,3 +64,26 @@ def test_load_cs_dataset():
     assert len(texts) == 60
     assert len(labels) == 60
     assert "결제" in set(labels)
+
+
+def test_improvement_report_before_after():
+    """few-shot 보강 전/후 정확도 비교 루프 (mock: augmented가 '교환'을 맞춤)."""
+    from app.prompts.classifier import improvement_report
+
+    texts = ["사이즈가 안 맞아 바꾸고 싶어요", "환불해주세요"]
+    labels = ["교환", "환불"]
+
+    def chat(prompt):
+        examples_section = prompt.split("[분류 대상]")[0]
+        target_section = prompt.split("[분류 대상]")[1]
+        has_exchange_example = "교환" in examples_section.split("[예시]")[-1]
+        if "바꾸고" in target_section:  # 교환 문의
+            return "교환" if has_exchange_example else "환불"  # 예시 없으면 오분류
+        return "환불"  # 환불 문의는 항상 정답
+
+    base = [("환불해주세요", "환불")]
+    augmented = base + [("옷을 다른 색으로 바꾸고 싶어요", "교환")]
+    r = improvement_report(texts, labels, base, augmented, chat_complete=chat)
+    assert r["before_accuracy"] == 0.5  # 교환을 환불로 오분류
+    assert r["after_accuracy"] == 1.0  # 교환 예시 보강 후 정답
+    assert r["delta"] == 0.5

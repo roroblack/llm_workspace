@@ -318,3 +318,26 @@
 ---
 
 > 이 공략집은 실제 소스·강의 PDF 정독에 근거해 작성됐다. 특정 코드 라인이 필요하면 위 색인의 프로젝트 폴더를 직접 열어 대조할 것.
+
+---
+
+## 부록 D — 통합 프로젝트로의 구현 결과 (스테이지 → 실제 코드)
+
+이 공략집의 개념들은 `_unified_mall_agent_project/`에 **실행 가능한 코드로 구현**됐다(Phase 0~7, 테스트 124개 통과). 개념을 코드로 확인하려면:
+
+| 스테이지(개념) | 통합 앱 구현 위치 |
+|---|---|
+| 1~2 전처리·임베딩 | `app/rag/embeddings.py`(ko-sroberta), `app/ml/recommend.py` |
+| 3~4 딥러닝 분류·BERT | `app/ml/sentiment.py`(KoELECTRA NSMC), `app/ml/intent.py` |
+| 6 LLM API | `app/core/llm_clients.py`(local/openai/gemini 추상화) |
+| 7 파라미터 | `app/lab/experiments.py`(temperature·다양성·토큰·비용) |
+| 8 프롬프트 엔지니어링 | `app/prompts/templates.py`, `classifier.py`(few-shot·인젝션·전후비교) |
+| 9 CoT | `app/prompts/templates.py`(build_cot_prompt·should_use_cot) |
+| 10 Function Calling·Tool | `app/tools/commerce_tools.py`(도구6·좋은도구 5원칙) |
+| 11 Agent Loop·Planning | `app/agent/react.py`(안전장치3), `app/agent/planning.py` |
+| 12 RAG·LangChain | `app/rag/`(인덱싱/서비스 분리·FAISS), `app/agent/lc_agent.py` |
+| 13 통합 | `app/main.py` + 챗 UI `app/static/` |
+
+**직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작하며, 에이전트의 실제 도구 호출(tool-calling)만 OpenAI/Gemini 키가 필요하다(`scripts/realkey_smoke.py`).
+
+> 구현의 정직한 완료 상태(이월 항목 포함)는 `reports/2026-07-13_0410_최종_통합_리포트.md` 참조.

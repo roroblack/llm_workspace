@@ -92,6 +92,39 @@ def suggest_fewshot_candidates(preds: list[str], labels: list[str], top_n: int =
     ]
 
 
+def improvement_report(
+    texts: list[str],
+    labels: list[str],
+    base_fewshot: list[tuple[str, str]],
+    augmented_fewshot: list[tuple[str, str]],
+    chat_complete: ChatComplete | None = None,
+) -> dict[str, Any]:
+    """오분류 개선 루프 마무리: few-shot 보강 전/후 정확도를 비교한다.
+
+    측정(base) → 분석(confusion_pairs) → 처방(augmented few-shot) → 재측정 순환을
+    하나의 리포트로 닫는다.
+    """
+    def _run(fewshot: list[tuple[str, str]]) -> list[str]:
+        return [
+            normalize_category((chat_complete or _default_chat_complete)(build_classify_prompt(t, fewshot)))
+            for t in texts
+        ]
+
+    before_preds = _run(base_fewshot)
+    before = measure_accuracy(before_preds, labels)
+    pairs = confusion_pairs(before_preds, labels)
+
+    after_preds = _run(augmented_fewshot)
+    after = measure_accuracy(after_preds, labels)
+
+    return {
+        "before_accuracy": before["accuracy"],
+        "after_accuracy": after["accuracy"],
+        "delta": round(after["accuracy"] - before["accuracy"], 4),
+        "confusion_pairs_before": {f"{k[0]}->{k[1]}": v for k, v in pairs.items()},
+    }
+
+
 def load_cs_dataset(path: Path | None = None) -> tuple[list[str], list[str]]:
     """cs_inquiries.csv에서 (content, category_hint) 로드. 라벨 컬럼=category_hint."""
     path = path or (get_settings().DATA_DIR / "cs_inquiries.csv")
