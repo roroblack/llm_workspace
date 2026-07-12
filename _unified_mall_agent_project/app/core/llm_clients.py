@@ -41,6 +41,52 @@ def get_chat_client(settings: Settings | None = None) -> OpenAI:
     raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
 
 
+def get_langchain_chat(settings: Settings | None = None):
+    """현재 프로바이더에 맞는 LangChain ChatModel 반환 (Phase 3.5).
+
+    local/openai → ChatOpenAI(호환 endpoint), gemini → ChatGoogleGenerativeAI.
+    키 없으면 ConfigError (폴백 없음).
+    """
+    settings = settings or get_settings()
+    provider = settings.LLM_PROVIDER
+
+    def _require(value: str | None, name: str) -> str:
+        if not (value and value.strip()):
+            raise ConfigError(f"{name}이(가) 비어 있습니다.")
+        return value
+
+    if provider in ("local", "openai"):
+        from langchain_openai import ChatOpenAI
+
+        if provider == "local":
+            return ChatOpenAI(
+                base_url=_require(settings.LOCAL_BASE_URL, "LOCAL_BASE_URL"),
+                api_key=settings.LOCAL_API_KEY,
+                model=_require(settings.LOCAL_MODEL, "LOCAL_MODEL"),
+                temperature=0,
+            )
+        if not settings.has_openai_key():
+            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다.")
+        return ChatOpenAI(
+            api_key=settings.OPENAI_API_KEY,
+            model=_require(settings.OPENAI_MODEL, "OPENAI_MODEL"),
+            temperature=0,
+        )
+
+    if provider == "gemini":
+        if not settings.has_google_key():
+            raise ConfigError("GOOGLE_API_KEY가 설정되지 않았습니다.")
+        from langchain_google_genai import ChatGoogleGenerativeAI
+
+        return ChatGoogleGenerativeAI(
+            model=_require(settings.GEMINI_MODEL, "GEMINI_MODEL"),
+            api_key=settings.GOOGLE_API_KEY,
+            temperature=0,
+        )
+
+    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+
+
 def get_active_model(settings: Settings | None = None) -> str:
     """현재 프로바이더의 채팅 모델명을 반환한다."""
     settings = settings or get_settings()
