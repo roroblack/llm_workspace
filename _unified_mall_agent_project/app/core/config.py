@@ -56,6 +56,13 @@ class Settings(BaseSettings):
     SENTIMENT_MODEL: str = "monologg/koelectra-base-finetuned-nsmc"
     SENTIMENT_DEVICE: int = -1  # -1=CPU
 
+    # --- Lab (비용 추정) ---
+    # 1M 토큰당 USD [input, output]. 로컬(local)은 과금 없음이라 미등록 → 비용추정 불가.
+    PRICE_TABLE: dict[str, list[float]] = {
+        "gpt-4o-mini": [0.15, 0.60],
+        "gemini-2.5-flash": [0.075, 0.30],
+    }
+
     # --- 경로 / DB ---
     DATA_DIR: Path = ROOT_DIR / "data"
     DOCS_DIR: Path = ROOT_DIR / "data" / "docs"

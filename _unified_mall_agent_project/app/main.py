@@ -8,13 +8,18 @@ Phase 2: DB 테이블 생성 + 시딩 + auth/products/orders/payments 라우터.
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from app.core.errors import register_exception_handlers
 from app.db.database import Base, SessionLocal, engine
 from app.db.seed import seed_products
-from app.routers import agent, auth, health, nlp, orders, payments, products, rag
+from app.routers import agent, auth, health, lab, nlp, orders, payments, products, rag
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 
 @asynccontextmanager
@@ -52,7 +57,15 @@ def create_app() -> FastAPI:
     app.include_router(agent.router)
     app.include_router(rag.router)
     app.include_router(nlp.router)
-    # 정적 UI 마운트 자리 (Phase 7)
+    app.include_router(lab.router)
+
+    # 정적 UI
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+
     return app
 
 

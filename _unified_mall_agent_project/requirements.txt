@@ -28,3 +28,5 @@ langchain-text-splitters==1.1.2
 # Phase 6 (ML: 감성분석 KoELECTRA)
 transformers==5.13.0
 torch==2.12.0
+# Phase 7 (실험실: 토큰 카운트)
+tiktoken==0.13.0
