@@ -1,0 +1,15 @@
+# Phase 1 최소 의존성 (로컬 검증된 버전으로 고정 — RULE 재현성)
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.13.4
+pydantic-settings==2.10.1
+openai==2.44.0
+python-dotenv==1.1.1
+pytest==7.4.4
+httpx==0.28.1
+# Phase 2 (DB·인증)
+sqlalchemy==2.0.41
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.5.0
+python-multipart==0.0.20

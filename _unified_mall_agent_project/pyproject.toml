@@ -1,0 +1,12 @@
+[project]
+name = "unified-mall-agent"
+version = "0.1.0"
+description = "승승장구몰 AI 커머스 에이전트 플랫폼 (통합 프로젝트)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "llm: 실제 LLM 호출이 필요한 테스트 (기본 CI에서 제외)",
+]

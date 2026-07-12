@@ -1,0 +1,6 @@
+__pycache__/
+*.pyc
+data/mall.db
+data/vector_store/
+.env
+.venv/

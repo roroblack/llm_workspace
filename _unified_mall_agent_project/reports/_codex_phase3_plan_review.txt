@@ -1,0 +1,2048 @@
+﻿node.exe : OpenAI Codex v0.144.1
+At C:\Users\playdata2\AppData\Roaming\npm\codex.ps1:22 char:14
++ ...    $input | & "node$exe"  "$basedir/node_modules/@openai/codex/bin/co ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (OpenAI Codex v0.144.1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace
+model: gpt-5.5
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: xhigh
+reasoning summaries: none
+session id: 019f5644-4b04-7c73-8190-1d73794ff277
+--------
+user
+?? ??? ?????. ?? ???? Phase 3(??+?? ReAct ????) ????? ????.
+
+???:
+- _unified_mall_agent_project/plans/2026-07-12_2240_Phase3_??_??ReAct_????.md
+- _unified_mall_agent_project/RULE.md
+- _unified_mall_agent_project/app/core/llm_clients.py, errors.py
+- _unified_mall_agent_project/debug_notes/2026-07-12_2230_??Gemma??_??_?????.md (???? ??)
+
+??? ???? ??? (?? ?? ??):
+1. ?8 ????? 5? ?
+2. RULE ?? ?? (??? ????? ????? ????, ???? ???)
+3. chat_fn ?? mock ??? ??? ??/??
+4. ?? ReAct ?? ???? ?? ?? (????, ????, tool_call ??, ????)
+5. ?? Gemma? OpenAI tool-calling? ?? ?? ??? ??? ????
+6. ?? go/no-go + ?? ? ??? ?? ?
+
+????.
+
+codex
+먼저 지정된 문서와 핵심 코드만 읽어서 Phase 3의 범위, 기존 규칙, LLM 클라이언트 구조를 맞춰보겠습니다. 현재 환경은 읽기 전용이라 수정은 못 하지만, 구현 판단과 go/no-go 검토는 할 수 있습니다
+.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project\\plans -Force | Select-Object Name,Length,LastWriteTime" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project\\debug_notes -Force | Select-Object Name,Length,LastWriteTime" in C:\Users\playdata2\Documents\llm_worksp
+ace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project\\app\\core -Force | Select-Object Name,Length,LastWriteTime" in C:\Users\playdata2\Documents\llm_workspac
+e
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project -Force | Select-Object Name,Mode,Length" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1535ms:
+
+Name                                      Length LastWriteTime        
+----                                      ------ -------------        
+2026-07-12_1440_초기_통합_계획서.md                7789 2026-07-12 오후 2:34:05
+2026-07-12_1511_통합_계획서_v2.md               19019 2026-07-12 오후 9:05:39
+2026-07-12_2030_Phase1_뼈대_인프라_상세계획.md       5568 2026-07-12 오후 8:32:55
+2026-07-12_2110_Phase2_DB_인증_상세계획.md        5868 2026-07-12 오후 8:51:51
+2026-07-12_2240_Phase3_도구_수동ReAct_상세계획.md   4379 2026-07-12 오후 9:18:48
+
+
+
+ succeeded in 1535ms:
+
+Name           Length LastWriteTime        
+----           ------ -------------        
+__pycache__           2026-07-12 오후 8:56:10
+config.py      3148   2026-07-12 오후 8:51:23
+errors.py      2111   2026-07-12 오후 8:51:29
+llm_clients.py 2325   2026-07-12 오후 8:43:12
+__init__.py    0      2026-07-12 오후 8:33:23
+
+
+
+ succeeded in 1605ms:
+
+Name                                  Length LastWriteTime        
+----                                  ------ -------------        
+2026-07-12_2028_환경정찰_로컬모델_셋업.md         2064 2026-07-12 오후 8:28:43
+2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md   3075 2026-07-12 오후 9:17:08
+
+
+
+ succeeded in 1608ms:
+
+Name               Mode   Length
+----               ----   ------
+.github            d-----       
+.pytest_cache      d-----       
+app                d-----       
+data               d-----       
+debug_notes        d-----       
+history            d-----       
+legacy             d-----       
+plans              d-----       
+reports            d-----       
+scripts            d-----       
+tests              d-----       
+.env.example       -a---- 674   
+.gitignore         -a---- 63    
+pyproject.toml     -a---- 329   
+requirements.txt   -a---- 372   
+RULE.md            -a---- 5802  
+교과목3_LLM_학습_공략집.md -a---- 21999 
+
+
+
+codex
+파일명은 실제로 `도구_수동ReAct_상세계획`과 `로컬Gemma서버_구동_트러블슈팅`입니다. 이제 계획서와 RULE, LLM 클라이언트, 관련 테스트/에이전트 구조를 같이 보면서 구현 가능성을 확인하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\core\\llm_clients.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\debug_notes\\2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\ll
+m_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\RULE.md -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\core\\errors.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\plans\\2026-07-12_2240_Phase3_도구_수동ReAct_상세계획.md -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_
+workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg --files .\\_unified_mall_agent_project\\a
+pp .\\_unified_mall_agent_project\\tests" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1364ms:
+.\_unified_mall_agent_project\app\__init__.py
+.\_unified_mall_agent_project\tests\__init__.py
+.\_unified_mall_agent_project\tests\test_signup_secret.py
+.\_unified_mall_agent_project\tests\test_orders.py
+.\_unified_mall_agent_project\tests\test_llm_clients.py
+.\_unified_mall_agent_project\tests\test_health.py
+.\_unified_mall_agent_project\tests\test_errors.py
+.\_unified_mall_agent_project\tests\test_e2e_commerce.py
+.\_unified_mall_agent_project\tests\test_config.py
+.\_unified_mall_agent_project\tests\test_auth.py
+.\_unified_mall_agent_project\tests\conftest.py
+.\_unified_mall_agent_project\app\db\__init__.py
+.\_unified_mall_agent_project\app\services\__init__.py
+.\_unified_mall_agent_project\app\db\seed.py
+.\_unified_mall_agent_project\app\services\user_service.py
+.\_unified_mall_agent_project\app\db\models.py
+.\_unified_mall_agent_project\app\services\payment_service.py
+.\_unified_mall_agent_project\app\db\database.py
+.\_unified_mall_agent_project\app\services\order_service.py
+.\_unified_mall_agent_project\app\schemas\__init__.py
+.\_unified_mall_agent_project\app\schemas\commerce.py
+.\_unified_mall_agent_project\app\core\errors.py
+.\_unified_mall_agent_project\app\core\config.py
+.\_unified_mall_agent_project\app\core\llm_clients.py
+.\_unified_mall_agent_project\app\main.py
+.\_unified_mall_agent_project\app\core\__init__.py
+.\_unified_mall_agent_project\app\routers\__init__.py
+.\_unified_mall_agent_project\app\routers\products.py
+.\_unified_mall_agent_project\app\routers\payments.py
+.\_unified_mall_agent_project\app\routers\orders.py
+.\_unified_mall_agent_project\app\routers\health.py
+.\_unified_mall_agent_project\app\routers\auth.py
+.\_unified_mall_agent_project\app\auth\security.py
+.\_unified_mall_agent_project\app\auth\__init__.py
+
+ succeeded in 1392ms:
+# RULE.md — 통합 프로젝트 작업 규칙
+
+> 이 문서는 `_unified_mall_agent_project`에서 수행되는 **모든 작업(사람/AI 에이전트 공통)**에 적용되는 최상위 규칙이다.
+> 어떤 지시·계획·리포트도 이 문서와 충돌하면 이 문서가 우선한다.
+
+---
+
+## 1. 할루시네이션(환각) 방지 규칙
+
+### 1.1 근거 없는 주장 금지
+- 코드, 파일, API, 라이브러리 동작에 대해 서술할 때는 **반드시 실제 파일을 읽거나 실행해서 확인한 후** 서술한다.
+- 확인하지 않은 내용은 "확인 필요"라고 명시하고, 추측을 사실처럼 쓰지 않는다.
+- 파일 경로·함수명·클래스명을 인용할 때는 실제 존재를 확인하고 `경로:줄번호` 형식으로 남긴다.
+
+### 1.2 검증 우선 원칙
+- 코드 변경 후에는 **실행 또는 테스트로 동작을 검증**하고, 검증 결과(성공/실패 로그)를 리포트에 그대로 기록한다.
+- 테스트가 실패하면 실패했다고 정직하게 기록한다. "아마 될 것이다"류의 서술 금지.
+- 외부 라이브러리 버전·API 시그니처는 requirements.txt 또는 실제 설치 환경에서 확인한다.
+
+### 1.3 출처 표기
+- 레거시 프로젝트에서 가져온 코드는 **원본 프로젝트명과 파일 경로를 주석 또는 리포트에 명시**한다.
+- 문서 작성 시 참조한 파일/리포트를 문서 하단 "참조" 절에 나열한다.
+
+---
+
+## 2. 하네스(Harness) 작업 규칙
+
+모든 작업 세션은 아래 루프를 따른다.
+
+```
+[작업 시작]
+ 1. plans/ 에서 현재 유효한 계획서를 읽는다
+ 2. history/ 최신 이력을 읽고 직전 작업 상태를 파악한다
+[작업 수행]
+ 3. 계획서의 해당 단계만 수행한다 (계획에 없는 작업은 계획서 갱신 먼저)
+ 4. 변경 전 코드를 대체/삭제하는 경우 legacy/ 에 보존한다
+ 5. 변경 후 실행/테스트로 검증한다
+[작업 종료]
+ 6. reports/ 에 작업 리포트를 제출한다 (필수, 생략 불가)
+ 7. history/ 에 작업 이력을 추가한다
+ 8. 계획 진행 상태가 바뀌면 plans/ 문서를 갱신한다
+```
+
+- 한 세션에서 **계획서에 정의된 범위를 초과하는 작업을 하지 않는다.** 범위 변경이 필요하면 먼저 계획서를 수정하고 사유를 기록한다.
+- 작업 단위는 "검증 가능한 최소 단위"로 쪼갠다. 한 번에 여러 기능을 섞어 작업하지 않는다.
+
+---
+
+## 3. 구현 원칙
+
+### 3.1 하드코딩 금지
+- API 키, 모델명, 경로, DB 접속 정보, 매직 넘버를 소스 코드에 직접 쓰지 않는다.
+- 설정은 `.env` + `config` 모듈(pydantic-settings)로 일원화한다.
+- 예외: 테스트 코드의 고정 입력값, 상수 모듈에 이름 붙여 선언한 상수.
+
+### 3.2 폴백(fallback) 금지
+- 오류를 삼키고 임의의 기본 동작으로 대체하는 코드를 작성하지 않는다.
+- API 키 부재, 파일 부재, DB 연결 실패 등은 **명시적 예외를 발생시키고 명확한 오류 메시지로 실패**시킨다.
+- "키 없으면 데모 응답", "실패하면 빈 값 반환" 같은 레거시 패턴은 이관 시 제거한다.
+- 예외: 사용자에게 오류를 안내하는 HTTP 오류 응답(4xx/5xx)은 폴백이 아니라 정상 오류 처리다.
+
+### 3.3 꼭 필요한 부분만 구현 (YAGNI)
+- 계획서에 명시된 기능만 구현한다. "나중에 쓸 것 같은" 코드, 사용되지 않는 옵션, 죽은 코드를 만들지 않는다.
+- 레거시 프로젝트 이관 시 **학습 가치가 검증된 핵심 로직만** 가져오고, 중복 스캐폴딩은 버린다.
+- 같은 기능의 두 구현이 생기면 즉시 하나로 통합하고 나머지는 legacy/로 보낸다.
+
+### 3.4 리포트 제출 의무
+- **모든 작업 세션은 reports/ 에 리포트 파일 제출로 종료된다.** 리포트 없는 작업은 완료로 인정하지 않는다.
+- 리포트에는 최소한 다음을 포함한다:
+  1. 작업 목표 (어느 계획서의 어느 단계인지)
+  2. 실제 수행 내용 (변경 파일 목록 포함)
+  3. 검증 방법과 결과 (실행/테스트 로그 원문 요약)
+  4. 미해결 이슈·다음 작업 제안
+
+---
+
+## 4. 폴더별 문서 규칙
+
+| 폴더 | 용도 | 갱신 시점 |
+|---|---|---|
+| `plans/` | 작업 계획서. 단계별 목표·범위·완료 기준 정의 | 새 작업 착수 전 / 범위 변경 시 / 단계 완료 체크 시 |
+| `history/` | 시간순 작업 이력 (무엇을, 왜, 어떤 결과로) | 매 작업 세션 종료 시 추가 (수정 금지, 추가만) |
+| `legacy/` | 대체·폐기된 코드와 문서의 보존소 | 기존 코드를 대체/삭제하기 직전 |
+| `reports/` | 작업 결과 리포트 (검증 로그 포함) | 매 작업 세션 종료 시 (필수) |
+
+### 4.1 파일명 규칙
+- 모든 문서 파일명 앞에 작성 시각을 붙인다: `YYYY-MM-DD_HHmm_<제목>.md`
+  - 예: `2026-07-12_1430_전체_프로젝트_분석_리포트.md`
+- legacy/ 보존 시 원본 위치를 알 수 있게 한다: `legacy/<원본프로젝트명>/<원본경로>` 구조 유지.
+
+### 4.2 history 기록 형식
+```markdown
+## YYYY-MM-DD HH:mm — <작업 제목>
+- 계획: <plans/ 문서명> 의 <단계>
+- 수행: <핵심 변경 요약>
+- 검증: <성공/실패 + 방법>
+- 리포트: <reports/ 파일명>
+```
+
+---
+
+## 5. 금지 사항 요약 (Quick Reference)
+
+- ❌ 확인 안 한 사실을 단정적으로 서술
+- ❌ 검증(실행/테스트) 없이 "완료" 선언
+- ❌ API 키·경로·모델명 하드코딩
+- ❌ 오류 삼키는 폴백 / 데모 모드 자동 대체
+- ❌ 계획서 밖의 임의 작업
+- ❌ 리포트 없이 작업 종료
+- ❌ 사용하지 않는 코드·기능 선제 구현
+- ❌ history/ 기존 기록 수정 (추가만 허용)
+
+
+ succeeded in 1399ms:
+"""예외 taxonomy 및 FastAPI 예외 핸들러.
+
+RULE.md 3.2(폴백 금지)와 통합 계획서 §6을 구현한다. 오류를 삼켜 그럴듯한 가짜
+결과로 대체하지 않고, 정의된 HTTP 상태 + 구조화된 본문 {ok, error_code, message}로
+명확히 실패시킨다.
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+
+class AppError(Exception):
+    """애플리케이션 공통 예외 베이스."""
+
+    http_status: int = 500
+    error_code: str = "app_error"
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ConfigError(AppError):
+    """설정/키 부재 등 서비스 의존성 미준비 (폴백 대신 명시적 실패)."""
+
+    http_status = 503
+    error_code = "config_error"
+
+
+class InfraError(AppError):
+    """DB/외부 인프라 연결 실패."""
+
+    http_status = 503
+    error_code = "infra_error"
+
+
+class LLMOutputError(AppError):
+    """LLM 출력이 스키마 검증을 통과하지 못함 (재시도 후 최종 실패)."""
+
+    http_status = 502
+    error_code = "llm_output_error"
+
+
+class ValidationErr(AppError):
+    """사용자 입력 검증 실패."""
+
+    http_status = 422
+    error_code = "validation_error"
+
+
+class AuthErr(AppError):
+    """인증 실패 (토큰 없음/무효/만료)."""
+
+    http_status = 401
+    error_code = "auth_error"
+
+
+class ForbiddenErr(AppError):
+    """권한 없음 (타인 리소스 접근 등)."""
+
+    http_status = 403
+    error_code = "forbidden"
+
+
+class NotFoundErr(AppError):
+    """리소스 없음."""
+
+    http_status = 404
+    error_code = "not_found"
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다."""
+
+    @app.exception_handler(AppError)
+    async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.http_status,
+            content={"ok": False, "error_code": exc.error_code, "message": exc.message},
+        )
+
+
+ succeeded in 1403ms:
+# 디버그 노트 — 로컬 Gemma 서버 구동 트러블슈팅
+
+- 일시: 2026-07-12 22:30
+- 목적: Phase 3 착수 전, 빌드용 로컬 Gemma(외부 토큰 0)를 실제 구동
+- 결과: **성공** — 앱 OpenAI 클라이언트로 정상 한국어 응답 확인
+
+## 겪은 문제와 해결 (시간순)
+
+### 1) llama_cpp.server 의존성 충돌 (해결: 자체 서버 작성)
+- `python -m llama_cpp.server` 실행 시 `ModuleNotFoundError: sse_starlette` → 설치
+- 이어서 `starlette_context` 요구 → 설치하면 starlette 1.3.1이 딸려와 **fastapi 0.116.1(starlette<0.48)과 충돌**
+- sse-starlette 최신은 starlette≥0.49 요구 → fastapi와 양립 불가
+- **근본 해결**: `llama_cpp.server`를 버리고, `llama_cpp.Llama`를 직접 감싼 최소 OpenAI 호환 서버를 작성 → `scripts/local_model_server.py`. `
+create_chat_completion`이 이미 OpenAI 형식을 반환하므로 얇은 패스스루로 충분. 앱과 동일 base 환경(starlette 0.47)에서 충돌 없음.
+- 잔여 정리: sse-starlette==2.1.3(호환)만 남김. starlette 0.47.3 유지. 앱 pytest 32개 회귀 없음 확인.
+
+### 2) 모델 로드 실패 → 알고 보니 메모리 부족
+- 초기 오류: `Failed to load model from file` (제네릭)
+- verbose 로드로 실제 원인 확인:
+  - 아키텍처 `gemma4`는 번들 llama.cpp가 **지원함**(kv cache·백엔드까지 진행)
+  - 실제 실패: `ggml_backend_cpu_buffer_type_alloc_buffer: failed to allocate buffer of size 552601600` → **컴퓨트 버퍼 할당 실패**
+- 원인: 이 머신 **총 16GB, 여유 ~5GB**. 모델 q4_0 = **5.1GB**. 가중치+KV캐시+컴퓨트버퍼가 여유 RAM 초과.
+
+### 3) 메모리 튜닝 (해결)
+- 컴퓨트 버퍼는 배치 크기에, KV 캐시는 n_ctx에 비례
+- **n_batch=32, n_ubatch=32, n_ctx=1024, use_mmap=True** → 로드 14초 + 추론 성공
+- n_ctx=2048은 KV 캐시가 커서 다시 실패 → **n_ctx=1024로 확정**
+- 포트 8000을 점유하던 오래된 python 프로세스(다른 세션) 발견 → 정리
+
+## 최종 동작 구성
+
+```
+서버:  python scripts/local_model_server.py
+       (n_ctx=1024, n_batch=32, use_mmap, http://127.0.0.1:8000/v1)
+앱:    LLM_PROVIDER=local → OpenAI SDK(base_url=8000/v1) → Gemma
+검증:  "주문 상태를 묻는 고객에게 한 문장으로 응대" →
+       "주문하신 상품의 현재 상태를 확인해 드릴게요. 잠시만 기다려 주세요."
+```
+
+## Phase 3 이후 주의사항 (중요)
+- **로컬 Gemma는 CPU 추론이라 느림**(요청당 수~수십 초). ReAct 다단계 루프는 매우 느릴 수 있음 → max_steps 작게(2~3).
+- **Gemma는 OpenAI tool-calling 포맷을 네이티브 지원하지 않을 수 있음** → ReAct 로직 검증은 **결정론적 mock LLM 단위테스트**로 하고(토큰·RAM 무관, CI 포함), 로컬
+ Gemma 실호출은 `@pytest.mark.llm`로 분리된 수동 스모크로 둔다.
+- 서버는 필요할 때만 기동(5GB 상주). 미사용 시 종료로 RAM 회수.
+- 운영 환경 RAM 여유 확보 필요. 여유<5.5GB면 로드 실패 가능.
+
+
+ succeeded in 1451ms:
+"""LLM 프로바이더 추상화 (폴백 금지).
+
+RULE.md 3.2에 따라 키/설정이 없으면 조용한 대체 없이 ConfigError를 발생시킨다.
+로컬(Gemma)·OpenAI는 OpenAI 호환 클라이언트로 통일한다. Gemini는 LangChain을
+경유하므로 Phase 3.5 전까지 명시적 ConfigError로 미구현을 알린다.
+"""
+
+from __future__ import annotations
+
+from openai import OpenAI
+
+from app.core.config import Settings, get_settings
+from app.core.errors import ConfigError
+
+
+def get_chat_client(settings: Settings | None = None) -> OpenAI:
+    """현재 LLM_PROVIDER에 맞는 OpenAI 호환 채팅 클라이언트를 반환한다.
+
+    - local: llama-cpp-python OpenAI 호환 서버로 접속 (외부 토큰 0)
+    - openai: 키 없으면 ConfigError (데모/폴백 없음)
+    - gemini: Phase 3.5(LangChain)에서 지원 → 현재는 ConfigError
+    """
+    settings = settings or get_settings()
+    provider = settings.LLM_PROVIDER
+
+    if provider == "local":
+        if not (settings.LOCAL_BASE_URL and settings.LOCAL_BASE_URL.strip()):
+            raise ConfigError("LOCAL_BASE_URL이 비어 있습니다. 로컬 Gemma 서버 주소를 설정하세요.")
+        if not (settings.LOCAL_MODEL and settings.LOCAL_MODEL.strip()):
+            raise ConfigError("LOCAL_MODEL이 비어 있습니다.")
+        return OpenAI(base_url=settings.LOCAL_BASE_URL, api_key=settings.LOCAL_API_KEY)
+
+    if provider == "openai":
+        if not settings.has_openai_key():
+            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다. .env에 키를 넣으세요.")
+        return OpenAI(api_key=settings.OPENAI_API_KEY)
+
+    if provider == "gemini":
+        raise ConfigError("gemini 프로바이더는 Phase 3.5(LangChain)에서 지원 예정입니다.")
+
+    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+
+
+def get_active_model(settings: Settings | None = None) -> str:
+    """현재 프로바이더의 채팅 모델명을 반환한다."""
+    settings = settings or get_settings()
+    provider = settings.LLM_PROVIDER
+    if provider == "local":
+        return settings.LOCAL_MODEL
+    if provider == "openai":
+        return settings.OPENAI_MODEL
+    if provider == "gemini":
+        return settings.GEMINI_MODEL
+    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+
+
+ succeeded in 1463ms:
+# Phase 3 상세 계획 — 도구 계층 + 수동 ReAct 에이전트
+
+- 작성일시: 2026-07-12 22:40
+- 상위: `plans/2026-07-12_1511_통합_계획서_v2.md` Phase 3
+- 흡수: react/agent_loop/function_calling/tool_system + PDF6(ReAct)
+- AI 파트: 로컬 Gemma. 단 **ReAct 로직은 mock LLM으로 결정론적 테스트**, 로컬 실호출은 수동 스모크(@pytest.mark.llm)
+
+## 1. 목표
+DB 기반 커머스 도구 + 수동 ReAct 루프(원리 학습). 안전장치(max_steps/중복차단/트리밍) 포함.
+
+## 2. 산출 파일
+```
+app/
+├── tools/
+│   ├── __init__.py
+│   └── commerce_tools.py    # 도구 함수 + OpenAI 스키마 + TOOL_MAP
+├── agent/
+│   ├── __init__.py
+│   ├── schemas.py           # AgentStep, AgentResponse
+│   └── react.py             # 수동 ReAct 루프 (chat 함수 주입 가능)
+└── routers/agent.py         # POST /api/agent/chat
+tests/
+├── test_tools.py            # 도구 함수 단위 (DB, 오류처리)
+├── test_react_agent.py      # mock LLM으로 루프 로직 (결정론적)
+└── test_react_live.py       # @pytest.mark.llm 로컬 Gemma 스모크
+```
+
+## 3. 도구 (PDF6 좋은 도구 5원칙 + 구조화 실패관찰)
+- `get_price(db, product_code)` → {ok, product_name, price}
+- `get_stock(db, product_code)` → {ok, product_name, stock, reorder_level, need_reorder}
+- `get_order_status(db, order_no)` → {ok, order_no, status, total_amount}
+- `search_product(db, keyword)` → {ok, results:[{code,name,price}]}  (키워드 부분검색)
+- `get_exchange_rate(db, currency)` → {ok, currency, rate}  (고정 환율표 상수, 외부호출 없음)
+- 각 도구: 한 가지 일, 명확한 인자, 구체적 독스트링(모델 프롬프트), 일관된 dict 반환
+- **오류처리**: 내부 예외를 `{"ok": false, "error_code", "message"}` 구조화 관찰로 변환 (정상결과 위장 금지, §6)
+- `TOOLS_SCHEMA`(OpenAI function 스키마 리스트), `TOOL_MAP`(name→callable)
+
+## 4. 수동 ReAct 루프 (react.py)
+- `run_react_agent(question, db, chat_fn=None, max_steps=3, system_prompt=None)`
+  - `chat_fn`: (messages, tools) → assistant message dict. 기본은 실제 OpenAI 클라이언트, 테스트는 mock 주입
+  - messages = [system, user], 루프 max_steps:
+    1. `msg = chat_fn(messages, TOOLS_SCHEMA)`
+    2. tool_calls 없으면 → 최종답변 반환(stopped_by=final_answer)
+    3. 각 tool_call: **중복 서명(name+정렬인자) 차단**(반복 시 stopped_by=duplicate) → `TOOL_MAP[name](db, **args)` 실행 → 결과를 tool 메시지
+로 append
+    4. **history trim**(head 2 + tail N)
+  - max_steps 소진 → stopped_by=max_steps
+  - 각 단계 AgentStep(thought/action/observation) 기록
+- **키 부재/프로바이더 오류는 ConfigError**(폴백 없음). 로컬 서버 미기동 시 실호출 경로는 APIConnectionError → 502 매핑 검토
+
+## 5. 라우터
+- `POST /api/agent/chat` {question, max_steps?} → {answer, steps[], stopped_by}
+- LLM 실호출이므로 기본 provider=local. 서버 미기동 시 명확한 오류.
+
+## 6. 테스트 전략
+- **test_tools**: 실 DB로 각 도구 정상/오류(없는 상품→ok:false) — 결정론적
+- **test_react_agent**: mock chat_fn이 스크립트대로 tool_call 후 최종답변 반환 → 루프가 도구 실행·관찰·종료하는지. max_steps 초과, 중복호출 차단, 없는 도구 처리 
+케이스 — **모델 없이 결정론적**
+- **test_react_live**(@pytest.mark.llm, CI 제외): 로컬 Gemma로 실제 1~2스텝, 답변 문자열 존재만 확인(내용 비결정적이라 느슨하게)
+
+## 7. DoD
+1. pytest(mock 포함) 전부 pass — 도구·루프 로직 결정론적 검증
+2. 중복호출 차단·max_steps·도구 오류 관찰 테스트 pass
+3. (수동) 로컬 Gemma 스모크: `/api/agent/chat`가 도구 결과 반영 답변 생성 — 로그 캡처
+4. reports/history/진행표 갱신
+
+## 8. Codex 논의 포인트
+- chat_fn 주입 방식으로 mock 테스트하는 설계 적정성
+- 구조화 실패관찰이 RULE 폴백금지와 정합(정상위장 아님)한지
+- 로컬 Gemma tool-calling 미지원 가능성 대비(수동 스모크 분리)가 타당한지
+- max_steps 기본 3이 적정한지(로컬 느림)
+- 도구 스키마/시스템프롬프트 최소분을 Phase3에 두는 것(Phase4 선행 의존) 처리
+
+
+codex
+계획 자체는 규칙과 큰 방향이 맞아 보이지만, 도구 수와 실호출 경로에서 몇 가지 결정 포인트가 있습니다. DB 모델과 기존 테스트 픽스처를 확인해서 “지금 바로 들어가도 되는지”를 더 구체적으로 판단하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\db\\database.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\db\\models.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\pyproject.toml -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\db\\seed.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\tests\\conftest.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\main.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1342ms:
+"""CSV → DB 시딩 (멱등).
+
+products.csv → Product, inventory.csv → Inventory(product_name으로 매칭).
+매칭 실패/중복은 조용히 skip하지 않고 집계해 명시적으로 알린다 (Codex 합의).
+"""
+
+from __future__ import annotations
+
+import csv
+from pathlib import Path
+
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.errors import InfraError
+from app.db.models import Inventory, Product
+
+
+def _read_csv(path: Path) -> list[dict[str, str]]:
+    if not path.exists():
+        raise InfraError(f"시딩 CSV가 없습니다: {path}")
+    with path.open(encoding="utf-8") as f:
+        return list(csv.DictReader(f))
+
+
+def seed_products(db: Session, data_dir: Path | None = None) -> dict:
+    """products/inventory CSV를 DB에 시딩한다. 멱등(product_code 기준)."""
+    settings = get_settings()
+    data_dir = data_dir or settings.DATA_DIR
+
+    products = _read_csv(data_dir / "products.csv")
+    inventory = _read_csv(data_dir / "inventory.csv")
+
+    created_products = 0
+    for row in products:
+        code = row["product_id"].strip()
+        exists = db.query(Product).filter(Product.product_code == code).first()
+        if exists:
+            continue
+        db.add(
+            Product(
+                product_code=code,
+                name=row["product_name"].strip(),
+                category=row["category"].strip(),
+                price=int(row["price"]),
+            )
+        )
+        created_products += 1
+    db.commit()
+
+    # 이름 → product 매핑
+    name_to_product = {p.name: p for p in db.query(Product).all()}
+
+    # 먼저 전량 검증: unmatched가 있으면 inventory를 하나도 커밋하지 않고 실패
+    # (Codex 지적: 부분 반영 방지 — 검증을 commit보다 앞에)
+    to_add: list[Inventory] = []
+    unmatched: list[str] = []
+    for row in inventory:
+        pname = row["product_name"].strip()
+        product = name_to_product.get(pname)
+        if product is None:
+            unmatched.append(pname)
+            continue
+        exists = db.query(Inventory).filter(Inventory.product_id == product.id).first()
+        if exists:
+            continue
+        to_add.append(
+            Inventory(
+                product_id=product.id,
+                stock=int(row["stock"]),
+                reorder_level=int(row["reorder_level"]),
+                warehouse=row["warehouse"].strip(),
+            )
+        )
+
+    if unmatched:
+        # 조용히 skip하지 않고 명시적 실패 (커밋 전이라 부분 반영 없음)
+        db.rollback()
+        raise InfraError(f"inventory.csv에 products와 매칭 안 되는 상품: {unmatched}")
+
+    for inv in to_add:
+        db.add(inv)
+    db.commit()
+    created_inv = len(to_add)
+
+    return {
+        "products_created": created_products,
+        "inventory_created": created_inv,
+        "products_total": db.query(Product).count(),
+    }
+
+
+ succeeded in 1339ms:
+"""테스트 공통 픽스처.
+
+임시 SQLite DB + 테스트용 SECRET_KEY를 앱 import 전에 환경변수로 설정해 실 DB를
+건드리지 않고 격리한다.
+"""
+
+from __future__ import annotations
+
+import os
+import tempfile
+import uuid
+
+# --- 앱 import 이전에 환경 설정 (엔진이 이 값으로 바인딩됨) ---
+_TMP_DB = os.path.join(tempfile.gettempdir(), f"mall_test_{uuid.uuid4().hex}.db")
+os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
+os.environ["SECRET_KEY"] = "test-secret-key-do-not-use-in-prod"
+os.environ["LLM_PROVIDER"] = "local"
+
+import pytest  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+
+from app.core.config import get_settings  # noqa: E402
+
+get_settings.cache_clear()
+
+from app.db.database import Base, SessionLocal, engine  # noqa: E402
+from app.db.seed import seed_products  # noqa: E402
+from app.main import app  # noqa: E402
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _prepare_db():
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        seed_products(db)
+    finally:
+        db.close()
+    yield
+    try:
+        os.remove(_TMP_DB)
+    except OSError:
+        pass
+
+
+@pytest.fixture
+def client() -> TestClient:
+    # lifespan을 다시 돌리지 않도록 이미 준비된 앱에 TestClient만 붙인다
+    return TestClient(app)
+
+
+@pytest.fixture
+def unique_user():
+    def _make():
+        return f"user_{uuid.uuid4().hex[:8]}", "pass1234"
+
+    return _make
+
+
+def auth_header(client: TestClient, username: str, password: str) -> dict:
+    client.post("/auth/signup", json={"username": username, "password": password})
+    resp = client.post("/auth/login", data={"username": username, "password": password})
+    token = resp.json()["access_token"]
+    return {"Authorization": f"Bearer {token}"}
+
+
+ succeeded in 1346ms:
+"""SQLAlchemy ORM 모델 (승승장구몰 커머스 코어).
+
+카탈로그 엔티티는 Product(실데이터 products.csv 기준). 주문 시점 단가/상품명은
+OrderItem에 스냅샷으로 저장한다.
+"""
+
+from __future__ import annotations
+
+from datetime import datetime
+
+from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy.orm import Mapped, mapped_column, relationship
+
+from app.db.database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
+    hashed_password: Mapped[str] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    orders: Mapped[list["Order"]] = relationship(back_populates="user")
+
+
+class Product(Base):
+    __tablename__ = "products"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_code: Mapped[str] = mapped_column(String(20), unique=True, index=True)  # 예: P0001
+    name: Mapped[str] = mapped_column(String(200), index=True)
+    category: Mapped[str] = mapped_column(String(100))
+    price: Mapped[int] = mapped_column(Integer)
+
+    inventory: Mapped["Inventory"] = relationship(back_populates="product", uselist=False)
+
+
+class Inventory(Base):
+    __tablename__ = "inventory"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"), unique=True)
+    stock: Mapped[int] = mapped_column(Integer, default=0)
+    reorder_level: Mapped[int] = mapped_column(Integer, default=0)
+    warehouse: Mapped[str] = mapped_column(String(100), default="")
+
+    product: Mapped["Product"] = relationship(back_populates="inventory")
+
+
+class Order(Base):
+    __tablename__ = "orders"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_no: Mapped[str] = mapped_column(String(32), unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"))
+    status: Mapped[str] = mapped_column(String(20), default="PENDING")  # PENDING / PAID
+    total_amount: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    user: Mapped["User"] = relationship(back_populates="orders")
+    items: Mapped[list["OrderItem"]] = relationship(
+        back_populates="order", cascade="all, delete-orphan"
+    )
+    payment: Mapped["Payment"] = relationship(
+        back_populates="order", uselist=False, cascade="all, delete-orphan"
+    )
+
+
+class OrderItem(Base):
+    __tablename__ = "order_items"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    product_id: Mapped[int] = mapped_column(ForeignKey("products.id"))
+    product_name: Mapped[str] = mapped_column(String(200))  # 주문시점 스냅샷
+    unit_price: Mapped[int] = mapped_column(Integer)  # 주문시점 스냅샷
+    quantity: Mapped[int] = mapped_column(Integer)
+
+    order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class Payment(Base):
+    __tablename__ = "payments"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"), unique=True)
+    amount: Mapped[int] = mapped_column(Integer)
+    method: Mapped[str] = mapped_column(String(30))
+    status: Mapped[str] = mapped_column(String(20), default="PAID")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+    order: Mapped["Order"] = relationship(back_populates="payment")
+
+
+ succeeded in 1373ms:
+[project]
+name = "unified-mall-agent"
+version = "0.1.0"
+description = "승승장구몰 AI 커머스 에이전트 플랫폼 (통합 프로젝트)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "llm: 실제 LLM 호출이 필요한 테스트 (기본 CI에서 제외)",
+]
+
+
+ succeeded in 1401ms:
+"""DB 엔진·세션·Base 정의."""
+
+from __future__ import annotations
+
+from collections.abc import Iterator
+
+from sqlalchemy import create_engine
+from sqlalchemy.orm import Session, declarative_base, sessionmaker
+
+from app.core.config import get_settings
+
+_settings = get_settings()
+
+# SQLite + FastAPI(멀티스레드) 조합을 위해 check_same_thread=False
+engine = create_engine(
+    _settings.DATABASE_URL,
+    connect_args={"check_same_thread": False} if _settings.DATABASE_URL.startswith("sqlite") else {},
+)
+
+SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+Base = declarative_base()
+
+
+def get_db() -> Iterator[Session]:
+    """요청 스코프 DB 세션 의존성."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
+
+ succeeded in 1209ms:
+"""FastAPI 진입점.
+
+Phase 1: 예외 핸들러 + health.
+Phase 2: DB 테이블 생성 + 시딩 + auth/products/orders/payments 라우터.
+정적 UI/에이전트 라우터는 이후 Phase에서 붙인다.
+"""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+
+from fastapi import FastAPI
+
+from app.core.errors import register_exception_handlers
+from app.db.database import Base, SessionLocal, engine
+from app.db.seed import seed_products
+from app.routers import auth, health, orders, payments, products
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # 테이블 생성 + 시딩 (멱등)
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        seed_products(db)
+    finally:
+        db.close()
+    yield
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="승승장구몰 AI 커머스 에이전트",
+        version="0.2.0",
+        lifespan=lifespan,
+    )
+    register_exception_handlers(app)
+    app.include_router(health.router)
+    app.include_router(auth.router)
+    app.include_router(products.router)
+    app.include_router(orders.router)
+    app.include_router(payments.router)
+    # 정적 UI 마운트 자리 (Phase 7)
+    return app
+
+
+app = create_app()
+
+
+codex
+DB에는 상품/재고/주문/결제 모델이 이미 있어서 계획된 커머스 도구 대부분은 새 테이블 없이 구현 가능합니다. 주문 상태 도구만 테스트 데이터를 어떻게 만들지 확인하면 되고, 환율은 계획대로 상수 도구로 두는 쪽
+이 RULE의 하드코딩 예외 범위에 들어갑니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\services\\payment_service.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\services\\order_service.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\routers\\products.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\routers\\orders.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\tests\\test_e2e_commerce.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\tests\\test_orders.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1431ms:
+"""주문 서비스: 생성(재고검증·스냅샷·합계·재고차감) / 조회.
+
+주문 생성 + 재고 차감 + 주문항목 저장은 한 트랜잭션(한 commit)으로 처리한다
+(Codex 합의: 원자성).
+"""
+
+from __future__ import annotations
+
+import uuid
+
+from sqlalchemy.orm import Session
+
+from app.core.errors import ForbiddenErr, NotFoundErr, ValidationErr
+from app.db.models import Inventory, Order, OrderItem, Product, User
+
+
+def _new_order_no() -> str:
+    return "O" + uuid.uuid4().hex[:11].upper()
+
+
+def create_order(db: Session, user: User, lines: list[dict]) -> Order:
+    """lines: [{"product_code": str, "quantity": int}, ...]"""
+    order = Order(order_no=_new_order_no(), user_id=user.id, status="PENDING", total_amount=0)
+    total = 0
+    try:
+        for line in lines:
+            code = line["product_code"]
+            qty = int(line["quantity"])
+            if qty <= 0:
+                raise ValidationErr("수량은 1 이상이어야 합니다.")
+
+            product = db.query(Product).filter(Product.product_code == code).first()
+            if product is None:
+                raise NotFoundErr(f"상품을 찾을 수 없습니다: {code}")
+
+            inv = db.query(Inventory).filter(Inventory.product_id == product.id).first()
+            available = inv.stock if inv else 0
+            if available < qty:
+                raise ValidationErr(
+                    f"재고 부족: {product.name} (요청 {qty}, 재고 {available})"
+                )
+
+            # 주문시점 단가/상품명 스냅샷
+            order.items.append(
+                OrderItem(
+                    product_id=product.id,
+                    product_name=product.name,
+                    unit_price=product.price,
+                    quantity=qty,
+                )
+            )
+            total += product.price * qty
+            inv.stock -= qty  # 재고 차감
+
+        order.total_amount = total
+        db.add(order)
+        db.commit()  # 주문+항목+재고차감 원자적 커밋
+        db.refresh(order)
+        return order
+    except Exception:
+        db.rollback()
+        raise
+
+
+def list_orders(db: Session, user: User) -> list[Order]:
+    return db.query(Order).filter(Order.user_id == user.id).order_by(Order.id.desc()).all()
+
+
+def get_order(db: Session, user: User, order_no: str) -> Order:
+    order = db.query(Order).filter(Order.order_no == order_no).first()
+    if order is None:
+        raise NotFoundErr("주문을 찾을 수 없습니다.")
+    if order.user_id != user.id:
+        raise ForbiddenErr("본인의 주문만 조회할 수 있습니다.")
+    return order
+
+
+ succeeded in 1525ms:
+"""결제 서비스: 주문 결제(검증) / 조회.
+
+결제 생성 + 주문 PAID 전환은 한 트랜잭션으로 처리한다. 금액은 서버가 주문
+합계에서 계산한다 (Codex 합의).
+"""
+
+from __future__ import annotations
+
+from sqlalchemy.orm import Session
+
+from app.core.errors import ForbiddenErr, NotFoundErr, ValidationErr
+from app.db.models import Order, Payment, User
+
+
+def pay_order(db: Session, user: User, order_no: str, method: str) -> Payment:
+    order = db.query(Order).filter(Order.order_no == order_no).first()
+    if order is None:
+        raise NotFoundErr("주문을 찾을 수 없습니다.")
+    if order.user_id != user.id:
+        raise ForbiddenErr("본인의 주문만 결제할 수 있습니다.")
+    if order.status == "PAID" or order.payment is not None:
+        raise ValidationErr("이미 결제된 주문입니다.")
+
+    try:
+        payment = Payment(
+            order_id=order.id,
+            amount=order.total_amount,  # 서버가 주문 합계에서 계산
+            method=method,
+            status="PAID",
+        )
+        order.status = "PAID"
+        db.add(payment)
+        db.commit()  # 결제+주문 PAID 원자적 커밋
+        db.refresh(payment)
+        return payment
+    except Exception:
+        db.rollback()
+        raise
+
+
+def get_payment(db: Session, user: User, order_no: str) -> Payment:
+    order = db.query(Order).filter(Order.order_no == order_no).first()
+    if order is None:
+        raise NotFoundErr("주문을 찾을 수 없습니다.")
+    if order.user_id != user.id:
+        raise ForbiddenErr("본인의 결제만 조회할 수 있습니다.")
+    if order.payment is None:
+        raise NotFoundErr("결제 내역이 없습니다.")
+    return order.payment
+
+
+ succeeded in 1552ms:
+"""상품 조회 라우터."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.core.errors import NotFoundErr
+from app.db.database import get_db
+from app.db.models import Product
+from app.schemas.commerce import ProductResponse
+
+router = APIRouter(prefix="/api/products", tags=["products"])
+
+
+def _to_response(p: Product) -> ProductResponse:
+    return ProductResponse(
+        product_code=p.product_code,
+        name=p.name,
+        category=p.category,
+        price=p.price,
+        stock=p.inventory.stock if p.inventory else None,
+    )
+
+
+@router.get("", response_model=list[ProductResponse])
+def list_products(db: Session = Depends(get_db)) -> list[ProductResponse]:
+    return [_to_response(p) for p in db.query(Product).all()]
+
+
+@router.get("/{product_code}", response_model=ProductResponse)
+def get_product(product_code: str, db: Session = Depends(get_db)) -> ProductResponse:
+    p = db.query(Product).filter(Product.product_code == product_code).first()
+    if p is None:
+        raise NotFoundErr(f"상품을 찾을 수 없습니다: {product_code}")
+    return _to_response(p)
+
+
+ succeeded in 1548ms:
+"""주문 테스트: 생성·재고·본인조회·403·seed."""
+
+from tests.conftest import auth_header
+
+
+def test_products_seeded(client):
+    r = client.get("/api/products")
+    assert r.status_code == 200
+    products = r.json()
+    assert len(products) == 5
+    codes = {p["product_code"] for p in products}
+    assert "P0001" in codes
+
+
+def test_seed_idempotent():
+    """seed를 반복 실행해도 Product 수가 늘지 않는다 (멱등)."""
+    from app.db.database import SessionLocal
+    from app.db.models import Product
+    from app.db.seed import seed_products
+
+    db = SessionLocal()
+    try:
+        before = db.query(Product).count()
+        seed_products(db)
+        seed_products(db)
+        after = db.query(Product).count()
+        assert before == after == 5
+    finally:
+        db.close()
+
+
+def test_create_order_snapshot_and_total(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    r = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 2}]},
+        headers=headers,
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["status"] == "PENDING"
+    assert len(body["items"]) == 1
+    item = body["items"][0]
+    assert item["quantity"] == 2
+    assert body["total_amount"] == item["unit_price"] * 2
+
+
+def test_stock_decremented(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    before = client.get("/api/products/P0001").json()["stock"]
+    client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 1}]},
+        headers=headers,
+    )
+    after = client.get("/api/products/P0001").json()["stock"]
+    assert after == before - 1
+
+
+def test_insufficient_stock_422(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    r = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0002", "quantity": 99999}]},
+        headers=headers,
+    )
+    assert r.status_code == 422
+
+
+def test_unknown_product_404(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    r = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "NOPE", "quantity": 1}]},
+        headers=headers,
+    )
+    assert r.status_code == 404
+
+
+def test_other_users_order_forbidden_403(client, unique_user):
+    # user A 주문 생성
+    ua, pa = unique_user()
+    ha = auth_header(client, ua, pa)
+    order_no = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 1}]},
+        headers=ha,
+    ).json()["order_no"]
+
+    # user B가 A의 주문 조회 시도 → 403
+    ub, pb = unique_user()
+    hb = auth_header(client, ub, pb)
+    r = client.get(f"/api/orders/{order_no}", headers=hb)
+    assert r.status_code == 403
+
+
+ succeeded in 1585ms:
+"""주문 라우터 (인증 필요)."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends
+from sqlalchemy.orm import Session
+
+from app.auth.security import get_current_user
+from app.db.database import get_db
+from app.db.models import Order, User
+from app.schemas.commerce import (
+    OrderCreateRequest,
+    OrderItemResponse,
+    OrderResponse,
+)
+from app.services import order_service
+
+router = APIRouter(prefix="/api/orders", tags=["orders"])
+
+
+def _to_response(order: Order) -> OrderResponse:
+    return OrderResponse(
+        order_no=order.order_no,
+        status=order.status,
+        total_amount=order.total_amount,
+        items=[
+            OrderItemResponse(
+                product_name=i.product_name, unit_price=i.unit_price, quantity=i.quantity
+            )
+            for i in order.items
+        ],
+    )
+
+
+@router.post("", response_model=OrderResponse)
+def create_order(
+    body: OrderCreateRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> OrderResponse:
+    lines = [{"product_code": it.product_code, "quantity": it.quantity} for it in body.items]
+    order = order_service.create_order(db, user, lines)
+    return _to_response(order)
+
+
+@router.get("", response_model=list[OrderResponse])
+def list_orders(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[OrderResponse]:
+    return [_to_response(o) for o in order_service.list_orders(db, user)]
+
+
+@router.get("/{order_no}", response_model=OrderResponse)
+def get_order(
+    order_no: str,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> OrderResponse:
+    return _to_response(order_service.get_order(db, user, order_no))
+
+
+ succeeded in 1691ms:
+"""E2E: 가입 → 로그인 → 주문 → 결제 (DoD 핵심 시나리오)."""
+
+from tests.conftest import auth_header
+
+
+def test_signup_login_order_pay_flow(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+
+    # 주문 생성
+    order = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 2}]},
+        headers=headers,
+    ).json()
+    order_no = order["order_no"]
+    assert order["status"] == "PENDING"
+    total = order["total_amount"]
+
+    # 결제 (금액은 서버가 주문 합계에서 계산)
+    pay = client.post(
+        "/api/payments",
+        json={"order_no": order_no, "method": "card"},
+        headers=headers,
+    )
+    assert pay.status_code == 200
+    assert pay.json()["amount"] == total
+    assert pay.json()["status"] == "PAID"
+
+    # 주문이 PAID로 전환됐는지
+    fetched = client.get(f"/api/orders/{order_no}", headers=headers).json()
+    assert fetched["status"] == "PAID"
+
+    # 결제 조회
+    got = client.get(f"/api/payments/{order_no}", headers=headers)
+    assert got.status_code == 200
+    assert got.json()["amount"] == total
+
+
+def test_double_payment_rejected(client, unique_user):
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    order_no = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 1}]},
+        headers=headers,
+    ).json()["order_no"]
+    client.post("/api/payments", json={"order_no": order_no, "method": "card"}, headers=headers)
+    # 중복 결제 → 422
+    r = client.post(
+        "/api/payments", json={"order_no": order_no, "method": "card"}, headers=headers
+    )
+    assert r.status_code == 422
+
+
+def test_pay_others_order_forbidden(client, unique_user):
+    ua, pa = unique_user()
+    ha = auth_header(client, ua, pa)
+    order_no = client.post(
+        "/api/orders",
+        json={"items": [{"product_code": "P0001", "quantity": 1}]},
+        headers=ha,
+    ).json()["order_no"]
+
+    ub, pb = unique_user()
+    hb = auth_header(client, ub, pb)
+    r = client.post(
+        "/api/payments", json={"order_no": order_no, "method": "card"}, headers=hb
+    )
+    assert r.status_code == 403
+
+
+codex
+기존 테스트는 임시 SQLite DB에 쓰는 구조라 이 세션의 읽기 전용 권한에서는 실행 검증까지 하기는 어렵습니다. 대신 실제 파일 기준으로 구현 지점과 위험 지점을 라인 단위로 확인해 최종 판단을 정리하겠습니다
+.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"def get_chat_client|if provider == \
+\\"local\\\"|if provider == \\\"openai\\\"|if provider == \\\"gemini\\\"|def get_active_model\" .\\_unified_mall_agent_
+project\\app\\core\\llm_clients.py" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"폴백|리포트|계획서|검증|하드코딩\" .\\_unified_mal
+l_agent_project\\RULE.md" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"class Product|class Inventory|class 
+Order|class OrderItem|class Payment\" .\\_unified_mall_agent_project\\app\\db\\models.py" in C:\Users\playdata2\Documen
+ts\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"Gemma|tool-calling|n_ctx|max_steps|O
+penAI|검증|성공\" .\\_unified_mall_agent_project\\debug_notes\\2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md" in C:\Users\playdata2
+\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"도구|run_react_agent|chat_fn|중복|histor
+y trim|max_steps|test_react|DoD|Gemma|tool-calling\" .\\_unified_mall_agent_project\\plans\\2026-07-12_2240_Phase3_도구_수
+동ReAct_상세계획.md" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"class ConfigError|class LLMOutputErr
+or|register_exception_handlers|content=\\{\" .\\_unified_mall_agent_project\\app\\core\\errors.py" in C:\Users\playdata
+2\Documents\llm_workspace
+ succeeded in 1286ms:
+1:# 디버그 노트 — 로컬 Gemma 서버 구동 트러블슈팅
+4:- 목적: Phase 3 착수 전, 빌드용 로컬 Gemma(외부 토큰 0)를 실제 구동
+5:- 결과: **성공** — 앱 OpenAI 클라이언트로 정상 한국어 응답 확인
+13:- **근본 해결**: `llama_cpp.server`를 버리고, `llama_cpp.Llama`를 직접 감싼 최소 OpenAI 호환 서버를 작성 → `scripts/local_model_server.py`
+. `create_chat_completion`이 이미 OpenAI 형식을 반환하므로 얇은 패스스루로 충분. 앱과 동일 base 환경(starlette 0.47)에서 충돌 없음.
+24:- 컴퓨트 버퍼는 배치 크기에, KV 캐시는 n_ctx에 비례
+25:- **n_batch=32, n_ubatch=32, n_ctx=1024, use_mmap=True** → 로드 14초 + 추론 성공
+26:- n_ctx=2048은 KV 캐시가 커서 다시 실패 → **n_ctx=1024로 확정**
+33:       (n_ctx=1024, n_batch=32, use_mmap, http://127.0.0.1:8000/v1)
+34:앱:    LLM_PROVIDER=local → OpenAI SDK(base_url=8000/v1) → Gemma
+35:검증:  "주문 상태를 묻는 고객에게 한 문장으로 응대" →
+40:- **로컬 Gemma는 CPU 추론이라 느림**(요청당 수~수십 초). ReAct 다단계 루프는 매우 느릴 수 있음 → max_steps 작게(2~3).
+41:- **Gemma는 OpenAI tool-calling 포맷을 네이티브 지원하지 않을 수 있음** → ReAct 로직 검증은 **결정론적 mock LLM 단위테스트**로 하고(토큰·RAM 무관, CI 포함),
+ 로컬 Gemma 실호출은 `@pytest.mark.llm`로 분리된 수동 스모크로 둔다.
+
+ succeeded in 1308ms:
+4:> 어떤 지시·계획·리포트도 이 문서와 충돌하면 이 문서가 우선한다.
+15:### 1.2 검증 우선 원칙
+16:- 코드 변경 후에는 **실행 또는 테스트로 동작을 검증**하고, 검증 결과(성공/실패 로그)를 리포트에 그대로 기록한다.
+21:- 레거시 프로젝트에서 가져온 코드는 **원본 프로젝트명과 파일 경로를 주석 또는 리포트에 명시**한다.
+22:- 문서 작성 시 참조한 파일/리포트를 문서 하단 "참조" 절에 나열한다.
+32: 1. plans/ 에서 현재 유효한 계획서를 읽는다
+35: 3. 계획서의 해당 단계만 수행한다 (계획에 없는 작업은 계획서 갱신 먼저)
+37: 5. 변경 후 실행/테스트로 검증한다
+39: 6. reports/ 에 작업 리포트를 제출한다 (필수, 생략 불가)
+44:- 한 세션에서 **계획서에 정의된 범위를 초과하는 작업을 하지 않는다.** 범위 변경이 필요하면 먼저 계획서를 수정하고 사유를 기록한다.
+45:- 작업 단위는 "검증 가능한 최소 단위"로 쪼갠다. 한 번에 여러 기능을 섞어 작업하지 않는다.
+51:### 3.1 하드코딩 금지
+56:### 3.2 폴백(fallback) 금지
+60:- 예외: 사용자에게 오류를 안내하는 HTTP 오류 응답(4xx/5xx)은 폴백이 아니라 정상 오류 처리다.
+63:- 계획서에 명시된 기능만 구현한다. "나중에 쓸 것 같은" 코드, 사용되지 않는 옵션, 죽은 코드를 만들지 않는다.
+64:- 레거시 프로젝트 이관 시 **학습 가치가 검증된 핵심 로직만** 가져오고, 중복 스캐폴딩은 버린다.
+67:### 3.4 리포트 제출 의무
+68:- **모든 작업 세션은 reports/ 에 리포트 파일 제출로 종료된다.** 리포트 없는 작업은 완료로 인정하지 않는다.
+69:- 리포트에는 최소한 다음을 포함한다:
+70:  1. 작업 목표 (어느 계획서의 어느 단계인지)
+72:  3. 검증 방법과 결과 (실행/테스트 로그 원문 요약)
+81:| `plans/` | 작업 계획서. 단계별 목표·범위·완료 기준 정의 | 새 작업 착수 전 / 범위 변경 시 / 단계 완료 체크 시 |
+84:| `reports/` | 작업 결과 리포트 (검증 로그 포함) | 매 작업 세션 종료 시 (필수) |
+88:  - 예: `2026-07-12_1430_전체_프로젝트_분석_리포트.md`
+96:- 검증: <성공/실패 + 방법>
+97:- 리포트: <reports/ 파일명>
+105:- ❌ 검증(실행/테스트) 없이 "완료" 선언
+106:- ❌ API 키·경로·모델명 하드코딩
+107:- ❌ 오류 삼키는 폴백 / 데모 모드 자동 대체
+108:- ❌ 계획서 밖의 임의 작업
+109:- ❌ 리포트 없이 작업 종료
+
+2026-07-12T12:20:28.201180Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.3 seconds
+Output:
+rg: provider: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: ==: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: \openai\|if: 지정된 경로를 찾을 수 없습니다. (os error 3)
+rg: provider: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: ==: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: \gemini\|def: 지정된 경로를 찾을 수 없습니다. (os error 3)
+rg: get_active_model .\_unified_mall_agent_project\app\core\llm_clients.py: 지정된 경로를 찾을 수 없습니다. (os error 3)
+
+ succeeded in 1320ms:
+28:class Product(Base):
+40:class Inventory(Base):
+52:class Order(Base):
+71:class OrderItem(Base):
+84:class Payment(Base):
+
+ exited 1 in 1327ms:
+rg: provider: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: ==: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: \openai\|if: 지정된 경로를 찾을 수 없습니다. (os error 3)
+rg: provider: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: ==: 지정된 파일을 찾을 수 없습니다. (os error 2)
+rg: \gemini\|def: 지정된 경로를 찾을 수 없습니다. (os error 3)
+rg: get_active_model .\_unified_mall_agent_project\app\core\llm_clients.py: 지정된 경로를 찾을 수 없습니다. (os error 3)
+
+ succeeded in 1306ms:
+1:# Phase 3 상세 계획 — 도구 계층 + 수동 ReAct 에이전트
+6:- AI 파트: 로컬 Gemma. 단 **ReAct 로직은 mock LLM으로 결정론적 테스트**, 로컬 실호출은 수동 스모크(@pytest.mark.llm)
+9:DB 기반 커머스 도구 + 수동 ReAct 루프(원리 학습). 안전장치(max_steps/중복차단/트리밍) 포함.
+16:│   └── commerce_tools.py    # 도구 함수 + OpenAI 스키마 + TOOL_MAP
+23:├── test_tools.py            # 도구 함수 단위 (DB, 오류처리)
+24:├── test_react_agent.py      # mock LLM으로 루프 로직 (결정론적)
+25:└── test_react_live.py       # @pytest.mark.llm 로컬 Gemma 스모크
+28:## 3. 도구 (PDF6 좋은 도구 5원칙 + 구조화 실패관찰)
+34:- 각 도구: 한 가지 일, 명확한 인자, 구체적 독스트링(모델 프롬프트), 일관된 dict 반환
+39:- `run_react_agent(question, db, chat_fn=None, max_steps=3, system_prompt=None)`
+40:  - `chat_fn`: (messages, tools) → assistant message dict. 기본은 실제 OpenAI 클라이언트, 테스트는 mock 주입
+41:  - messages = [system, user], 루프 max_steps:
+42:    1. `msg = chat_fn(messages, TOOLS_SCHEMA)`
+44:    3. 각 tool_call: **중복 서명(name+정렬인자) 차단**(반복 시 stopped_by=duplicate) → `TOOL_MAP[name](db, **args)` 실행 → 결과를 tool 
+메시지로 append
+45:    4. **history trim**(head 2 + tail N)
+46:  - max_steps 소진 → stopped_by=max_steps
+51:- `POST /api/agent/chat` {question, max_steps?} → {answer, steps[], stopped_by}
+55:- **test_tools**: 실 DB로 각 도구 정상/오류(없는 상품→ok:false) — 결정론적
+56:- **test_react_agent**: mock chat_fn이 스크립트대로 tool_call 후 최종답변 반환 → 루프가 도구 실행·관찰·종료하는지. max_steps 초과, 중복호출 차단, 없는 도구 
+처리 케이스 — **모델 없이 결정론적**
+57:- **test_react_live**(@pytest.mark.llm, CI 제외): 로컬 Gemma로 실제 1~2스텝, 답변 문자열 존재만 확인(내용 비결정적이라 느슨하게)
+59:## 7. DoD
+60:1. pytest(mock 포함) 전부 pass — 도구·루프 로직 결정론적 검증
+61:2. 중복호출 차단·max_steps·도구 오류 관찰 테스트 pass
+62:3. (수동) 로컬 Gemma 스모크: `/api/agent/chat`가 도구 결과 반영 답변 생성 — 로그 캡처
+66:- chat_fn 주입 방식으로 mock 테스트하는 설계 적정성
+68:- 로컬 Gemma tool-calling 미지원 가능성 대비(수동 스모크 분리)가 타당한지
+69:- max_steps 기본 3이 적정한지(로컬 느림)
+70:- 도구 스키마/시스템프롬프트 최소분을 Phase3에 두는 것(Phase4 선행 의존) 처리
+
+ succeeded in 1331ms:
+25:class ConfigError(AppError):
+39:class LLMOutputError(AppError):
+74:def register_exception_handlers(app: FastAPI) -> None:
+81:            content={"ok": False, "error_code": exc.error_code, "message": exc.message},
+
+codex
+한 가지 라인 검색 명령은 PowerShell 인용 문제로 실패했지만, 파일 내용은 이미 확인했습니다. 추가로 LLM 설정과 로컬 서버 구현을 확인해 실호출 경로의 요구사항을 분리하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'get_chat_client|provider ==|get_activ
+e_model|ConfigError|OpenAI' .\\_unified_mall_agent_project\\app\\core\\llm_clients.py" in C:\Users\playdata2\Documents\
+llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\requirements.txt -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'llm|addopts|markers' .\\_unified_mall
+_agent_project\\pyproject.toml .\\_unified_mall_agent_project\\tests\\conftest.py" in C:\Users\playdata2\Documents\llm_
+workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\scripts\\local_model_server.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n 'DATABASE_URL|SECRET_KEY|LLM_PROVIDER|
+get_settings|LOCAL_BASE_URL|LOCAL_MODEL|OPENAI_MODEL|GEMINI_MODEL' .\\_unified_mall_agent_project\\app\\core\\config.py
+" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\app\\core\\config.py -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1667ms:
+"""로컬 Gemma OpenAI 호환 서버 (개발용).
+
+llama_cpp.server는 starlette_context(starlette 1.x)를 요구해 앱의 fastapi(starlette
+0.47)와 충돌한다. 이를 피하기 위해 llama_cpp.Llama를 직접 감싼 최소 OpenAI 호환
+엔드포인트를 제공한다. create_chat_completion이 이미 OpenAI 형식을 반환하므로
+얇은 패스스루로 충분하다.
+
+실행:
+    python scripts/local_model_server.py
+
+환경변수:
+    GEMMA_GGUF_PATH  : GGUF 모델 경로 (기본: HF 캐시 경로)
+    LOCAL_MODEL_PORT : 포트 (기본 8000)
+    N_CTX            : 컨텍스트 (기본 4096)
+"""
+
+from __future__ import annotations
+
+import os
+
+import uvicorn
+from fastapi import FastAPI, Request
+from llama_cpp import Llama
+
+DEFAULT_GGUF = (
+    r"C:\Users\playdata2\.cache\huggingface\hub"
+    r"\models--google--gemma-4-E4B-it-qat-q4_0-gguf\snapshots"
+    r"\bb3b92e6f031fa438b409f898dd9f14f499a0cb0\gemma-4-E4B_q4_0-it.gguf"
+)
+
+GGUF_PATH = os.environ.get("GEMMA_GGUF_PATH", DEFAULT_GGUF)
+PORT = int(os.environ.get("LOCAL_MODEL_PORT", "8000"))
+# 이 머신은 여유 RAM이 ~5GB로 빠듯하다. 컴퓨트 버퍼는 배치에 비례하므로 작게 잡는다
+# (debug_notes 2026-07-12_2028 / RAM 제약 노트 참조).
+N_CTX = int(os.environ.get("N_CTX", "1024"))
+N_BATCH = int(os.environ.get("N_BATCH", "32"))
+
+app = FastAPI(title="Local Gemma (OpenAI-compatible)")
+_llm: Llama | None = None
+
+
+def get_llm() -> Llama:
+    global _llm
+    if _llm is None:
+        _llm = Llama(
+            model_path=GGUF_PATH,
+            n_ctx=N_CTX,
+            n_batch=N_BATCH,
+            n_ubatch=N_BATCH,
+            use_mmap=True,
+            verbose=False,
+        )
+    return _llm
+
+
+@app.get("/v1/models")
+def list_models() -> dict:
+    return {"object": "list", "data": [{"id": "gemma-4-e4b", "object": "model"}]}
+
+
+@app.post("/v1/chat/completions")
+async def chat_completions(request: Request) -> dict:
+    body = await request.json()
+    llm = get_llm()
+    # tool calling 포함 OpenAI 파라미터를 그대로 전달
+    kwargs = {"messages": body["messages"]}
+    for key in ("temperature", "max_tokens", "top_p", "tools", "tool_choice", "stop"):
+        if key in body and body[key] is not None:
+            kwargs[key] = body[key]
+    return llm.create_chat_completion(**kwargs)
+
+
+if __name__ == "__main__":
+    print(f"[local_model_server] loading {GGUF_PATH}")
+    get_llm()
+    print(f"[local_model_server] ready on http://127.0.0.1:{PORT}/v1")
+    uvicorn.run(app, host="127.0.0.1", port=PORT, log_level="warning")
+
+
+ succeeded in 1686ms:
+3:RULE.md 3.2에 따라 키/설정이 없으면 조용한 대체 없이 ConfigError를 발생시킨다.
+4:로컬(Gemma)·OpenAI는 OpenAI 호환 클라이언트로 통일한다. Gemini는 LangChain을
+5:경유하므로 Phase 3.5 전까지 명시적 ConfigError로 미구현을 알린다.
+10:from openai import OpenAI
+13:from app.core.errors import ConfigError
+16:def get_chat_client(settings: Settings | None = None) -> OpenAI:
+17:    """현재 LLM_PROVIDER에 맞는 OpenAI 호환 채팅 클라이언트를 반환한다.
+19:    - local: llama-cpp-python OpenAI 호환 서버로 접속 (외부 토큰 0)
+20:    - openai: 키 없으면 ConfigError (데모/폴백 없음)
+21:    - gemini: Phase 3.5(LangChain)에서 지원 → 현재는 ConfigError
+26:    if provider == "local":
+28:            raise ConfigError("LOCAL_BASE_URL이 비어 있습니다. 로컬 Gemma 서버 주소를 설정하세요.")
+30:            raise ConfigError("LOCAL_MODEL이 비어 있습니다.")
+31:        return OpenAI(base_url=settings.LOCAL_BASE_URL, api_key=settings.LOCAL_API_KEY)
+33:    if provider == "openai":
+35:            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다. .env에 키를 넣으세요.")
+36:        return OpenAI(api_key=settings.OPENAI_API_KEY)
+38:    if provider == "gemini":
+39:        raise ConfigError("gemini 프로바이더는 Phase 3.5(LangChain)에서 지원 예정입니다.")
+41:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+44:def get_active_model(settings: Settings | None = None) -> str:
+48:    if provider == "local":
+50:    if provider == "openai":
+52:    if provider == "gemini":
+54:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+
+ succeeded in 1748ms:
+.\_unified_mall_agent_project\pyproject.toml:9:addopts = "-q"
+.\_unified_mall_agent_project\pyproject.toml:10:markers = [
+.\_unified_mall_agent_project\pyproject.toml:11:    "llm: 실제 LLM 호출이 필요한 테스트 (기본 CI에서 제외)",
+
+ succeeded in 1750ms:
+30:    LLM_PROVIDER: Literal["local", "openai", "gemini"] = "local"
+33:    LOCAL_BASE_URL: str = "http://127.0.0.1:8000/v1"
+34:    LOCAL_MODEL: str = "gemma-4-e4b"
+39:    OPENAI_MODEL: str = "gpt-4o-mini"
+44:    GEMINI_MODEL: str = "gemini-2.5-flash"
+51:    DATABASE_URL: str = f"sqlite:///{(ROOT_DIR / 'data' / 'mall.db').as_posix()}"
+54:    # SECRET_KEY는 하드코딩 금지: 미설정이면 auth 사용 시 ConfigError (RULE 3.1/3.2)
+55:    SECRET_KEY: str | None = None
+60:        if not (self.SECRET_KEY and self.SECRET_KEY.strip()):
+63:            raise ConfigError("SECRET_KEY가 설정되지 않았습니다. .env에 SECRET_KEY를 넣으세요.")
+64:        return self.SECRET_KEY
+75:            "local": self.LLM_PROVIDER == "local" and bool(self.LOCAL_BASE_URL),
+78:            "db": bool(self.DATABASE_URL),
+84:def get_settings() -> Settings:
+85:    """설정 싱글턴. 테스트에서 환경 변경 시 get_settings.cache_clear() 사용."""
+
+ succeeded in 1790ms:
+# Phase 1 최소 의존성 (로컬 검증된 버전으로 고정 — RULE 재현성)
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.13.4
+pydantic-settings==2.10.1
+openai==2.44.0
+python-dotenv==1.1.1
+pytest==7.4.4
+httpx==0.28.1
+# Phase 2 (DB·인증)
+sqlalchemy==2.0.41
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.5.0
+python-multipart==0.0.20
+
+
+ succeeded in 1836ms:
+"""애플리케이션 설정 (단일 소스).
+
+RULE.md 3.1(하드코딩 금지)에 따라 모델명·경로·키·DB 접속정보를 모두 여기로 모은다.
+값은 .env 또는 환경변수에서 로드한다. 기본 프로바이더는 로컬 Gemma(llama-cpp-python
+OpenAI 호환 서버)로, 빌드 중 외부 토큰을 소모하지 않는다.
+"""
+
+from __future__ import annotations
+
+from functools import lru_cache
+from pathlib import Path
+from typing import Literal
+
+from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# 프로젝트 루트: 이 파일은 app/core/config.py 이므로 parents[2] = 프로젝트 루트
+ROOT_DIR = Path(__file__).resolve().parents[2]
+
+
+class Settings(BaseSettings):
+    """전 계층이 공유하는 설정값."""
+
+    model_config = SettingsConfigDict(
+        env_file=str(ROOT_DIR / ".env"),
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
+
+    # --- LLM 프로바이더 선택 ---
+    LLM_PROVIDER: Literal["local", "openai", "gemini"] = "local"
+
+    # --- 로컬(Gemma GGUF, OpenAI 호환 서버) ---
+    LOCAL_BASE_URL: str = "http://127.0.0.1:8000/v1"
+    LOCAL_MODEL: str = "gemma-4-e4b"
+    LOCAL_API_KEY: str = "not-needed"
+
+    # --- OpenAI ---
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_EMBEDDING_MODEL: str = "text-embedding-3-small"
+
+    # --- Gemini ---
+    GOOGLE_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
+
+    # --- 경로 / DB ---
+    DATA_DIR: Path = ROOT_DIR / "data"
+    DOCS_DIR: Path = ROOT_DIR / "data" / "docs"
+    VECTOR_DIR: Path = ROOT_DIR / "data" / "vector_store"
+    # CWD 의존을 피하기 위해 절대 경로 기반 (Codex 합의)
+    DATABASE_URL: str = f"sqlite:///{(ROOT_DIR / 'data' / 'mall.db').as_posix()}"
+
+    # --- 인증 (JWT) ---
+    # SECRET_KEY는 하드코딩 금지: 미설정이면 auth 사용 시 ConfigError (RULE 3.1/3.2)
+    SECRET_KEY: str | None = None
+    JWT_ALGORITHM: str = "HS256"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
+
+    def require_secret_key(self) -> str:
+        if not (self.SECRET_KEY and self.SECRET_KEY.strip()):
+            from app.core.errors import ConfigError
+
+            raise ConfigError("SECRET_KEY가 설정되지 않았습니다. .env에 SECRET_KEY를 넣으세요.")
+        return self.SECRET_KEY
+
+    def has_openai_key(self) -> bool:
+        return bool(self.OPENAI_API_KEY and self.OPENAI_API_KEY.strip())
+
+    def has_google_key(self) -> bool:
+        return bool(self.GOOGLE_API_KEY and self.GOOGLE_API_KEY.strip())
+
+    def readiness(self) -> dict[str, bool]:
+        """LLM 실호출 없이 '설정/키/경로 존재 여부'만 보고한다 (Codex 합의)."""
+        return {
+            "local": self.LLM_PROVIDER == "local" and bool(self.LOCAL_BASE_URL),
+            "openai": self.has_openai_key(),
+            "gemini": self.has_google_key(),
+            "db": bool(self.DATABASE_URL),
+            "vector": self.VECTOR_DIR.exists(),
+        }
+
+
+@lru_cache
+def get_settings() -> Settings:
+    """설정 싱글턴. 테스트에서 환경 변경 시 get_settings.cache_clear() 사용."""
+    return Settings()
+
+
+codex
+RULE의 작업 시작 절차상 최신 history도 확인해야 합니다. 최종 판단 전에 직전 세션 상태를 읽어 계획서와 실제 진행 상태가 어긋나지 않는지 보겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project\\history -Force | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,LastWriteTime,Lengt
+h" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-ChildItem -LiteralPath .\\_unified_mall_
+agent_project\\reports -Force | Sort-Object LastWriteTime -Descending | Select-Object -First 5 Name,LastWriteTime,Lengt
+h" in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 823ms:
+
+Name                    LastWriteTime         Length
+----                    -------------         ------
+2026-07-12_1445_작업이력.md 2026-07-12 오후 9:17:46   8369
+
+
+
+ succeeded in 832ms:
+
+Name                             LastWriteTime         Length
+----                             -------------         ------
+_codex_phase3_plan_review.txt    2026-07-12 오후 9:19:03      0
+2026-07-12_2140_Phase2_완료_리포트.md 2026-07-12 오후 9:05:50   4179
+_codex_phase2_impl_review.txt    2026-07-12 오후 9:03:40 745278
+_codex_phase2_plan_review.txt    2026-07-12 오후 8:50:52 245477
+2026-07-12_2050_Phase1_완료_리포트.md 2026-07-12 오후 8:44:07   4088
+
+
+
+codex
+history는 단일 파일에 누적되는 형태이고, reports에는 방금 Phase 3 리뷰용 빈 파일이 보입니다. 최신 이력의 마지막 구간만 읽어서 이전 완료 상태와 Phase 3 착수 조건을 확인하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\history\\2026-07-12_1445_작업이력.md -Tail 120 -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspace
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -LiteralPath .\\_unified_mall_ag
+ent_project\\reports\\2026-07-12_2140_Phase2_완료_리포트.md -Raw -Encoding UTF8" in C:\Users\playdata2\Documents\llm_workspa
+ce
+ succeeded in 698ms:
+# 작업 이력 (history)
+
+> 시간순 추가만 허용. 기존 기록 수정 금지 (RULE.md 4.2 / 5).
+
+---
+
+## 2026-07-12 14:45 — 프로젝트 초기화 (Phase 0 완료)
+
+- 계획: `plans/2026-07-12_1440_초기_통합_계획서.md` 의 Phase 0
+- 수행:
+  1. 워크스페이스 28개 폴더 전수 분석 (4개 병렬 탐색 에이전트, 실제 소스 코드 기반)
+  2. 통합 주제 선정: `react_tools_agent_fastapi_project` 베이스, "승승장구몰 AI 커머스 에이전트 플랫폼"
+  3. `_unified_mall_agent_project/` 생성: `RULE.md` + `plans/` `history/` `legacy/` `reports/`
+  4. 분석 리포트 2건, 초기 계획서 1건 작성
+- 검증: 문서 작업 단계이므로 코드 검증 없음. 분석 내용은 각 프로젝트의 실제 소스 파일 열람에 근거 (리포트 내 출처 명시)
+- 리포트:
+  - `reports/2026-07-12_1430_전체_프로젝트_분석_리포트.md`
+  - `reports/2026-07-12_1435_통합_주제_선정_리포트.md`
+- 다음 작업: Phase 1 (뼈대 구축) — 착수 전 계획서 Phase 1 절 확인, API 키 유효성 점검부터
+
+---
+
+## 2026-07-12 15:40 — 교과목3 커버리지 점검 + 계획서 고도화 + 공략집 작성
+
+- 계획: Phase 0 심화 (사용자 요청 #1~#4)
+- 수행:
+  1. **교과목3 강의 PDF 6종 정독**(from_colab_llm 0703~0710) → 커버리지 점검. 누락 5종 발견(LangChain 자동화 계층, 도구 오류처리, 오분류 혼동쌍 루프, 인덱싱/서비스
+ 분리, FAISS 거리점수)
+  2. **Codex CLI 2회 반복 리뷰**(round1/round2). 지적 반영: 폴백 제거 체크리스트, 이중구현 YAGNI(Phase 3 수동↔3.5 LangChain 수렴), 구조화 실패관찰. Code
+x의 "5일 마감" 가정은 사용자 미지정이라 미채택 → §8.5 우선순위 티어로 대체
+  3. **계획서 v2 작성**(v1 대체): 에러 taxonomy(§6), 테스트 전략(§5), 폴백제거 체크리스트(§7), 우선순위 티어(§8.5), Phase 3.5 신설, 커버리지 누락 5종 흡수
+  4. **학습 공략집** 작성(`교과목3_LLM_학습_공략집.md`): 12스테이지 커리큘럼 정리
+  5. **전체 프로젝트 반영 완전성 점검**: 28개 전부 흡수/근거있는 미이관 확인, 누락 없음
+- 검증: 문서/분석 작업. PDF 정독·소스 대조 근거(리포트에 출처 명시). Codex 실행 EXIT=0 로그 보존. (코드 구현 전이라 실행검증 대상 없음)
+- 리포트:
+  - `reports/2026-07-12_1520_교과목3_커버리지_점검_리포트.md`
+  - `reports/2026-07-12_1535_전체_프로젝트_반영_완전성_점검_리포트.md`
+  - `reports/_codex_review_round1_raw.txt`, `_codex_review_round2_raw.txt`
+- 산출물: `plans/2026-07-12_1511_통합_계획서_v2.md`, `교과목3_LLM_학습_공략집.md`
+- 다음 작업: Phase 1 착수 (계획서 v2 기준)
+
+---
+
+## 2026-07-12 20:28 — [사용자 지시] Phase 1~7 논스톱 빌드 착수
+
+### 사용자가 내린 명령 (원문 요지)
+> "Phase 1~7을 논스톱으로 진행. 진행방식:
+> 1) 각 Phase마다 계획서 작성 & Codex CLI와 논의해서 완성
+> 2) 구현 시작
+> 3) 결과 리포트 → 리포트 파일을 Codex CLI에게 전달해 점검
+> 4) 완벽하게 될 때까지 다시 작업
+> 5) Codex와 내(에이전트)가 합의점에 도달하면 다음 스텝
+> 6) 1~5 반복. 모든 과정 문서화, 디버깅사항은 `debug_notes/`에 날짜시간 명시해 저장.
+> 프로젝트 완성 시 전체점검을 Codex와 진행, 완벽 완성되면 리포트 + 설명·공략집 제공.
+> **외부 키는 토큰 소모되니 빌드 동안은 로컬 Gemma(젬마4 e4b)로 AI 파트 대체.**
+> 전부 완료 후 키를 .env에 넣고 짧게만 테스트(Gemini 무료티어/GPT $20 한도 → 토큰 최소).
+> 내가 어떤 명령을 했고 네가 무슨 작업을 했는지 히스토리에 남겨 다른 에이전트가 이어받을 수 있게 할 것."
+
+### 이 지시에 따라 착수한 작업
+1. 환경 정찰: ollama/LM Studio 없음, **llama-cpp-python 0.3.33** 확인 → 로컬 Gemma GGUF를 OpenAI 호환 서버로 기동 가능
+2. 로컬 모델 확정: `google/gemma-4-E4B-it-qat-q4_0-gguf` (4.9GB), 경로/실행법 debug_note 기록
+3. `debug_notes/` 폴더 생성
+4. 진행 규약: 각 Phase = 계획→Codex논의→구현→리포트→Codex점검→합의→다음. AI 파트는 `LLM_PROVIDER=local`(Gemma)로 대체, 최종에만 실키 스모크테스트.
+- 디버그 노트: `debug_notes/2026-07-12_2028_환경정찰_로컬모델_셋업.md`
+- 다음: Phase 1 상세계획 작성 → Codex 논의 → 구현
+
+---
+
+## 2026-07-12 20:50 — Phase 1 (뼈대+인프라) 완료
+
+- 계획: `plans/2026-07-12_2030_Phase1_뼈대_인프라_상세계획.md`
+- 워크플로 이행:
+  1. Phase 1 상세계획 작성 → **Codex 논의**(`_codex_phase1_plan_review.txt`): go, 3개 문구조정(health LLM호출금지·test_health명시·DoD 좁힘) 
+→ 반영·합의
+  2. **구현**: app/core(config·llm_clients·errors)·routers/health·main·tests 4종·requirements·pyproject·.env.example·ci.ym
+l, data 단일본 이관(react 베이스)
+  3. **검증**: pytest 12 pass, uvicorn 기동 + /api/health 200(readiness 5종)
+  4. **Codex 구현점검**(`_codex_phase1_impl_review.txt`): 독립 재검증(12 pass/200) 후 조건부 not-done 3건 → 반영: local 빈설정 ConfigError
+ 가드, 통합 503 테스트, history/진행표 갱신
+  5. 재검증 pytest 15 pass → **Codex 조건 충족, 합의 done**
+- 검증: pytest 15/15 pass, health 200 (로그는 리포트에)
+- RULE 준수: 하드코딩·폴백·데모모드 없음. AI 파트 미사용(Phase1은 LLM 실호출 없음)
+- 리포트: `reports/2026-07-12_2050_Phase1_완료_리포트.md`
+- 다음: Phase 2 (DB·인증·커머스 코어), SQLite 확정. 착수 전 Phase 2 상세계획 → Codex 논의
+
+---
+
+## 2026-07-12 21:40 — Phase 2 (DB·인증·커머스 코어) 완료
+
+- 계획: `plans/2026-07-12_2110_Phase2_DB_인증_상세계획.md`
+- 워크플로 이행:
+  1. Phase 2 상세계획 → **Codex 논의**(`_codex_phase2_plan_review.txt`): 조건부 GO, 9건(SECRET_KEY config화·트랜잭션 원자성·네이밍·결제 서버계산·s
+eed 명시오류·DB절대경로·auth예외·추가테스트·Menu→Product) → 반영·합의
+  2. **구현**: db(database/models/seed) + auth/security(JWT·bcrypt) + schemas + services(user/order/payment) + routers(au
+th/products/orders/payments) + main lifespan(테이블·시딩). 카탈로그는 실데이터 기준 Product로 정정
+  3. **검증**: pytest 29 pass + 라이브 E2E(uvicorn 실SQLite: 상품5·주문 총액158000·결제 PAID)
+  4. **Codex 구현점검**(`_codex_phase2_impl_review.txt`): 인메모리 E2E 독립검증(통과), 버그 2건(signup 유저잔존·seed 부분반영)+문서 → 반영: signup p
+reflight, seed 검증순서, .env.example SECRET_KEY, 회귀테스트
+  5. 재검증 pytest 32 pass → **Codex 합의 done**
+- 검증: pytest 32/32, 라이브 E2E OK (로그는 리포트)
+- RULE 준수: 하드코딩·폴백 없음, 트랜잭션 원자성, 명시적 오류(401/403/404/422)
+- 리포트: `reports/2026-07-12_2140_Phase2_완료_리포트.md`
+- 다음: Phase 3 (도구+수동 ReAct). 로컬 Gemma 서버 기동 필요. 착수 전 Phase 3 상세계획 → Codex 논의
+
+---
+
+## 2026-07-12 22:30 — 로컬 Gemma 서버 구동 (Phase 3 인프라 de-risk)
+
+- 목적: 빌드용 AI 파트를 외부 토큰 없이 로컬 Gemma로 대체 (사용자 지시)
+- 문제·해결:
+  1. `llama_cpp.server`가 starlette_context(starlette 1.x) 요구 → fastapi(starlette 0.47)와 충돌 → **자체 OpenAI호환 서버 작성**(`scr
+ipts/local_model_server.py`, llama_cpp.Llama 직접 래핑)
+  2. 모델 로드 실패 → 실제 원인은 **RAM 부족**(16GB 중 여유5GB, 모델5.1GB) → **n_ctx=1024, n_batch=32, mmap**로 튜닝해 로드 성공
+  3. 포트 8000 점유 잔여 프로세스 정리
+- 검증: 앱 `LLM_PROVIDER=local` → OpenAI SDK → Gemma 정상 한국어 응답 확인. 앱 pytest 32개 회귀 없음(의존성 변경 후 재확인)
+- 디버그 노트: `debug_notes/2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md`
+- Phase 3 방침: ReAct 로직은 **결정론적 mock LLM 단위테스트**로 검증(CI 포함), 로컬 Gemma 실호출은 `@pytest.mark.llm` 수동 스모크로 분리(느림·tool-calling
+ 제약 대비)
+- 다음: Phase 3 상세계획 → Codex 논의 → 구현
+
+ succeeded in 718ms:
+# Phase 2 완료 리포트 — DB · 인증 · 커머스 코어
+
+- 작성일시: 2026-07-12 21:40
+- 계획: `plans/2026-07-12_2110_Phase2_DB_인증_상세계획.md` (Codex 조건부 GO → 9건 반영 합의)
+- AI 파트: 없음 (Phase 2는 LLM 실호출 없음 → 완전 테스트)
+
+## 1. 수행 내용 (생성/수정 파일)
+
+| 파일 | 역할 |
+|---|---|
+| `app/db/database.py` | engine/SessionLocal/Base/get_db (SQLite, 절대경로) |
+| `app/db/models.py` | User, Product, Inventory, Order, OrderItem, Payment (2.0 Mapped, 스냅샷·cascade) |
+| `app/db/seed.py` | products/inventory CSV → DB, 멱등, 매칭실패 시 명시적 InfraError |
+| `app/auth/security.py` | bcrypt 해싱, JWT 발급/검증, get_current_user, SECRET_KEY는 config(ConfigError 가드) |
+| `app/schemas/commerce.py` | 요청/응답 스키마 (PaymentCreate는 order_no+method만) |
+| `app/services/{user,order,payment}_service.py` | 비즈니스 로직 (재고검증·스냅샷·재고차감·원자적 commit·권한검증) |
+| `app/routers/{auth,products,orders,payments}.py` | API 엔드포인트 |
+| `app/main.py` | lifespan(테이블생성+시딩) + 라우터 등록 |
+| `app/core/config.py` | SECRET_KEY/JWT_ALGORITHM/만료·DATABASE_URL 절대경로 추가 |
+| `app/core/errors.py` | AuthErr(401)/ForbiddenErr(403)/NotFoundErr(404) 추가 |
+| `tests/conftest.py` + test_auth/test_orders/test_e2e_commerce | 격리 픽스처 + 테스트 14개 |
+
+## 2. RULE 준수
+- 하드코딩 없음: SECRET_KEY·DB·모델명 전부 config. 레거시 `getenv(default="change-this")` 미도입.
+- 폴백 없음: 인증 실패 401, 권한 위반 403, 재고부족 422, 없는 리소스 404 — 전부 명시적 오류. seed 매칭실패도 조용히 skip 안 하고 InfraError.
+- 트랜잭션 원자성: 주문+재고차감+항목 1 commit, 결제+주문PAID 1 commit (예외 시 rollback).
+
+## 3. 검증 결과
+
+### pytest (29개 = Phase1 15 + Phase2 14)
+```
+$ python -m pytest -q
+.............................                                            [100%]
+PYTEST_EXIT=0
+```
+
+### 라이브 E2E (uvicorn, 실 SQLite 시딩)
+```
+products: 200 count= 5
+auth: token acquired
+order: 200 O21CA661170A total= 158000 status= PENDING   (79000 x 2)
+payment: 200 amount= 158000 status= PAID
+order after pay: PAID
+LIVE_E2E_OK
+```
+
+### DoD 대조
+| DoD | 결과 |
+|---|---|
+| pytest 전부 pass | ✅ 29 passed |
+| E2E 가입→로그인→주문→결제 | ✅ 라이브 + test_e2e_commerce |
+| 타인 주문/결제 403 | ✅ test_orders/test_e2e |
+| 재고부족 422 | ✅ test_insufficient_stock_422 |
+| seed 후 Product 5건 | ✅ count=5 |
+| 중복결제/무효토큰/seed멱등 (Codex 추가) | ✅ test_double_payment/test_invalid_token/멱등 seed |
+| reports/history/진행표 | ✅ 본 리포트 + 예정 |
+
+## 4. Codex 조건부 GO 9건 반영 확인
+1. SECRET_KEY config화+ConfigError ✅ 2. 트랜잭션 원자성 ✅ 3. product_code/product_id 네이밍 분리 ✅ 4. 결제금액 서버계산 ✅ 5. seed 명시적 오류 ✅ 6
+. DATABASE_URL 절대경로 ✅ 7. auth 예외 구조화 ✅ 8. 추가 테스트 ✅ 9. v2 Menu→Product ✅
+
+## 4.5 Codex 구현 점검 반영 (조건부 GO → done)
+
+Codex가 인메모리 E2E 독립 재검증(전부 통과) 후 **기능 GO / RULE-done 미완** 판정. 4건 반영:
+1. (버그) signup이 SECRET_KEY 없을 때 유저 먼저 생성 → **preflight `require_secret_key()`** 로 유저 생성 전 실패 (`auth.py`). 회귀 테스트 `test_
+signup_secret.py`
+2. (버그) seed가 unmatched 검사 전 inventory commit(부분반영) → **검증을 commit보다 앞으로** 재구성 (`seed.py`)
+3. `.env.example`에 `SECRET_KEY`/만료 문서화
+4. history/v2 진행표 갱신
+→ **테스트 29 → 32개, 전부 pass.** Codex 조건 충족 → Phase 2 done.
+- Codex 구현리뷰 원문: `reports/_codex_phase2_impl_review.txt`
+
+## 5. 다음 작업
+- Phase 3 (도구 계층 + 수동 ReAct 에이전트). **여기서부터 로컬 Gemma 서버 기동 필요.**
+- 착수 전 Phase 3 상세계획 → Codex 논의.
+
+## 참조
+- 계획: `plans/2026-07-12_2110_Phase2_DB_인증_상세계획.md`
+- Codex 계획리뷰: `reports/_codex_phase2_plan_review.txt`
+
+
+codex
+검토 결과: **조건부 GO**입니다. 구현 들어가도 됩니다. 단, 아래 조건만 명확히 하고 시작하는 게 좋습니다.
+
+1. **도구 수는 5개로 충분**
+   `get_price`, `get_stock`, `get_order_status`, `search_product`, `get_exchange_rate`로 Phase 3 목표를 충족합니다. 8개로 늘리면 YAGN
+I 위험이 큽니다. DB 모델도 상품/재고/주문을 이미 지원합니다: [models.py](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_proje
+ct/app/db/models.py:28).
+
+2. **RULE 정합성은 대체로 OK**
+   구조화 실패관찰 `{"ok": false, ...}`는 정상 위장이 아니므로 폴백 금지와 충돌하지 않습니다. 다만 DB 연결 실패, 설정 오류, LLM 서버 미기동 같은 인프라성 실패는 삼키지 말고 `Infr
+aError`/전용 LLM 오류로 올리는 게 맞습니다. RULE 근거: [RULE.md](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_proje
+ct/RULE.md:56).
+
+3. **`chat_fn` 주입 mock 테스트 설계는 적정**
+   ReAct 루프 검증은 모델 없이 결정론적으로 해야 합니다. 계획서의 `chat_fn(messages, tools)` 구조가 맞고, mock으로 tool_call → tool observation → fina
+l answer 흐름을 고정 테스트하면 됩니다: [Phase3 plan](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/plans/
+2026-07-12_2240_Phase3_도구_수동ReAct_상세계획.md:39).
+
+4. **수동 ReAct 구현 시 주의점**
+   `tool_calls`가 있을 때 assistant message를 먼저 append한 뒤 tool message를 append해야 OpenAI 호환 메시지 순서가 깨지지 않습니다. 인자 파싱은 JSON 실패
+ 케이스를 테스트해야 하고, 중복 판정은 `name + json.dumps(args, sort_keys=True)`로 고정하세요. trim은 assistant/tool 쌍을 깨지 않게 해야 합니다.
+
+5. **로컬 Gemma tool-calling은 게이트로 두면 안 됨**
+   로컬 서버는 OpenAI 호환 endpoint지만 Gemma가 네이티브 tool_call을 안정적으로 낼지는 확인 필요입니다. 그래서 mock 테스트를 필수 DoD로, `@pytest.mark.llm` 로컬 
+Gemma는 수동 스모크로 분리하는 계획이 맞습니다. 근거: [debug note](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/
+debug_notes/2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md:40).
+
+6. **추천 순서**
+   도구 함수/스키마 → 도구 단위테스트 → ReAct 루프/mock 테스트 → `/api/agent/chat` 라우터 → 오류 매핑 → 로컬 Gemma 수동 스모크 순서가 좋습니다.
+
+현재 환경이 읽기 전용이라 파일 수정이나 pytest 실행은 하지 못했습니다. 판단만 놓고 보면 **Phase 3는 조건부 GO**이고, 조건은 “5개 도구 유지 + 인프라 오류는 구조화 관찰로 삼키지 않기 + 로
+컬 Gemma tool-calling은 비필수 스모크로 분리”입니다.
+tokens used
+45,173
+검토 결과: **조건부 GO**입니다. 구현 들어가도 됩니다. 단, 아래 조건만 명확히 하고 시작하는 게 좋습니다.
+
+1. **도구 수는 5개로 충분**
+   `get_price`, `get_stock`, `get_order_status`, `search_product`, `get_exchange_rate`로 Phase 3 목표를 충족합니다. 8개로 늘리면 YAGNI 위험이 큽니다. DB 모델도 상품/재고/주문을 이미 지원합니다: [models.py](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/db/models.py:28).
+
+2. **RULE 정합성은 대체로 OK**
+   구조화 실패관찰 `{"ok": false, ...}`는 정상 위장이 아니므로 폴백 금지와 충돌하지 않습니다. 다만 DB 연결 실패, 설정 오류, LLM 서버 미기동 같은 인프라성 실패는 삼키지 말고 `InfraError`/전용 LLM 오류로 올리는 게 맞습니다. RULE 근거: [RULE.md](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/RULE.md:56).
+
+3. **`chat_fn` 주입 mock 테스트 설계는 적정**
+   ReAct 루프 검증은 모델 없이 결정론적으로 해야 합니다. 계획서의 `chat_fn(messages, tools)` 구조가 맞고, mock으로 tool_call → tool observation → final answer 흐름을 고정 테스트하면 됩니다: [Phase3 plan](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/plans/2026-07-12_2240_Phase3_도구_수동ReAct_상세계획.md:39).
+
+4. **수동 ReAct 구현 시 주의점**
+   `tool_calls`가 있을 때 assistant message를 먼저 append한 뒤 tool message를 append해야 OpenAI 호환 메시지 순서가 깨지지 않습니다. 인자 파싱은 JSON 실패 케이스를 테스트해야 하고, 중복 판정은 `name + json.dumps(args, sort_keys=True)`로 고정하세요. trim은 assistant/tool 쌍을 깨지 않게 해야 합니다.
+
+5. **로컬 Gemma tool-calling은 게이트로 두면 안 됨**
+   로컬 서버는 OpenAI 호환 endpoint지만 Gemma가 네이티브 tool_call을 안정적으로 낼지는 확인 필요입니다. 그래서 mock 테스트를 필수 DoD로, `@pytest.mark.llm` 로컬 Gemma는 수동 스모크로 분리하는 계획이 맞습니다. 근거: [debug note](/c:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/debug_notes/2026-07-12_2230_로컬Gemma서버_구동_트러블슈팅.md:40).
+
+6. **추천 순서**
+   도구 함수/스키마 → 도구 단위테스트 → ReAct 루프/mock 테스트 → `/api/agent/chat` 라우터 → 오류 매핑 → 로컬 Gemma 수동 스모크 순서가 좋습니다.
+
+현재 환경이 읽기 전용이라 파일 수정이나 pytest 실행은 하지 못했습니다. 판단만 놓고 보면 **Phase 3는 조건부 GO**이고, 조건은 “5개 도구 유지 + 인프라 오류는 구조화 관찰로 삼키지 않기 + 로컬 Gemma tool-calling은 비필수 스모크로 분리”입니다.
