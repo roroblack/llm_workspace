@@ -78,6 +78,15 @@ def get_exchange_rate(db: Session, currency: str) -> dict[str, Any]:
     return {"ok": True, "currency": currency.upper(), "rate": rate}
 
 
+def search_knowledge_base(db: Session, query: str) -> dict[str, Any]:
+    """정책·매뉴얼 등 지식 문서를 검색한다(RAG). 인자: query(자연어 질문)."""
+    # db 인자는 도구 시그니처 일관성용(RAG는 벡터스토어 사용).
+    from app.rag.service import search
+
+    results = search(query)
+    return {"ok": True, "count": len(results), "results": results}
+
+
 # name → callable (db, **args)
 TOOL_MAP = {
     "get_price": get_price,
@@ -85,6 +94,7 @@ TOOL_MAP = {
     "get_order_status": get_order_status,
     "search_product": search_product,
     "get_exchange_rate": get_exchange_rate,
+    "search_knowledge_base": search_knowledge_base,
 }
 
 
@@ -110,4 +120,5 @@ TOOLS_SCHEMA = [
     _schema("get_order_status", "주문번호로 상태/금액 조회", "order_no", "주문번호"),
     _schema("search_product", "상품명 키워드 검색", "keyword", "검색 키워드"),
     _schema("get_exchange_rate", "통화 환율 조회", "currency", "USD/EUR/JPY"),
+    _schema("search_knowledge_base", "정책·매뉴얼 지식 문서 검색(RAG)", "query", "자연어 질문"),
 ]

@@ -10,7 +10,7 @@ def test_build_tools_count():
     db = SessionLocal()
     try:
         tools = build_tools(db)
-        assert len(tools) == 5
+        assert len(tools) == 6
         names = {t.name for t in tools}
         assert names == {
             "get_price",
@@ -18,6 +18,7 @@ def test_build_tools_count():
             "get_order_status",
             "search_product",
             "get_exchange_rate",
+            "search_knowledge_base",
         }
     finally:
         db.close()

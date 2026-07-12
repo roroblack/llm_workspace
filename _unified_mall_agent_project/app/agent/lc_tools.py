@@ -46,4 +46,16 @@ def build_tools(db: Session) -> list[BaseTool]:
         """통화 코드(USD/EUR/JPY)의 원화 환율을 조회한다. 인자: currency."""
         return _dumps(C.get_exchange_rate(db, currency))
 
-    return [get_price, get_stock, get_order_status, search_product, get_exchange_rate]
+    @tool
+    def search_knowledge_base(query: str) -> str:
+        """정책·매뉴얼 등 지식 문서를 검색한다(RAG). 인자: query(자연어 질문)."""
+        return _dumps(C.search_knowledge_base(db, query))
+
+    return [
+        get_price,
+        get_stock,
+        get_order_status,
+        search_product,
+        get_exchange_rate,
+        search_knowledge_base,
+    ]

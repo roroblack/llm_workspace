@@ -43,6 +43,15 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    # --- RAG / 임베딩 ---
+    EMBEDDING_PROVIDER: Literal["local_st"] = "local_st"
+    ST_EMBEDDING_MODEL: str = "jhgan/ko-sroberta-multitask"
+    CHUNK_SIZE: int = 400
+    CHUNK_OVERLAP: int = 50
+    RAG_TOP_K: int = 3
+    # 임베딩 정규화 시 거리는 [0,2] 범위 → 이 값 초과는 무관으로 간주(방어)
+    RAG_MAX_DISTANCE: float = 1.5
+
     # --- 경로 / DB ---
     DATA_DIR: Path = ROOT_DIR / "data"
     DOCS_DIR: Path = ROOT_DIR / "data" / "docs"

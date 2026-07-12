@@ -23,7 +23,8 @@ from app.tools.commerce_tools import TOOL_MAP, TOOLS_SCHEMA
 
 DEFAULT_SYSTEM_PROMPT = (
     "너는 승승장구몰의 상담 에이전트다. 필요하면 도구를 호출해 가격·재고·주문상태·"
-    "환율을 확인한 뒤 답한다. 재고가 재주문 기준 이하이면 재주문이 필요하다고 판단한다. "
+    "환율을 확인하고, 정책·매뉴얼은 지식 문서 검색(search_knowledge_base)으로 확인한 뒤 "
+    "답한다. 재고가 재주문 기준 이하이면 재주문이 필요하다고 판단한다. "
     "최종 답변은 한국어로 간결하게 작성한다."
 )
 
