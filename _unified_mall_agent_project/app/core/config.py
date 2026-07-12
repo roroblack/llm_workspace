@@ -52,6 +52,10 @@ class Settings(BaseSettings):
     # 임베딩 정규화 시 거리는 [0,2] 범위 → 이 값 초과는 무관으로 간주(방어)
     RAG_MAX_DISTANCE: float = 1.5
 
+    # --- ML (감성분석) ---
+    SENTIMENT_MODEL: str = "monologg/koelectra-base-finetuned-nsmc"
+    SENTIMENT_DEVICE: int = -1  # -1=CPU
+
     # --- 경로 / DB ---
     DATA_DIR: Path = ROOT_DIR / "data"
     DOCS_DIR: Path = ROOT_DIR / "data" / "docs"

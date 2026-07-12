@@ -14,7 +14,7 @@ from fastapi import FastAPI
 from app.core.errors import register_exception_handlers
 from app.db.database import Base, SessionLocal, engine
 from app.db.seed import seed_products
-from app.routers import agent, auth, health, orders, payments, products, rag
+from app.routers import agent, auth, health, nlp, orders, payments, products, rag
 
 
 @asynccontextmanager
@@ -51,6 +51,7 @@ def create_app() -> FastAPI:
     app.include_router(payments.router)
     app.include_router(agent.router)
     app.include_router(rag.router)
+    app.include_router(nlp.router)
     # 정적 UI 마운트 자리 (Phase 7)
     return app
 

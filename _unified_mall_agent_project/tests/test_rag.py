@@ -11,6 +11,9 @@ from app.rag import service
 from app.rag.build_index import build_index
 from app.rag.embeddings import get_embeddings
 
+# 실제 임베딩 모델 로드가 필요 → CI 기본 경로에서 제외 (Codex 합의)
+pytestmark = pytest.mark.ml
+
 
 @pytest.fixture(scope="module", autouse=True)
 def _rag_env(tmp_path_factory):
