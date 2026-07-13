@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ app_title }}</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <header class="top-header">
+        <div class="brand-area">
+            <div class="brand-icon">♪</div>
+            <div>
+                <h1>Emotion Music AI</h1>
+                <p>감성 기반 음악 추천 챗봇</p>
+            </div>
+        </div>
+
+        <div class="header-actions" aria-label="화면 옵션">
+            <button type="button" class="utility-button">☀️ 라이트 모드</button>
+            <button type="button" class="utility-button">↻ 대화 초기화</button>
+            <button type="button" class="utility-button primary">💾 대화 저장</button>
+        </div>
+    </header>
+
+    <main class="app-shell">
+        <section class="main-grid">
+            <section class="chat-card" aria-labelledby="chatTitle">
+                <div class="card-title-row">
+                    <h2 id="chatTitle">💬 AI 대화창</h2>
+                    <span class="status-badge"><span></span> AI 준비됨</span>
+                </div>
+
+                <div id="chatWindow" class="chat-window">
+                    <div class="message bot">
+                        <div class="avatar">🤖</div>
+                        <div class="bubble">
+                            안녕하세요! 저는 Emotion Music AI입니다. 😊<br /><br />
+                            지금 느끼는 기분이나 상황을 알려주시면 감성을 분석하고 맞는 음악을 추천해드릴게요.<br /><br />
+                            예) 오늘 너무 우울해요 / 공부할 때 집중할 음악 추천해줘
+                        </div>
+                    </div>
+                </div>
+
+                <form id="chatForm" class="chat-form">
+                    <div class="field-group">
+                        <label for="topK">추천 개수</label>
+                        <select id="topK" class="top-k-select" aria-label="추천 개수">
+                            <option value="3" selected>3곡 추천</option>
+                            <option value="4">4곡 추천</option>
+                            <option value="5">5곡 추천</option>
+                        </select>
+                    </div>
+
+                    <div class="field-group input-field-group">
+                        <label for="messageInput">기분 또는 상황</label>
+                        <input
+                            id="messageInput"
+                            type="text"
+                            placeholder="예: 공부할 때 들을 음악 추천해줘"
+                            autocomplete="off"
+                            required
+                        />
+                    </div>
+
+                    <button type="submit" class="submit-button">♫ 추천받기</button>
+                </form>
+            </section>
+
+            <aside class="side-panel" aria-label="감성 분석 및 추천 정보">
+                <section class="info-card">
+                    <p class="eyebrow">EMOTION MODEL</p>
+                    <h2>📊 감성 분석 결과</h2>
+                    <p class="sub-text">입력한 메시지를 분석한 감성 점수입니다.</p>
+
+                    <div class="emotion-list">
+                        <div class="emotion-row">
+                            <span>😊 행복</span>
+                            <div class="bar"><span style="width: 18%"></span></div>
+                            <strong>18%</strong>
+                        </div>
+                        <div class="emotion-row">
+                            <span>😢 슬픔</span>
+                            <div class="bar"><span style="width: 12%"></span></div>
+                            <strong>12%</strong>
+                        </div>
+                        <div class="emotion-row">
+                            <span>📚 집중</span>
+                            <div class="bar"><span style="width: 72%"></span></div>
+                            <strong>72%</strong>
+                        </div>
+                        <div class="emotion-row">
+                            <span>💖 사랑</span>
+                            <div class="bar"><span style="width: 8%"></span></div>
+                            <strong>8%</strong>
+                        </div>
+                        <div class="emotion-row">
+                            <span>⚪ 차분함</span>
+                            <div class="bar"><span style="width: 36%"></span></div>
+                            <strong>36%</strong>
+                        </div>
+                        <div class="emotion-row">
+                            <span>⚡ 활력</span>
+                            <div class="bar"><span style="width: 24%"></span></div>
+                            <strong>24%</strong>
+                        </div>
+                    </div>
+                    <p class="notice-text">※ 결과는 참고용이며 실제와 다를 수 있습니다.</p>
+                </section>
+
+                <section class="info-card">
+                    <p class="eyebrow">RECOMMENDATION</p>
+                    <h2>🎧 추천 결과 예시</h2>
+                    <div class="recommend-card">
+                        <div class="recommend-icon">🎧</div>
+                        <div>
+                            <strong>감성에 맞는 추천곡</strong>
+                            <p>추천 결과는 곡명, 분위기, 추천 이유 중심으로 정리됩니다.</p>
+                        </div>
+                    </div>
+                    <ul class="feature-list">
+                        <li>감성 분석 결과 확인</li>
+                        <li>추천 개수 선택 가능</li>
+                        <li>대화형 음악 추천</li>
+                    </ul>
+                </section>
+
+                <section class="info-card history-card">
+                    <div class="history-title-row">
+                        <h2>🕘 최근 추천 히스토리</h2>
+                        <button type="button">더보기 ›</button>
+                    </div>
+                    <div class="history-list">
+                        <span>집중<small>방금 전</small></span>
+                        <span>행복<small>10분 전</small></span>
+                        <span>운동<small>30분 전</small></span>
+                        <span>차분함<small>1시간 전</small></span>
+                        <span>사랑<small>2시간 전</small></span>
+                    </div>
+                </section>
+            </aside>
+        </section>
+
+        <section class="guide-card">
+            <h2>빠른 감성 선택</h2>
+            <div class="chips">
+                <button class="chip" data-example="오늘 기분이 좋아서 밝은 음악을 듣고 싶어요." type="button">😀 행복</button>
+                <button class="chip" data-example="오늘 너무 우울해서 조용한 노래를 듣고 싶어요." type="button">😢 슬픔</button>
+                <button class="chip" data-example="그리운 사람이 생각나서 발라드를 듣고 싶어요." type="button">🌧 그리움</button>
+                <button class="chip" data-example="공부할 때 집중할 수 있는 음악을 추천해줘." type="button">📚 집중</button>
+                <button class="chip" data-example="운동할 때 들을 신나는 음악 추천해줘." type="button">🏃 운동</button>
+                <button class="chip" data-example="사랑할 때 듣기 좋은 노래 추천해줘." type="button">❤️ 사랑</button>
+            </div>
+        </section>
+
+        <footer class="footer-text">
+            Powered by <strong>PyTorch</strong> 감성 분석 모델 + <strong>OpenAI ChatGPT</strong>
+        </footer>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,48 @@
+{
+  "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment",
+  "positive_index": 1,
+  "results": [
+    {
+      "text": "이 영화 정말 재미있어요. 강력 추천합니다.",
+      "label": "긍정",
+      "negative_probability": 0.10521192848682404,
+      "positive_probability": 0.8947880864143372,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    },
+    {
+      "text": "시간 낭비였어요. 정말 별로네요.",
+      "label": "긍정",
+      "negative_probability": 0.27828389406204224,
+      "positive_probability": 0.7217161655426025,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    },
+    {
+      "text": "배우 연기는 좋았지만 스토리가 너무 지루했다.",
+      "label": "긍정",
+      "negative_probability": 0.36173129081726074,
+      "positive_probability": 0.6382687091827393,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    },
+    {
+      "text": "기대 안 했는데 생각보다 훨씬 좋았어요!",
+      "label": "긍정",
+      "negative_probability": 0.12374789267778397,
+      "positive_probability": 0.8762521147727966,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    },
+    {
+      "text": "음식이 맛없고 서비스도 최악이었습니다.",
+      "label": "긍정",
+      "negative_probability": 0.40619057416915894,
+      "positive_probability": 0.5938094258308411,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    },
+    {
+      "text": "가격 대비 만족스러운 제품입니다.",
+      "label": "긍정",
+      "negative_probability": 0.12597118318080902,
+      "positive_probability": 0.8740288615226746,
+      "model_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment"
+    }
+  ]
+}

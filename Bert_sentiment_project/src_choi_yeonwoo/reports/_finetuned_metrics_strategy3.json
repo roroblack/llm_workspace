@@ -1,0 +1,17 @@
+{
+  "model_name": "monologg/koelectra-base-v3-discriminator",
+  "num_samples": 6000,
+  "epochs": 1,
+  "max_len": 64,
+  "strategy": 3,
+  "test_metrics": {
+    "test_loss": 0.504831850528717,
+    "test_accuracy": 0.7558333333333334,
+    "test_precision": 0.7411575562700965,
+    "test_recall": 0.7774030354131535,
+    "test_f1": 0.7588477366255144,
+    "test_runtime": 101.7588,
+    "test_samples_per_second": 11.793,
+    "test_steps_per_second": 0.373
+  }
+}

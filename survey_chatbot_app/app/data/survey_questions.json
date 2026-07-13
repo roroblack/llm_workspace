@@ -1,0 +1,6 @@
+[
+  {"id": 1, "key": "experience", "question": "인공지능 챗봇을 사용해 본 경험이 있나요?", "type": "single", "options": ["있다", "없다"]},
+  {"id": 2, "key": "purpose", "question": "챗봇을 주로 어떤 목적으로 사용하고 싶나요?", "type": "single", "options": ["고객상담", "교육", "쇼핑", "예약", "기타"]},
+  {"id": 3, "key": "satisfaction", "question": "챗봇 서비스에 대한 기대 만족도를 선택해 주세요.", "type": "scale", "options": ["1", "2", "3", "4", "5"]},
+  {"id": 4, "key": "comment", "question": "챗봇에게 기대하는 점을 자유롭게 작성해 주세요.", "type": "text", "options": []}
+]

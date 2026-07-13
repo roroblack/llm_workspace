@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<!-- app/static/index.html -->
+<!-- ChatGPT 챗봇 메인 화면입니다. 오른쪽 아래 버튼으로 챗봇 창을 열고, -->
+<!-- 챗봇 헤더의 설정(톱니바퀴) 버튼으로 생성 옵션을 조정할 수 있습니다. -->
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FastAPI ChatGPT 챗봇</title>
+    <!-- 정적 CSS 파일을 불러옵니다. -->
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <!-- 메인 소개 영역입니다. -->
+    <div class="page">
+        <div class="hero">
+            <h1>FastAPI ChatGPT 챗봇</h1>
+            <p>오른쪽 아래 파란색 버튼을 눌러 챗봇과 대화해 보세요.</p>
+            <p>챗봇 창의 ⚙️ 버튼을 누르면 모델, temperature 등 생성 옵션을 설정할 수 있습니다.</p>
+            <p class="notice">API 키가 없으면 데모 모드로 동작합니다.</p>
+        </div>
+    </div>
+
+    <!-- 오른쪽 아래 고정 챗봇 열기 버튼입니다. -->
+    <button id="chatIcon" class="chat-icon" aria-label="챗봇 열기">💬</button>
+
+    <!-- 챗봇 모달 창입니다. 기본적으로 hidden 클래스로 숨겨져 있습니다. -->
+    <section id="chatModal" class="chat-modal hidden" aria-label="챗봇 창">
+        <!-- 상단 헤더: 제목 + 설정 버튼 + 닫기 버튼 -->
+        <header class="chat-header">
+            <span class="chat-title">ChatGPT 챗봇</span>
+            <div class="header-actions">
+                <!-- 설정 패널을 열고 닫는 버튼입니다. -->
+                <button id="settingsButton" class="icon-button" aria-label="설정" title="설정">⚙️</button>
+                <!-- 챗봇 창을 닫는 버튼입니다. -->
+                <button id="closeButton" class="close-button" aria-label="닫기">×</button>
+            </div>
+        </header>
+
+        <!-- 설정 패널입니다. 기본적으로 숨겨져 있고, 설정 버튼으로 토글합니다. -->
+        <div id="settingsPanel" class="settings-panel hidden">
+            <h3 class="settings-heading">⚙️ 챗봇 설정</h3>
+
+            <!-- System Instruction 입력 -->
+            <label class="field">
+                <span class="field-label">System Instruction</span>
+                <textarea id="systemInstruction" class="field-input" rows="3"
+                    placeholder="예: 너는 항상 존댓말로 짧고 명확하게 답변한다."></textarea>
+            </label>
+
+            <!-- 모델 선택 -->
+            <label class="field">
+                <span class="field-label">모델 (model)</span>
+                <select id="modelSelect" class="field-input"></select>
+            </label>
+
+            <!-- temperature 슬라이더 -->
+            <label class="field">
+                <span class="field-label">temperature <em id="temperatureValue">0.7</em></span>
+                <input id="temperature" class="field-range" type="range" min="0" max="2" step="0.1" value="0.7" />
+                <span class="field-help">gpt-5 / o 계열 모델에서는 자동으로 무시됩니다.</span>
+            </label>
+
+            <!-- top_p 슬라이더 -->
+            <label class="field">
+                <span class="field-label">top_p <em id="topPValue">1.0</em></span>
+                <input id="topP" class="field-range" type="range" min="0" max="1" step="0.05" value="1" />
+            </label>
+
+            <!-- top_k 입력 -->
+            <label class="field">
+                <span class="field-label">top_k</span>
+                <input id="topK" class="field-input" type="number" min="0" step="1" placeholder="비워두면 미적용" />
+                <span class="field-help">OpenAI Chat API는 top_k 미지원 (실습용 필드).</span>
+            </label>
+
+            <!-- max_output_tokens 입력 -->
+            <label class="field">
+                <span class="field-label">max_output_tokens</span>
+                <input id="maxTokens" class="field-input" type="number" min="1" max="32000" step="1"
+                    placeholder="예: 1024" />
+                <span class="field-help">gpt-5 / o 계열은 추론에 토큰을 써서, 값이 작으면(예: 2000 미만) 자동으로 상향됩니다.</span>
+            </label>
+
+            <!-- reasoning_effort(추론 강도) 선택 -->
+            <label class="field">
+                <span class="field-label">추론 강도 (reasoning_effort)</span>
+                <select id="reasoningEffort" class="field-input">
+                    <option value="">기본값 (medium)</option>
+                    <option value="minimal">minimal (가장 빠름·저비용)</option>
+                    <option value="low">low</option>
+                    <option value="medium">medium</option>
+                    <option value="high">high (가장 깊게·고비용)</option>
+                </select>
+                <span class="field-help">gpt-5 / o 계열에만 적용됩니다. 낮을수록 빠르고 저렴, 높을수록 깊게 추론합니다.</span>
+            </label>
+
+            <!-- 설정 버튼들 -->
+            <div class="settings-buttons">
+                <button id="resetSettings" type="button" class="secondary-button">기본값</button>
+                <button id="saveSettings" type="button" class="primary-button">저장</button>
+            </div>
+            <p id="settingsStatus" class="settings-status"></p>
+        </div>
+
+        <!-- 대화 메시지 목록 영역입니다. -->
+        <div id="chatMessages" class="chat-messages"></div>
+
+        <!-- 입력창 + 전송 버튼 폼입니다. -->
+        <form id="chatForm" class="chat-form">
+            <input id="chatInput" class="chat-input" type="text" placeholder="메시지를 입력하세요..."
+                autocomplete="off" />
+            <button id="sendButton" class="send-button" type="submit">전송</button>
+        </form>
+    </section>
+
+    <!-- 프론트엔드 동작 스크립트를 불러옵니다. -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

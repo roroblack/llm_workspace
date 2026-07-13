@@ -1,0 +1,16 @@
+# Python 가상환경 폴더를 Git에 올리지 않습니다.
+.venv/
+venv/
+
+# 환경변수 파일은 API 키가 들어가므로 Git에 올리지 않습니다.
+.env
+
+# Python 캐시 파일을 Git에 올리지 않습니다.
+__pycache__/
+*.py[cod]
+
+# PyCharm 설정 폴더를 Git에 올리지 않습니다.
+.idea/
+
+# 실행 중 생성될 수 있는 로그 파일을 Git에 올리지 않습니다.
+*.log

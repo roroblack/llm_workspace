@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <!-- 문서 문자 인코딩을 UTF-8로 지정합니다. -->
+    <meta charset="UTF-8" />
+
+    <!-- 모바일 화면에서도 레이아웃이 깨지지 않도록 반응형 뷰포트를 설정합니다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <!-- 브라우저 탭에 표시될 제목입니다. -->
+    <title>{{ app_title }}</title>
+
+    <!-- FastAPI static 경로에 있는 CSS 파일을 연결합니다. -->
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <!-- 전체 화면을 감싸는 최상위 영역입니다. -->
+    <main class="app-shell">
+        <!-- 서비스 상단 제목 영역입니다. -->
+        <header class="hero-card">
+            <!-- 서비스 아이콘입니다. -->
+            <div class="hero-icon">📋</div>
+
+            <!-- 제목과 설명을 묶는 영역입니다. -->
+            <div>
+                <!-- 작은 보조 제목입니다. -->
+                <p class="eyebrow">FastAPI + OpenAI + PyTorch</p>
+
+                <!-- 메인 제목입니다. -->
+                <h1>설문조사 AI 챗봇</h1>
+
+                <!-- 앱 설명입니다. -->
+                <p class="hero-desc">질문 흐름을 따라 설문 응답을 수집하고, PyTorch 의도 분석과 OpenAI 답변 생성을 함께 실습합니다.</p>
+            </div>
+        </header>
+
+        <!-- 채팅과 분석 패널을 2단으로 배치하는 영역입니다. -->
+        <section class="layout-grid">
+            <!-- 왼쪽 채팅 카드입니다. -->
+            <section class="chat-card">
+                <!-- 채팅 카드 상단 제목 영역입니다. -->
+                <div class="card-head">
+                    <!-- 카드 제목입니다. -->
+                    <h2>💬 AI 대화창</h2>
+
+                    <!-- 상태 배지입니다. -->
+                    <span class="status-dot">AI 준비됨</span>
+                </div>
+
+                <!-- 대화 메시지가 누적 표시되는 영역입니다. -->
+                <div id="chatWindow" class="chat-window">
+                    <!-- 초기 봇 메시지입니다. -->
+                    <div class="message bot">
+                        <!-- 봇 아바타입니다. -->
+                        <div class="avatar">🤖</div>
+
+                        <!-- 봇 말풍선입니다. -->
+                        <div class="bubble">
+                            안녕하세요. 설문조사 AI 챗봇입니다. 😊<br />
+                            <strong>설문 시작</strong>이라고 입력하면 질문을 하나씩 안내합니다.<br />
+                            <br />
+                            예: 설문 시작 / 요약 / 링크 / 도움말
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 사용자 입력 폼입니다. -->
+                <form id="chatForm" class="chat-form">
+                    <!-- 메시지 입력 라벨입니다. -->
+                    <label for="messageInput">메시지 입력</label>
+
+                    <!-- 메시지 입력창입니다. -->
+                    <input id="messageInput" type="text" placeholder="예: 설문 시작" autocomplete="off" required />
+
+                    <!-- 메시지 전송 버튼입니다. -->
+                    <button type="submit">보내기</button>
+                </form>
+
+                <!-- 빠른 입력 버튼 영역입니다. -->
+                <div class="quick-area">
+                    <!-- 빠른 입력 제목입니다. -->
+                    <p>빠른 입력</p>
+
+                    <!-- 빠른 입력 버튼 묶음입니다. -->
+                    <div class="chips">
+                        <button type="button" class="chip" data-text="설문 시작">설문 시작</button>
+                        <button type="button" class="chip" data-text="있다">있다</button>
+                        <button type="button" class="chip" data-text="없다">없다</button>
+                        <button type="button" class="chip" data-text="요약">요약</button>
+                        <button type="button" class="chip" data-text="링크">링크</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 오른쪽 분석 및 안내 패널입니다. -->
+            <aside class="side-panel">
+                <!-- 의도 분석 결과 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목입니다. -->
+                    <h2>📊 PyTorch 의도 분석</h2>
+
+                    <!-- 설명 문장입니다. -->
+                    <p class="muted">사용자 입력을 start, answer, summary, link, help 등의 의도로 분류합니다.</p>
+
+                    <!-- 현재 의도 표시 영역입니다. -->
+                    <div class="metric-row">
+                        <span>현재 의도</span>
+                        <strong id="intentText">대기중</strong>
+                    </div>
+
+                    <!-- 신뢰도 표시 영역입니다. -->
+                    <div class="metric-row">
+                        <span>신뢰도</span>
+                        <strong id="confidenceText">0%</strong>
+                    </div>
+
+                    <!-- 진행률 막대 배경입니다. -->
+                    <div class="progress-track">
+                        <!-- 진행률 막대입니다. -->
+                        <div id="confidenceBar" class="progress-fill"></div>
+                    </div>
+                </section>
+
+                <!-- 설문 진행 상태 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목입니다. -->
+                    <h2>✅ 설문 진행 상태</h2>
+
+                    <!-- 진행률 설명입니다. -->
+                    <p class="muted">질문에 답할 때마다 진행 단계가 자동으로 증가합니다.</p>
+
+                    <!-- 진행 단계 표시입니다. -->
+                    <div class="step-box">
+                        <span id="stepText">0 / 4</span>
+                    </div>
+                </section>
+
+                <!-- 실습 포인트 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목입니다. -->
+                    <h2>🧭 실습 포인트</h2>
+
+                    <!-- PDF 기반 실습 흐름을 요약한 목록입니다. -->
+                    <ul class="guide-list">
+                        <li>채팅 UI에서 설문 메뉴 제공</li>
+                        <li>설문 시작 메시지와 링크 버튼 구성</li>
+                        <li>구글 설문지 흐름을 앱 내부 질문으로 구현</li>
+                        <li>응답 요약 및 설문 링크 안내</li>
+                    </ul>
+                </section>
+            </aside>
+        </section>
+    </main>
+
+    <!-- 브라우저에서 채팅 API를 호출하는 JavaScript 파일입니다. -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

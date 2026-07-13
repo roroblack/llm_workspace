@@ -1,0 +1,150 @@
+[
+  {
+    "title": "Noel(노을) - I Miss You(그리워 그리워)",
+    "artist": "Noel",
+    "mood": "그리움",
+    "tags": [
+      "그리움",
+      "보고싶다",
+      "이별",
+      "발라드",
+      "추억",
+      "슬픔"
+    ],
+    "reason": "그리운 사람을 떠올릴 때 어울리는 감성 발라드입니다.",
+    "url": "https://www.youtube.com/watch?v=rr7arlNxLro"
+  },
+  {
+    "title": "음악중심 - Noel - I Miss You",
+    "artist": "Noel",
+    "mood": "그리움",
+    "tags": [
+      "그리움",
+      "보고싶다",
+      "라이브",
+      "발라드",
+      "추억"
+    ],
+    "reason": "그리움을 직접적으로 표현하는 노래라 감정 몰입에 좋습니다.",
+    "url": "https://www.youtube.com/watch?v=8Rj9sNumJ_c"
+  },
+  {
+    "title": "그리워 - 채동선 곡, 이은상 시",
+    "artist": "Korean Art Song",
+    "mood": "그리움",
+    "tags": [
+      "그리움",
+      "클래식",
+      "가곡",
+      "차분함",
+      "추억"
+    ],
+    "reason": "조용하고 차분한 분위기로 그리운 감정을 정리하기 좋습니다.",
+    "url": "https://www.youtube.com/watch?v=9lgrOlpvmI0"
+  },
+  {
+    "title": "잔잔한 위로 피아노",
+    "artist": "Piano Collection",
+    "mood": "위로",
+    "tags": [
+      "위로",
+      "힐링",
+      "잔잔함",
+      "피아노",
+      "편안함",
+      "휴식"
+    ],
+    "reason": "마음이 지쳤을 때 긴장을 풀고 안정감을 주는 음악입니다.",
+    "url": "https://www.youtube.com/results?search_query=잔잔한+위로+피아노"
+  },
+  {
+    "title": "슬플 때 듣는 발라드 모음",
+    "artist": "K-Ballad Playlist",
+    "mood": "슬픔",
+    "tags": [
+      "슬픔",
+      "우울",
+      "눈물",
+      "발라드",
+      "이별",
+      "감성"
+    ],
+    "reason": "슬픈 감정을 억누르지 않고 자연스럽게 풀어내는 데 도움이 됩니다.",
+    "url": "https://www.youtube.com/results?search_query=슬플때+듣는+발라드"
+  },
+  {
+    "title": "행복할 때 듣는 밝은 노래",
+    "artist": "Happy Playlist",
+    "mood": "행복",
+    "tags": [
+      "행복",
+      "기쁨",
+      "밝음",
+      "신남",
+      "댄스",
+      "긍정"
+    ],
+    "reason": "좋은 기분을 더 밝고 경쾌하게 만들어 주는 곡 목록입니다.",
+    "url": "https://www.youtube.com/results?search_query=행복할때+듣는+음악"
+  },
+  {
+    "title": "운동할 때 듣는 신나는 음악",
+    "artist": "Workout Playlist",
+    "mood": "활력",
+    "tags": [
+      "활력",
+      "운동",
+      "신남",
+      "에너지",
+      "집중",
+      "빠른템포"
+    ],
+    "reason": "활동적인 상황에서 에너지를 끌어올리기 좋은 음악입니다.",
+    "url": "https://www.youtube.com/results?search_query=운동할때+듣는+신나는+음악"
+  },
+  {
+    "title": "공부할 때 듣는 집중 음악",
+    "artist": "Study Music",
+    "mood": "집중",
+    "tags": [
+      "집중",
+      "공부",
+      "잔잔함",
+      "로파이",
+      "피아노",
+      "차분함"
+    ],
+    "reason": "가사가 적고 반복적인 분위기라 학습 집중에 적합합니다.",
+    "url": "https://www.youtube.com/results?search_query=공부할때+듣는+음악"
+  },
+  {
+    "title": "화날 때 마음을 가라앉히는 음악",
+    "artist": "Calm Music",
+    "mood": "분노완화",
+    "tags": [
+      "화남",
+      "분노",
+      "진정",
+      "명상",
+      "호흡",
+      "차분함"
+    ],
+    "reason": "감정이 격해졌을 때 호흡을 안정시키는 데 도움이 됩니다.",
+    "url": "https://www.youtube.com/results?search_query=화날때+듣는+음악"
+  },
+  {
+    "title": "사랑할 때 듣는 달달한 노래",
+    "artist": "Love Song Playlist",
+    "mood": "사랑",
+    "tags": [
+      "사랑",
+      "설렘",
+      "달달함",
+      "연애",
+      "고백",
+      "행복"
+    ],
+    "reason": "사랑과 설렘의 감정을 부드럽게 표현하는 음악입니다.",
+    "url": "https://www.youtube.com/results?search_query=사랑할때+듣는+노래"
+  }
+]

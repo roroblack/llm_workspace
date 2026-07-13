@@ -1,0 +1,344 @@
+/* app/static/style.css */
+/* ------------------------------------------------------------ */
+/* 챗봇 화면 전체 디자인을 담당하는 CSS 파일입니다. */
+/* 제공된 React CSS 모듈의 floating icon + modal 구조를 참고하여 작성했습니다. */
+/* ------------------------------------------------------------ */
+
+/* 모든 요소의 박스 크기 계산 방식을 border-box로 통일합니다. */
+* {
+    box-sizing: border-box;
+}
+
+/* body는 브라우저 기본 여백을 제거하고 전체 배경을 지정합니다. */
+body {
+    margin: 0;
+    font-family: Arial, "Noto Sans KR", sans-serif;
+    background: #f5f7fb;
+    color: #222;
+}
+
+/* 메인 페이지를 화면 중앙에 배치합니다. */
+.page {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 32px;
+}
+
+/* 소개 카드 영역입니다. */
+.hero {
+    width: min(720px, 100%);
+    padding: 40px;
+    border-radius: 24px;
+    background: #ffffff;
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+    text-align: center;
+}
+
+/* 제목 크기와 간격을 지정합니다. */
+.hero h1 {
+    margin: 0 0 16px;
+    font-size: 36px;
+}
+
+/* 안내 문구의 색상과 줄 간격을 지정합니다. */
+.hero p {
+    margin: 8px 0;
+    line-height: 1.6;
+    color: #555;
+}
+
+/* API 키 관련 안내 문구를 강조합니다. */
+.notice {
+    font-size: 14px;
+    color: #0b6bcb;
+}
+
+/* 오른쪽 아래 고정 챗봇 버튼입니다. */
+.chat-icon {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    width: 64px;
+    height: 64px;
+    border: none;
+    border-radius: 50%;
+    background: #0d6efd;
+    color: #ffffff;
+    font-size: 28px;
+    cursor: pointer;
+    box-shadow: 0 10px 28px rgba(13, 110, 253, 0.35);
+}
+
+/* 버튼 위에 마우스를 올렸을 때 색상을 약간 진하게 바꿉니다. */
+.chat-icon:hover {
+    background: #0959cf;
+}
+
+/* 챗봇 모달 창입니다. */
+.chat-modal {
+    position: fixed;
+    right: 24px;
+    bottom: 104px;
+    width: min(380px, calc(100vw - 48px));
+    height: 520px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 18px 48px rgba(0, 0, 0, 0.18);
+}
+
+/* hidden 클래스가 붙으면 화면에서 숨깁니다. */
+.hidden {
+    display: none;
+}
+
+/* 모달 상단 헤더 영역입니다. */
+.chat-header {
+    height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 16px;
+    background: #0d6efd;
+    color: #ffffff;
+}
+
+/* 헤더 오른쪽 버튼들을 담는 영역입니다. */
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+/* 헤더 제목 텍스트입니다. */
+.chat-title {
+    font-weight: 700;
+}
+
+/* 설정(톱니바퀴) 같은 아이콘 버튼입니다. */
+.icon-button {
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 20px;
+    cursor: pointer;
+    padding: 4px;
+    line-height: 1;
+}
+
+.icon-button:hover {
+    opacity: 0.8;
+}
+
+/* 닫기 버튼입니다. */
+.close-button {
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    font-size: 28px;
+    cursor: pointer;
+}
+
+/* ------------------------------------------------------------ */
+/* 설정 패널 스타일 */
+/* ------------------------------------------------------------ */
+
+/* 설정 패널 전체 영역입니다. 헤더 아래에 펼쳐집니다. */
+.settings-panel {
+    padding: 16px;
+    border-bottom: 1px solid #e5e7eb;
+    background: #f9fafb;
+    overflow-y: auto;
+    max-height: 340px;
+}
+
+/* 설정 제목입니다. */
+.settings-heading {
+    margin: 0 0 12px;
+    font-size: 15px;
+    color: #111827;
+}
+
+/* 각 설정 항목을 세로로 배치하는 라벨 묶음입니다. */
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 12px;
+}
+
+/* 설정 항목의 라벨 텍스트입니다. */
+.field-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #374151;
+}
+
+/* 라벨 옆에 표시되는 현재 슬라이더 값입니다. */
+.field-label em {
+    font-style: normal;
+    color: #0d6efd;
+}
+
+/* 텍스트 입력, select, textarea 공통 스타일입니다. */
+.field-input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font-size: 13px;
+    font-family: inherit;
+    background: #ffffff;
+}
+
+.field-input:focus {
+    outline: none;
+    border-color: #0d6efd;
+}
+
+/* textarea는 세로 크기만 조절 가능하게 합니다. */
+textarea.field-input {
+    resize: vertical;
+}
+
+/* 슬라이더(range) 입력입니다. */
+.field-range {
+    width: 100%;
+}
+
+/* 설정 항목의 도움말 문구입니다. */
+.field-help {
+    font-size: 11px;
+    color: #9ca3af;
+}
+
+/* 설정 하단 버튼 묶음입니다. */
+.settings-buttons {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 4px;
+}
+
+/* 주 버튼(저장)입니다. */
+.primary-button {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 8px;
+    background: #0d6efd;
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.primary-button:hover {
+    background: #0959cf;
+}
+
+/* 보조 버튼(기본값)입니다. */
+.secondary-button {
+    padding: 8px 16px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #ffffff;
+    color: #374151;
+    cursor: pointer;
+    font-size: 13px;
+}
+
+.secondary-button:hover {
+    background: #f3f4f6;
+}
+
+/* 설정 저장 상태 안내 문구입니다. */
+.settings-status {
+    margin: 8px 0 0;
+    font-size: 12px;
+    color: #16a34a;
+    text-align: right;
+    min-height: 16px;
+}
+
+/* 대화 메시지 목록 영역입니다. */
+.chat-messages {
+    flex: 1;
+    padding: 16px;
+    overflow-y: auto;
+    background: #f8fafc;
+}
+
+/* 모든 메시지 말풍선의 기본 스타일입니다. */
+.message {
+    max-width: 82%;
+    margin-bottom: 12px;
+    padding: 10px 12px;
+    border-radius: 14px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+    font-size: 14px;
+}
+
+/* 사용자 메시지는 오른쪽에 배치합니다. */
+.message.user {
+    margin-left: auto;
+    background: #0d6efd;
+    color: #ffffff;
+    border-bottom-right-radius: 4px;
+}
+
+/* 봇 메시지는 왼쪽에 배치합니다. */
+.message.assistant {
+    margin-right: auto;
+    background: #ffffff;
+    color: #222222;
+    border: 1px solid #e5e7eb;
+    border-bottom-left-radius: 4px;
+}
+
+/* 입력창과 전송 버튼을 담는 하단 폼입니다. */
+.chat-form {
+    display: flex;
+    gap: 8px;
+    padding: 12px;
+    border-top: 1px solid #e5e7eb;
+    background: #ffffff;
+}
+
+/* 사용자 질문 입력창입니다. */
+.chat-input {
+    flex: 1;
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 10px;
+    font-size: 14px;
+}
+
+/* 입력창 포커스 상태입니다. */
+.chat-input:focus {
+    outline: none;
+    border-color: #0d6efd;
+}
+
+/* 전송 버튼입니다. */
+.send-button {
+    padding: 0 16px;
+    border: none;
+    border-radius: 10px;
+    background: #0d6efd;
+    color: #ffffff;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* 전송 버튼 비활성 또는 대기 상태에서 사용할 스타일입니다. */
+.send-button:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}

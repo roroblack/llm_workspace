@@ -1,0 +1,177 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <!-- 문서의 문자 인코딩을 UTF-8로 지정합니다. -->
+    <meta charset="UTF-8" />
+    <!-- 모바일 화면에서도 레이아웃이 화면 폭에 맞게 보이도록 viewport를 설정합니다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 브라우저 탭에 표시될 제목을 설정합니다. -->
+    <title>{{ app_title }}</title>
+    <!-- FastAPI static 경로에서 CSS 파일을 불러옵니다. -->
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <!-- 전체 앱 화면을 감싸는 최상위 컨테이너입니다. -->
+    <main class="app-shell">
+        <!-- 상단 서비스 소개 영역입니다. -->
+        <header class="hero-card">
+            <!-- 서비스 아이콘입니다. -->
+            <div class="logo">☕</div>
+            <!-- 서비스 제목과 설명을 담는 영역입니다. -->
+            <div>
+                <!-- 앱의 큰 제목입니다. -->
+                <h1>Coffee Order AI</h1>
+                <!-- 앱의 짧은 설명입니다. -->
+                <p>FastAPI + OpenAI + PyTorch 기반 커피 주문 챗봇</p>
+            </div>
+            <!-- 우측 서버 상태 표시 영역입니다. -->
+            <div class="status-pill" id="serverStatus">서버 확인 중</div>
+        </header>
+
+        <!-- 회원가입 / 로그인 인증 바 영역입니다. -->
+        <section class="auth-bar" id="authBar">
+            <!-- 로그아웃 상태에서 보이는 회원가입/로그인 폼입니다. -->
+            <form id="authForm" class="auth-form">
+                <!-- 아이디 입력창입니다. -->
+                <input id="authUsername" class="auth-input" type="text" placeholder="아이디" autocomplete="username" />
+                <!-- 비밀번호 입력창입니다. -->
+                <input id="authPassword" class="auth-input" type="password" placeholder="비밀번호" autocomplete="current-password" />
+                <!-- 이름 입력창입니다. (회원가입 시에만 사용) -->
+                <input id="authName" class="auth-input" type="text" placeholder="이름(가입 시)" autocomplete="name" />
+                <!-- 로그인 버튼입니다. -->
+                <button id="loginButton" class="auth-button primary" type="submit">로그인</button>
+                <!-- 회원가입 버튼입니다. -->
+                <button id="signupButton" class="auth-button" type="button">회원가입</button>
+            </form>
+            <!-- 로그인 상태에서 보이는 사용자 정보 영역입니다. -->
+            <div id="authUser" class="auth-user" hidden>
+                <!-- 로그인한 사용자 인사말입니다. -->
+                <span id="authUserName" class="auth-username"></span>
+                <!-- 로그아웃 버튼입니다. -->
+                <button id="logoutButton" class="auth-button" type="button">로그아웃</button>
+            </div>
+        </section>
+
+        <!-- 본문 2단 레이아웃 영역입니다. -->
+        <section class="layout-grid">
+            <!-- 왼쪽 채팅 카드입니다. -->
+            <section class="chat-card">
+                <!-- 카드 상단 제목 영역입니다. -->
+                <div class="section-title-row">
+                    <!-- 채팅 영역 제목입니다. -->
+                    <h2>AI 커피 주문 대화창</h2>
+                    <!-- PyTorch 모델 사용 표시입니다. -->
+                    <span class="mini-badge">PyTorch Intent Model</span>
+                </div>
+
+                <!-- 대화 메시지가 출력되는 영역입니다. -->
+                <div id="chatWindow" class="chat-window">
+                    <!-- 초기 봇 안내 메시지입니다. -->
+                    <div class="message bot">
+                        <!-- 봇 아바타입니다. -->
+                        <div class="avatar">🤖</div>
+                        <!-- 봇 말풍선입니다. -->
+                        <div class="bubble">
+                            안녕하세요. 어떤 커피를 주문하시겠어요?<br />
+                            예: 부드러운 커피 추천해줘 / 아이스 아메리카노 한 잔 주문할게 / 장바구니 확인
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 빠른 입력 버튼 영역입니다. -->
+                <div class="quick-area">
+                    <!-- 빠른 입력 제목입니다. -->
+                    <strong>빠른 주문 예시</strong>
+                    <!-- 빠른 입력 버튼 묶음입니다. -->
+                    <div class="chips">
+                        <!-- 부드러운 커피 추천 예시 버튼입니다. -->
+                        <button class="chip" data-example="부드러운 커피 추천해줘">부드러운</button>
+                        <!-- 고소한 커피 추천 예시 버튼입니다. -->
+                        <button class="chip" data-example="고소한 커피 추천해줘">고소한</button>
+                        <!-- 달달한 커피 추천 예시 버튼입니다. -->
+                        <button class="chip" data-example="달달한 커피 추천해줘">달달한</button>
+                        <!-- 아이스 아메리카노 주문 예시 버튼입니다. -->
+                        <button class="chip" data-example="아이스 아메리카노 한 잔 주문할게">아이스 아메리카노</button>
+                        <!-- 메뉴판 요청 예시 버튼입니다. -->
+                        <button class="chip" data-example="메뉴판 보여줘">메뉴판</button>
+                    </div>
+                </div>
+
+                <!-- 사용자 입력 폼입니다. -->
+                <form id="chatForm" class="chat-form">
+                    <!-- 추천 개수 선택 필드입니다. -->
+                    <label class="field-group">
+                        <!-- 추천 개수 라벨입니다. -->
+                        <span>추천 개수</span>
+                        <!-- 추천 메뉴 개수를 선택하는 select입니다. -->
+                        <select id="topK">
+                            <!-- 3개 추천 옵션입니다. -->
+                            <option value="3" selected>3개 추천</option>
+                            <!-- 4개 추천 옵션입니다. -->
+                            <option value="4">4개 추천</option>
+                            <!-- 5개 추천 옵션입니다. -->
+                            <option value="5">5개 추천</option>
+                        </select>
+                    </label>
+                    <!-- 메시지 입력 필드입니다. -->
+                    <label class="field-group message-field">
+                        <!-- 메시지 입력 라벨입니다. -->
+                        <span>주문 또는 상황</span>
+                        <!-- 사용자 메시지 입력창입니다. -->
+                        <input id="messageInput" type="text" placeholder="예: 따뜻한 카페라떼 두 잔 주문할게" autocomplete="off" required />
+                    </label>
+                    <!-- 전송 버튼입니다. -->
+                    <button id="submitButton" class="primary-button" type="submit">☕ 전송</button>
+                </form>
+            </section>
+
+            <!-- 오른쪽 사이드 패널입니다. -->
+            <aside class="side-panel">
+                <!-- 의도 분석 결과 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목입니다. -->
+                    <h2>분석 결과</h2>
+                    <!-- 분석 설명입니다. -->
+                    <p>PyTorch 모델이 사용자의 주문 의도를 분류합니다.</p>
+                    <!-- 의도 결과 표시 영역입니다. -->
+                    <div class="metric-row"><span>예측 의도</span><strong id="intentText">대기 중</strong></div>
+                    <!-- 신뢰도 표시 영역입니다. -->
+                    <div class="metric-row"><span>신뢰도</span><strong id="confidenceText">0%</strong></div>
+                    <!-- 신뢰도 막대 배경입니다. -->
+                    <div class="progress-track"><div id="confidenceBar" class="progress-bar"></div></div>
+                </section>
+
+                <!-- 추천 메뉴 결과 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목입니다. -->
+                    <h2>추천 메뉴</h2>
+                    <!-- 추천 결과 설명입니다. -->
+                    <p>맛, 메뉴명, 주문 문장을 기준으로 메뉴를 추천합니다.</p>
+                    <!-- 추천 메뉴 카드들이 추가될 영역입니다. -->
+                    <div id="recommendList" class="recommend-list"></div>
+                </section>
+
+                <!-- 장바구니 카드입니다. -->
+                <section class="info-card">
+                    <!-- 카드 제목 영역입니다. -->
+                    <div class="section-title-row compact">
+                        <!-- 장바구니 제목입니다. -->
+                        <h2>장바구니</h2>
+                        <!-- 초기화 버튼입니다. -->
+                        <button id="clearCartButton" class="ghost-button" type="button">비우기</button>
+                    </div>
+                    <!-- 장바구니 항목이 표시될 영역입니다. -->
+                    <div id="cartList" class="cart-list">담긴 메뉴가 없습니다.</div>
+                    <!-- 총액 표시 영역입니다. -->
+                    <div class="total-row"><span>총액</span><strong id="totalPrice">0원</strong></div>
+                    <!-- 결제 버튼입니다. -->
+                    <button id="checkoutButton" class="checkout-button" type="button">데모 결제 진행</button>
+                </section>
+            </aside>
+        </section>
+    </main>
+
+    <!-- FastAPI static 경로에서 JavaScript 파일을 불러옵니다. -->
+    <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+# Streamlit 웹 애플리케이션 실행에 필요한 패키지입니다.
+streamlit==1.36.0
+
+# Hugging Face 사전 학습 모델과 토크나이저를 사용하기 위한 패키지입니다.
+transformers==4.44.2
+
+# PyTorch 기반 KoGPT2 모델 실행에 필요한 패키지입니다.
+torch==2.4.1
+
+# 일부 Hugging Face 토크나이저가 내부적으로 사용할 수 있는 서브워드 토크나이저 패키지입니다.
+sentencepiece==0.2.0
+
+# Hugging Face 모델 로딩과 장치 배치를 보조하는 패키지입니다.
+accelerate==0.34.2

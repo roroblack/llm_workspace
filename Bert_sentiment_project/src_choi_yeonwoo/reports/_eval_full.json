@@ -1,0 +1,55 @@
+{
+  "nsmc_sample": 5000,
+  "results": [
+    {
+      "model": "pretrained_nsmc",
+      "load_path": "monologg/koelectra-base-finetuned-nsmc",
+      "nsmc_n": 5000,
+      "nsmc": {
+        "accuracy": 0.9,
+        "precision": 0.8911671924290221,
+        "recall": 0.9098228663446055,
+        "f1": 0.900398406374502,
+        "confusion_matrix": [
+          [
+            2240,
+            276
+          ],
+          [
+            224,
+            2260
+          ]
+        ]
+      },
+      "custom_n": 20,
+      "custom_acc": 1.0,
+      "custom_wrong": [],
+      "elapsed_sec": 381.3
+    },
+    {
+      "model": "finetuned_full",
+      "load_path": "C:\\Users\\playdata2\\Documents\\llm_workspace\\Bert_sentiment_project\\models\\korean_sentiment",
+      "nsmc_n": 5000,
+      "nsmc": {
+        "accuracy": 0.8432,
+        "precision": 0.8607809847198642,
+        "recall": 0.8164251207729468,
+        "f1": 0.8380165289256198,
+        "confusion_matrix": [
+          [
+            2188,
+            328
+          ],
+          [
+            456,
+            2028
+          ]
+        ]
+      },
+      "custom_n": 20,
+      "custom_acc": 1.0,
+      "custom_wrong": [],
+      "elapsed_sec": 327.3
+    }
+  ]
+}

@@ -1,0 +1,24 @@
+# FAISS CPU 버전 벡터 검색 엔진입니다.
+faiss-cpu>=1.8.0
+
+# LangChain 커뮤니티 벡터스토어와 PDF 로더를 사용합니다.
+langchain-community>=0.2.0
+
+# LangChain 핵심 Document/Embeddings 인터페이스를 사용합니다.
+langchain-core>=0.2.0
+
+# RecursiveCharacterTextSplitter를 사용합니다.
+langchain-text-splitters>=0.2.0
+
+# Chroma 메타데이터 필터링 실습에 사용합니다.
+chromadb>=0.5.0
+langchain-chroma>=0.1.0
+
+# PDF 파일 로드 실습 확장에 사용합니다.
+pypdf>=4.0.0
+
+# .env 설정 파일을 읽기 위해 사용합니다.
+python-dotenv>=1.0.0
+
+# Google Gemini 임베딩으로 전환할 때 사용합니다. 기본 실습은 local이라 API 키 없이 실행됩니다.
+langchain-google-genai>=1.0.0

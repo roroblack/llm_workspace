@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8" />
+    <title>Tools 기반 ReAct Agent</title>
+    <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+    <main class="container">
+        <h1>Tools 기반 ReAct Agent</h1>
+        <p class="desc">FastAPI + Torch + OpenAI + LangChain + Vector DB 실습 프로젝트</p>
+
+        <section class="card">
+            <h2>1. 서버 상태 확인</h2>
+            <button onclick="callHealth()">Health 확인</button>
+            <pre id="healthResult"></pre>
+        </section>
+
+        <section class="card">
+            <h2>2. Vector DB 재생성 / 검색</h2>
+            <button onclick="rebuildVector()">Vector DB 재생성</button>
+            <input id="vectorQuery" value="ReAct 루프의 안전장치" />
+            <button onclick="searchVector()">Vector 검색</button>
+            <pre id="vectorResult"></pre>
+        </section>
+
+        <section class="card">
+            <h2>3. Torch 재고 분석</h2>
+            <button onclick="callTorch()">Torch 분석 실행</button>
+            <pre id="torchResult"></pre>
+        </section>
+
+        <section class="card">
+            <h2>4. 로컬 도구 데모</h2>
+            <button onclick="callLocalTools()">API 키 없이 도구 확인</button>
+            <pre id="toolsResult"></pre>
+        </section>
+
+        <section class="card">
+            <h2>5. OpenAI + LangChain ReAct Agent</h2>
+            <textarea id="question">스마트워치 재고를 확인하고 재주문이 필요한지 알려줘. 관련 ReAct 안전장치도 설명해줘.</textarea>
+            <button onclick="callReact()">ReAct 실행</button>
+            <pre id="reactResult"></pre>
+        </section>
+
+        <section class="card">
+            <h2>6. Gemini + Vector DB 보조 답변</h2>
+            <button onclick="callGemini()">Gemini 실행</button>
+            <pre id="geminiResult"></pre>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

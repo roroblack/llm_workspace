@@ -1,0 +1,544 @@
+/* 모든 요소의 박스 크기 계산을 border-box로 통일합니다. */
+* {
+    box-sizing: border-box;
+}
+
+/* 문서 전체의 기본 배경, 글꼴, 글자색을 설정합니다. */
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, "Noto Sans KR", sans-serif;
+    color: #1f2937;
+    background: linear-gradient(135deg, #f7efe8 0%, #f9fafb 48%, #eef6f3 100%);
+}
+
+/* 앱 전체 폭과 여백을 설정합니다. */
+.app-shell {
+    width: min(1320px, 94vw);
+    margin: 0 auto;
+    padding: 34px 0 44px;
+}
+
+/* 상단 히어로 카드를 설정합니다. */
+.hero-card {
+    display: flex;
+    align-items: center;
+    gap: 18px;
+    padding: 28px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 20px 60px rgba(67, 56, 202, 0.08);
+    backdrop-filter: blur(12px);
+}
+
+/* 서비스 아이콘 스타일입니다. */
+.logo {
+    width: 72px;
+    height: 72px;
+    display: grid;
+    place-items: center;
+    border-radius: 24px;
+    font-size: 38px;
+    background: linear-gradient(135deg, #8b5cf6, #14b8a6);
+    box-shadow: 0 18px 30px rgba(20, 184, 166, 0.22);
+}
+
+/* 제목 기본 여백을 제거합니다. */
+.hero-card h1 {
+    margin: 0;
+    font-size: clamp(32px, 4vw, 52px);
+    color: #4c1d95;
+}
+
+/* 소개 문장 스타일입니다. */
+.hero-card p {
+    margin: 8px 0 0;
+    color: #64748b;
+    font-weight: 700;
+}
+
+/* 서버 상태 배지를 오른쪽에 배치합니다. */
+.status-pill {
+    margin-left: auto;
+    padding: 12px 16px;
+    border-radius: 999px;
+    color: #065f46;
+    background: #dcfce7;
+    font-weight: 800;
+}
+
+/* 회원가입/로그인 인증 바입니다. */
+.auth-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-top: 16px;
+    padding: 16px 20px;
+    border: 1px solid rgba(148, 163, 184, 0.25);
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.86);
+    box-shadow: 0 12px 34px rgba(15, 23, 42, 0.06);
+}
+
+/* 로그인/회원가입 입력 폼 레이아웃입니다. */
+.auth-form {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+}
+
+/* 인증 입력창 스타일입니다. */
+.auth-input {
+    height: 46px;
+    flex: 1 1 150px;
+    min-width: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 0 14px;
+    color: #111827;
+    background: #ffffff;
+    font-size: 15px;
+    outline: none;
+}
+
+/* 인증 입력창 포커스 스타일입니다. */
+.auth-input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+
+/* 인증 버튼 공통 스타일입니다. */
+.auth-button {
+    height: 46px;
+    padding: 0 18px;
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    color: #334155;
+    background: #ffffff;
+    font-weight: 800;
+    cursor: pointer;
+    white-space: nowrap;
+}
+
+/* 인증 버튼 hover 스타일입니다. */
+.auth-button:hover {
+    background: #f1f5f9;
+}
+
+/* 강조 인증 버튼(로그인) 스타일입니다. */
+.auth-button.primary {
+    color: #ffffff;
+    border: none;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+/* 강조 인증 버튼 hover 스타일입니다. */
+.auth-button.primary:hover {
+    filter: brightness(0.96);
+}
+
+/* 로그인 상태 사용자 정보 영역입니다. */
+.auth-user {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    width: 100%;
+}
+
+/* 로그인 사용자 인사말 텍스트입니다. */
+.auth-username {
+    font-weight: 900;
+    color: #4c1d95;
+}
+
+/* 로그인 사용자 인사말 앞의 여백을 밀어 버튼을 오른쪽으로 보냅니다. */
+.auth-user .auth-button {
+    margin-left: auto;
+}
+
+/* 본문 2단 레이아웃을 설정합니다. */
+.layout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.55fr) minmax(360px, 0.85fr);
+    gap: 22px;
+    margin-top: 24px;
+}
+
+/* 채팅 카드와 정보 카드의 공통 느낌을 설정합니다. */
+.chat-card,
+.info-card {
+    border: 1px solid rgba(148, 163, 184, 0.28);
+    border-radius: 26px;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 18px 50px rgba(15, 23, 42, 0.08);
+}
+
+/* 채팅 카드 안쪽 여백을 설정합니다. */
+.chat-card {
+    padding: 22px;
+}
+
+/* 카드 제목 행을 설정합니다. */
+.section-title-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* 작은 제목 행은 여백을 줄입니다. */
+.section-title-row.compact {
+    margin-bottom: 8px;
+}
+
+/* 카드 제목 스타일입니다. */
+.section-title-row h2,
+.info-card h2 {
+    margin: 0;
+    font-size: 24px;
+}
+
+/* 작은 배지 스타일입니다. */
+.mini-badge {
+    padding: 8px 12px;
+    border-radius: 999px;
+    color: #0f766e;
+    background: #ccfbf1;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+/* 채팅 메시지 출력 영역입니다. */
+.chat-window {
+    height: 530px;
+    overflow-y: auto;
+    padding: 20px;
+    border: 1px solid #dbe4ef;
+    border-radius: 22px;
+    background: #f8fafc;
+}
+
+/* 스크롤바 폭을 설정합니다. */
+.chat-window::-webkit-scrollbar {
+    width: 10px;
+}
+
+/* 스크롤바 막대 스타일입니다. */
+.chat-window::-webkit-scrollbar-thumb {
+    border-radius: 999px;
+    background: #cbd5e1;
+}
+
+/* 메시지 한 줄의 공통 레이아웃입니다. */
+.message {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+    margin: 14px 0;
+}
+
+/* 사용자 메시지는 오른쪽 정렬합니다. */
+.message.user {
+    justify-content: flex-end;
+}
+
+/* 봇 아바타와 사용자 아바타 스타일입니다. */
+.avatar {
+    flex: 0 0 42px;
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    border-radius: 50%;
+    background: #ede9fe;
+}
+
+/* 메시지 말풍선 스타일입니다. */
+.bubble {
+    max-width: 74%;
+    padding: 16px 18px;
+    border: 1px solid #dbe4ef;
+    border-radius: 20px;
+    background: #ffffff;
+    line-height: 1.7;
+    white-space: pre-wrap;
+}
+
+/* 사용자 말풍선 색상입니다. */
+.message.user .bubble {
+    color: #ffffff;
+    border-color: #4f46e5;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+/* 빠른 버튼 영역입니다. */
+.quick-area {
+    margin-top: 18px;
+}
+
+/* 빠른 버튼 묶음입니다. */
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+/* 빠른 입력 버튼입니다. */
+.chip {
+    border: 1px solid #c7d2fe;
+    border-radius: 999px;
+    padding: 10px 14px;
+    color: #4338ca;
+    background: #eef2ff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* 빠른 입력 버튼 hover 스타일입니다. */
+.chip:hover {
+    background: #ddd6fe;
+}
+
+/* 입력 폼 레이아웃입니다. */
+.chat-form {
+    display: grid;
+    grid-template-columns: 210px minmax(0, 1fr) 132px;
+    gap: 16px;
+    align-items: end;
+    margin-top: 18px;
+    padding: 18px;
+    border: 1px solid #dbe4ef;
+    border-radius: 22px;
+    background: #ffffff;
+}
+
+/* 라벨과 입력 컨트롤을 같은 폭 기준으로 묶습니다. */
+.field-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+/* 입력 라벨 텍스트입니다. */
+.field-group span {
+    color: #475569;
+    font-size: 14px;
+    font-weight: 900;
+}
+
+/* select와 input 공통 스타일입니다. */
+.field-group select,
+.field-group input {
+    width: 100%;
+    height: 54px;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 0 16px;
+    color: #111827;
+    background: #ffffff;
+    font-size: 16px;
+    outline: none;
+}
+
+/* 입력 컨트롤 포커스 스타일입니다. */
+.field-group select:focus,
+.field-group input:focus {
+    border-color: #6366f1;
+    box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.12);
+}
+
+/* 주요 버튼 스타일입니다. */
+.primary-button,
+.checkout-button {
+    height: 54px;
+    border: none;
+    border-radius: 14px;
+    color: #ffffff;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    font-size: 16px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+/* 주요 버튼 hover 스타일입니다. */
+.primary-button:hover,
+.checkout-button:hover {
+    filter: brightness(0.96);
+}
+
+/* 오른쪽 패널 레이아웃입니다. */
+.side-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+/* 정보 카드 안쪽 여백입니다. */
+.info-card {
+    padding: 22px;
+}
+
+/* 정보 카드 설명 문장입니다. */
+.info-card p {
+    margin: 8px 0 18px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* 지표 한 줄 레이아웃입니다. */
+.metric-row,
+.total-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 10px 0;
+}
+
+/* 진행 막대 배경입니다. */
+.progress-track {
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+/* 진행 막대 실제 값입니다. */
+.progress-bar {
+    width: 0%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(135deg, #2563eb, #7c3aed);
+    transition: width 0.25s ease;
+}
+
+/* 추천 목록 간격입니다. */
+.recommend-list {
+    display: grid;
+    gap: 12px;
+}
+
+/* 추천 메뉴 카드입니다. */
+.menu-card {
+    padding: 16px;
+    border: 1px solid #dbe4ef;
+    border-radius: 18px;
+    background: #f8fafc;
+}
+
+/* 메뉴 카드 제목 영역입니다. */
+.menu-card-title {
+    display: flex;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 6px;
+    font-weight: 900;
+}
+
+/* 메뉴 설명 텍스트입니다. */
+.menu-desc {
+    color: #64748b;
+    line-height: 1.55;
+    margin: 0 0 10px;
+}
+
+/* 맛 태그 영역입니다. */
+.tag-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 12px;
+}
+
+/* 맛 태그 스타일입니다. */
+.tag {
+    padding: 5px 8px;
+    border-radius: 999px;
+    color: #0f766e;
+    background: #ccfbf1;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+/* 담기 버튼 스타일입니다. */
+.add-button,
+.ghost-button {
+    border: 1px solid #cbd5e1;
+    border-radius: 12px;
+    padding: 9px 12px;
+    color: #334155;
+    background: #ffffff;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* 담기 버튼 hover 스타일입니다. */
+.add-button:hover,
+.ghost-button:hover {
+    background: #f1f5f9;
+}
+
+/* 장바구니 목록 스타일입니다. */
+.cart-list {
+    display: grid;
+    gap: 10px;
+    color: #64748b;
+}
+
+/* 장바구니 개별 항목입니다. */
+.cart-item {
+    padding: 12px;
+    border-radius: 14px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+}
+
+/* 총액 행 스타일입니다. */
+.total-row {
+    padding-top: 14px;
+    border-top: 1px solid #e2e8f0;
+    font-size: 18px;
+}
+
+/* 결제 버튼은 전체 폭으로 표시합니다. */
+.checkout-button {
+    width: 100%;
+    margin-top: 8px;
+}
+
+/* 화면 폭이 작아질 때 1단으로 전환합니다. */
+@media (max-width: 980px) {
+    .layout-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .chat-form {
+        grid-template-columns: 1fr;
+    }
+
+    .hero-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .status-pill {
+        margin-left: 0;
+    }
+}
+
+/* 모바일에서 채팅창 높이와 말풍선 폭을 조정합니다. */
+@media (max-width: 640px) {
+    .chat-window {
+        height: 430px;
+        padding: 14px;
+    }
+
+    .bubble {
+        max-width: 86%;
+    }
+}

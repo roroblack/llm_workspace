@@ -1,0 +1,31 @@
+# Python 캐시 파일 제외
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상환경 제외
+.venv/
+venv/
+env/
+
+# PyCharm 설정 제외
+.idea/
+
+# 환경 변수 파일 제외
+.env
+
+# 실행 중 생성되는 벡터DB 인덱스 제외
+data/indexes/faiss_index/*
+data/indexes/chroma_db/*
+
+# 단, 빈 폴더 유지를 위한 .gitkeep은 포함
+!data/indexes/faiss_index/.gitkeep
+!data/indexes/chroma_db/.gitkeep
+
+# OS 임시 파일 제외
+.DS_Store
+Thumbs.db
+
+# 문서 폴더 제외
+notes/
+reports/

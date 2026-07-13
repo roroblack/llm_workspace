@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LLM API 실습 테스트 앱</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header class="app-header">
+    <div>
+      <p class="eyebrow">FastAPI + Gemini/OpenAI</p>
+      <h1>LLM API 실습 테스트 앱</h1>
+      <p class="subtitle">Swagger를 열지 않고 브라우저 화면에서 직접 LLM 호출, 시스템 지시, temperature, 토큰 비교를 테스트합니다.</p>
+    </div>
+    <button id="healthBtn" class="secondary-btn">서버 상태 확인</button>
+  </header>
+
+  <main class="container">
+    <section class="status-card" id="statusCard">
+      <strong>상태:</strong> 서버 확인 전입니다.
+    </section>
+
+    <section class="provider-bar">
+      <label for="providerSelect"><strong>LLM 공급자 선택</strong></label>
+      <select id="providerSelect">
+        <option value="gemini" selected>Gemini</option>
+        <option value="openai">OpenAI</option>
+      </select>
+      <span class="hint">선택한 공급자로 아래 4개 기능이 모두 호출됩니다. OpenAI는 OPENAI_API_KEY가 .env에 있을 때만 동작합니다.</span>
+    </section>
+
+    <section class="grid">
+      <article class="card">
+        <h2>1. 기본 호출</h2>
+        <label>프롬프트</label>
+        <textarea id="basicPrompt" rows="4">승승장구몰을 한 문장으로 홍보해줘.</textarea>
+        <div class="row">
+          <div>
+            <label>Temperature</label>
+            <input id="basicTemperature" type="number" min="0" max="2" step="0.1" value="0.7" />
+          </div>
+          <div>
+            <label>최대 출력 토큰</label>
+            <input id="basicMaxTokens" type="number" min="1" max="4096" value="300" />
+          </div>
+        </div>
+        <button onclick="callBasic()">기본 호출 실행</button>
+      </article>
+
+      <article class="card">
+        <h2>2. 시스템 지시 역할 테스트</h2>
+        <!-- 시스템 지시로 모델의 역할과 말투를 바꾸는 실습입니다. -->
+        <label>시스템 지시</label>
+        <textarea id="roleSystem" rows="4">너는 승승장구몰의 친절한 CS 상담원이다. 존댓말로 간결히 답하라.</textarea>
+        <label>사용자 질문</label>
+        <textarea id="roleUser" rows="3">환불 얼마나 걸려요?</textarea>
+        <div class="row">
+          <div>
+            <label>Temperature</label>
+            <input id="roleTemperature" type="number" min="0" max="2" step="0.1" value="0.3" />
+          </div>
+          <div>
+            <label>최대 출력 토큰</label>
+            <input id="roleMaxTokens" type="number" min="1" max="4096" value="300" />
+          </div>
+        </div>
+        <button onclick="callRole()">역할 테스트 실행</button>
+      </article>
+
+      <article class="card">
+        <h2>3. Temperature 다양성 테스트</h2>
+        <label>반복 질문</label>
+        <textarea id="diversityPrompt" rows="4">승승장구몰을 한 문장으로 홍보해줘.</textarea>
+        <div class="row">
+          <div>
+            <label>Temperature</label>
+            <input id="diversityTemperature" type="number" min="0" max="2" step="0.1" value="1.0" />
+          </div>
+          <div>
+            <label>반복 횟수</label>
+            <input id="repeatCount" type="number" min="1" max="10" value="5" />
+          </div>
+        </div>
+        <button onclick="callDiversity()">다양성 측정 실행</button>
+      </article>
+
+      <article class="card">
+        <h2>4. 한국어/영어 토큰 비교</h2>
+        <label>한국어 문장</label>
+        <textarea id="koreanText" rows="4">승승장구몰의 무선 블루투스 이어버드를 한 문장으로 친절하게 홍보해줘.</textarea>
+        <label>영어 문장</label>
+        <textarea id="englishText" rows="4">Write one friendly sentence promoting SeungSeung Mall's wireless earbuds.</textarea>
+        <button onclick="callTokenCompare()">토큰 비교 실행</button>
+      </article>
+    </section>
+
+    <section class="result-panel">
+      <div class="result-header">
+        <h2>실행 결과</h2>
+        <button class="secondary-btn" onclick="clearResult()">결과 지우기</button>
+      </div>
+      <pre id="resultBox">아직 실행 결과가 없습니다.</pre>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

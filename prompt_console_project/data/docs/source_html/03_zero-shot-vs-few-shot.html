@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="ko"><head><meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1" name="viewport"/>
+<title>제3강 — zero-shot vs few-shot</title>
+<link href="https://fonts.googleapis.com" rel="preconnect"/>
+<link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+<link href="https://fonts.googleapis.com/css2?family=Nanum+Gothic+Coding&amp;display=swap" rel="stylesheet"/>
+<link href="../assets/style.css" rel="stylesheet"/>
+</head><body>
+<div class="topbar">
+<a class="home" href="../index.html">📚 Agentic AI 강의</a>
+<span class="ch">제3강 · prompt engineering</span>
+<span class="meta">한국기술교육대학교 · AI 특화 인재양성 과정</span>
+</div>
+<div class="wrap">
+<div class="content">
+<div class="chip-nav"><b>제3강 · prompt engineering — 세부 목차</b><a class="" href="01_왜-프롬프트가-중요한가.html">01. 왜 프롬프트가 중요한가</a><a class="" href="02_좋은-프롬프트의-4요소.html">02. 좋은 프롬프트의 4요소</a><a class="cur" href="03_zero-shot-vs-few-shot.html">03. zero shot vs few shot</a><a class="" href="04_JSON-출력-강제하기.html">04. JSON 출력 강제하기</a><a class="" href="05_프롬프트-인젝션-기초-방어.html">05. 프롬프트 인젝션 기초 방어</a><a class="" href="06_따라하기-고객문의-분류와-정확도-측정.html">06. 따라하기 고객문의 분류와 정확도 측정</a><a class="" href="07_오분류-사례-분석.html">07. 오분류 사례 분석</a><a class="" href="08_정리-체크리스트.html">08. 정리 체크리스트</a><a class="" href="09_실습문제와-해답.html">09. 실습문제와 해답</a></div>
+<div class="md">
+<h1 id="zero-shot-vs-few-shot">zero-shot vs few-shot</h1>
+<h2 id="_1">한 줄 요약</h2>
+<p><strong>zero-shot</strong>은 예시 없이 지시만 주는 것, <strong>few-shot</strong>은 정답 예시 몇 개를 먼저 보여 주고 시키는 것입니다. few-shot은 경계가 헷갈리는 분류·판단에서 정확도를 크게 올려 줍니다.</p>
+<hr/>
+<h2 id="1">1. 두 방식의 차이</h2>
+<pre><code class="language-text">zero-shot : (예시 없이) 지시만 주고 바로 시킨다
+            "다음 문의를 분류하라: '카드가 두 번 청구됐어요'"
+
+few-shot  : 정답 예시 몇 개를 먼저 보여주고 시킨다
+            예) '반품 배송비 누가 내요?'      → 환불
+                '색상이 사진과 달라요, 교환?'  → 교환
+            그 다음에  "그럼 이건? '카드가 두 번 청구됐어요'"
+</code></pre>
+<p>few-shot은 모델에게 <strong>"이런 식으로 답해"</strong> 라는 본보기를 주는 것입니다.</p>
+<blockquote>
+<p>비유: 신입에게 "분류해"라고만 하면(zero-shot) 자기 기준대로 합니다. 하지만 "이건 이렇게, 저건 저렇게 분류한 거야. 같은 식으로 해"라며 <strong>예시 몇 개를 보여 주면</strong>(few-shot), 우리 회사 기준을 금방 따라옵니다.</p>
+</blockquote>
+<hr/>
+<h2 id="2-few-shot">2. few-shot 프롬프트 만들기</h2>
+<p>분류 작업에 few-shot을 적용해 봅니다. 예시 4개를 프롬프트 안에 넣습니다.</p>
+<pre><code class="language-python">CATEGORIES = ["배송", "환불", "교환", "결제", "상품문의", "칭찬", "불만"]
+
+# few-shot = 정답 예시 몇 개를 먼저 보여주고 같은 식으로 답하게 하는 기법.
+FEWSHOT = """다음 고객 문의를 아래 7개 중 정확히 하나로 분류하라.
+카테고리: 배송 / 환불 / 교환 / 결제 / 상품문의 / 칭찬 / 불만
+카테고리 이름 한 단어만 출력하라(다른 말 금지).
+
+[예시]
+문의: 반품하면 배송비는 누가 부담하나요?           → 환불
+문의: 색상이 사진과 달라요. 다른 색으로 바꿔주세요.  → 교환
+문의: 상담원분이 정말 친절하셨어요. 감사합니다.      → 칭찬
+문의: 카드가 두 번 청구됐어요.                      → 결제
+"""
+</code></pre>
+<p>이 프롬프트에는 4요소가 다 들어 있습니다 — 지시("분류하라"), 맥락("카테고리 7개"), 형식("한 단어만"), 그리고 <strong>예시 4개(few-shot)</strong>.</p>
+<hr/>
+<h2 id="3">3. 분류 함수</h2>
+<pre><code class="language-python">from common import get_genai_client, GEMINI_MODEL
+from google.genai import types
+
+client = get_genai_client()
+
+def classify(content: str) -&gt; str:
+    """문의 한 건을 7개 카테고리 중 하나로 분류한다(few-shot 사용)."""
+    resp = client.models.generate_content(
+        model=GEMINI_MODEL,
+        contents=f"{FEWSHOT}\n[분류할 문의]\n문의: {content} →",
+        config=types.GenerateContentConfig(temperature=0),  # 분류는 일관성이 중요 → 0
+    )
+    out = resp.text.strip()
+    for c in CATEGORIES:        # 군더더기가 붙어도 7개 중 포함된 단어를 골라낸다
+        if c in out:
+            return c
+    return "기타"
+</code></pre>
+<p>두 가지 포인트가 있습니다.</p>
+<ul>
+<li><strong><code>temperature=0</code></strong>: 분류는 매번 같은 답이 나와야 하므로 무작위성을 끕니다(2강 복습).</li>
+<li><strong><code>for c in CATEGORIES</code></strong>: 모델이 "결제입니다" 처럼 군더더기를 붙여도, 7개 중 포함된 단어를 골라내는 <strong>안전망</strong>입니다.</li>
+</ul>
+<hr/>
+<h2 id="4">4. 실행</h2>
+<pre><code class="language-python">print(classify("카드가 두 번 청구됐어요"))        # → 결제
+print(classify("포장이 찢어진 채로 왔어요"))       # → 불만 또는 교환
+print(classify("이 제품 방수 되나요?"))            # → 상품문의
+</code></pre>
+<p><strong>예상 출력</strong></p>
+<pre><code class="language-text">결제
+불만
+상품문의
+</code></pre>
+<p>예시를 보여 줬더니, 우리가 원하는 <strong>7개 카테고리 안에서 한 단어로</strong> 깔끔하게 답합니다.</p>
+<hr/>
+<h2 id="5-few-shot">5. few-shot, 예시는 몇 개가 좋을까?</h2>
+<ul>
+<li><strong>너무 적으면(0~1개)</strong>: 모델이 기준을 못 잡습니다.</li>
+<li><strong>적당하면(3~5개)</strong>: 대부분의 분류 작업에 충분합니다.</li>
+<li><strong>너무 많으면</strong>: 토큰(비용)이 늘고, 효과는 점점 줄어듭니다.</li>
+</ul>
+<p>특히 <strong>헷갈리는 경계</strong>(환불 vs 결제, 불만 vs 상품문의)를 콕 집은 예시가 효과적입니다. 이 "경계 예시 추가"는 07번(오분류 분석)과 연습문제에서 직접 해 봅니다.</p>
+<hr/>
+<h2 id="_2">핵심 정리</h2>
+<ul>
+<li><strong>zero-shot</strong> = 예시 없음, <strong>few-shot</strong> = 정답 예시를 보여 줌.</li>
+<li>few-shot은 <strong>경계가 헷갈리는 분류</strong>에서 정확도를 크게 올린다.</li>
+<li>분류는 <code>temperature=0</code>으로 일관성을 확보한다.</li>
+<li>예시는 3~5개, 특히 <strong>헷갈리는 경계</strong>를 집은 예시가 효과적이다.</li>
+<li>다음 절에서는 답을 코드로 바로 쓰게 만드는 <strong>JSON 강제 출력</strong>을 배웁니다.</li>
+</ul>
+</div>
+</div>
+<div class="pager"><a class="prv" href="02_좋은-프롬프트의-4요소.html"><span class="lbl">← 이전 절</span>02. 좋은 프롬프트의 4요소</a><a class="nxt" href="04_JSON-출력-강제하기.html"><span class="lbl">다음 절 →</span>04. JSON 출력 강제하기</a></div>
+</div>
+</body></html>

@@ -1,0 +1,364 @@
+/* 모든 요소의 크기 계산 방식을 border-box로 통일합니다. */
+* {
+    box-sizing: border-box;
+}
+
+/* 전체 문서의 기본 배경과 글꼴을 설정합니다. */
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: Arial, "Noto Sans KR", sans-serif;
+    color: #172033;
+    background: linear-gradient(135deg, #eef7ff 0%, #f8fbff 45%, #f0f7f4 100%);
+}
+
+/* 전체 앱의 최대 너비와 여백을 설정합니다. */
+.app-shell {
+    width: min(1260px, 94vw);
+    margin: 0 auto;
+    padding: 32px 0 48px;
+}
+
+/* 상단 소개 카드 스타일입니다. */
+.hero-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 28px;
+    margin-bottom: 22px;
+    border-radius: 28px;
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.10);
+    border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+/* 상단 아이콘 원형 박스입니다. */
+.hero-icon {
+    width: 76px;
+    height: 76px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 24px;
+    font-size: 38px;
+    background: linear-gradient(135deg, #14b8a6, #2563eb);
+    color: #ffffff;
+}
+
+/* 작은 상단 라벨입니다. */
+.eyebrow {
+    margin: 0 0 6px;
+    color: #0f766e;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+/* 메인 제목입니다. */
+h1 {
+    margin: 0;
+    font-size: clamp(32px, 4vw, 48px);
+}
+
+/* 상단 설명 문장입니다. */
+.hero-desc {
+    margin: 8px 0 0;
+    color: #64748b;
+    line-height: 1.7;
+}
+
+/* 채팅 영역과 사이드 패널을 나누는 그리드입니다. */
+.layout-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(320px, 0.9fr);
+    gap: 22px;
+}
+
+/* 카드 공통 스타일입니다. */
+.chat-card,
+.info-card {
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(226, 232, 240, 0.95);
+    border-radius: 28px;
+    box-shadow: 0 22px 60px rgba(15, 23, 42, 0.09);
+}
+
+/* 채팅 카드 내부 여백입니다. */
+.chat-card {
+    padding: 22px;
+}
+
+/* 카드 상단 제목 행입니다. */
+.card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+/* 카드 제목 공통 스타일입니다. */
+h2 {
+    margin: 0;
+    font-size: 22px;
+}
+
+/* AI 준비 상태 배지입니다. */
+.status-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    padding: 8px 12px;
+    border-radius: 999px;
+    color: #047857;
+    background: #dcfce7;
+    font-weight: 800;
+}
+
+/* 상태 배지 앞의 초록 점입니다. */
+.status-dot::before {
+    content: "";
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #22c55e;
+}
+
+/* 대화창 영역입니다. */
+.chat-window {
+    height: 520px;
+    overflow-y: auto;
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid #dbe5f2;
+    background: linear-gradient(180deg, #f8fafc 0%, #ffffff 100%);
+}
+
+/* 메시지 한 줄의 공통 배치입니다. */
+.message {
+    display: flex;
+    gap: 12px;
+    margin: 16px 0;
+}
+
+/* 사용자 메시지는 오른쪽으로 정렬합니다. */
+.message.user {
+    justify-content: flex-end;
+}
+
+/* 아바타 스타일입니다. */
+.avatar {
+    width: 42px;
+    height: 42px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 auto;
+    border-radius: 50%;
+    background: #eef6ff;
+    border: 1px solid #dbeafe;
+}
+
+/* 말풍선 공통 스타일입니다. */
+.bubble {
+    max-width: 78%;
+    padding: 16px 18px;
+    border-radius: 20px;
+    line-height: 1.75;
+    white-space: pre-wrap;
+    border: 1px solid #e2e8f0;
+    background: #ffffff;
+}
+
+/* 사용자 말풍선 색상입니다. */
+.message.user .bubble {
+    color: #ffffff;
+    border-color: #2563eb;
+    background: linear-gradient(135deg, #2563eb, #4f46e5);
+}
+
+/* 입력 폼 레이아웃입니다. */
+.chat-form {
+    display: grid;
+    grid-template-columns: 120px 1fr 120px;
+    gap: 12px;
+    align-items: center;
+    margin-top: 18px;
+    padding: 18px;
+    border-radius: 22px;
+    border: 1px solid #dbe5f2;
+    background: #ffffff;
+}
+
+/* 입력 라벨입니다. */
+.chat-form label {
+    font-weight: 800;
+    color: #334155;
+}
+
+/* 텍스트 입력창입니다. */
+.chat-form input {
+    width: 100%;
+    height: 52px;
+    padding: 0 16px;
+    border-radius: 14px;
+    border: 1px solid #cbd5e1;
+    font-size: 16px;
+    outline: none;
+}
+
+/* 입력창 포커스 스타일입니다. */
+.chat-form input:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.12);
+}
+
+/* 전송 버튼입니다. */
+.chat-form button {
+    height: 52px;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #14b8a6, #2563eb);
+    color: #ffffff;
+    font-size: 16px;
+    font-weight: 900;
+    cursor: pointer;
+}
+
+/* 전송 버튼 hover 효과입니다. */
+.chat-form button:hover {
+    filter: brightness(0.96);
+}
+
+/* 빠른 입력 영역입니다. */
+.quick-area {
+    margin-top: 16px;
+}
+
+/* 빠른 입력 제목입니다. */
+.quick-area p {
+    margin: 0 0 10px;
+    font-weight: 800;
+    color: #334155;
+}
+
+/* 빠른 입력 버튼 묶음입니다. */
+.chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+/* 빠른 입력 버튼입니다. */
+.chip {
+    border: 1px solid #99f6e4;
+    border-radius: 999px;
+    padding: 10px 14px;
+    background: #f0fdfa;
+    color: #0f766e;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* 빠른 입력 hover 효과입니다. */
+.chip:hover {
+    background: #ccfbf1;
+}
+
+/* 오른쪽 패널 레이아웃입니다. */
+.side-panel {
+    display: grid;
+    gap: 18px;
+    align-content: start;
+}
+
+/* 정보 카드 내부 여백입니다. */
+.info-card {
+    padding: 22px;
+}
+
+/* 흐린 설명 문장입니다. */
+.muted {
+    margin: 10px 0 18px;
+    color: #64748b;
+    line-height: 1.6;
+}
+
+/* 수치 정보 한 줄입니다. */
+.metric-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin: 14px 0;
+}
+
+/* 수치명입니다. */
+.metric-row span {
+    color: #475569;
+    font-weight: 700;
+}
+
+/* 수치값입니다. */
+.metric-row strong {
+    color: #0f172a;
+}
+
+/* 진행률 바 배경입니다. */
+.progress-track {
+    width: 100%;
+    height: 12px;
+    overflow: hidden;
+    border-radius: 999px;
+    background: #e2e8f0;
+}
+
+/* 진행률 바 채움입니다. */
+.progress-fill {
+    width: 0%;
+    height: 100%;
+    border-radius: inherit;
+    background: linear-gradient(90deg, #14b8a6, #2563eb, #4f46e5);
+    transition: width 0.3s ease;
+}
+
+/* 설문 단계 박스입니다. */
+.step-box {
+    display: grid;
+    place-items: center;
+    min-height: 84px;
+    border-radius: 20px;
+    background: linear-gradient(135deg, #ecfeff, #eff6ff);
+    color: #0f766e;
+    font-size: 30px;
+    font-weight: 900;
+}
+
+/* 안내 목록입니다. */
+.guide-list {
+    margin: 0;
+    padding-left: 20px;
+    color: #475569;
+    line-height: 1.9;
+}
+
+/* 태블릿 이하 화면에서는 1열로 변경합니다. */
+@media (max-width: 940px) {
+    .layout-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* 모바일 화면 입력 영역을 세로로 정렬합니다. */
+@media (max-width: 680px) {
+    .hero-card {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .chat-form {
+        grid-template-columns: 1fr;
+    }
+
+    .bubble {
+        max-width: 92%;
+    }
+}

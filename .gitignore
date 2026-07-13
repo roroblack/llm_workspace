@@ -7,3 +7,54 @@ __pycache__/
 .git_backup/
 **/.git_backup/
 NAVER_NEWS_LSTM_Classifier/
+
+# --- 소스만 푸시: 아래는 제외 (환경/모델/아카이브/대용량 데이터/로그) ---
+# 시크릿(.env) — 절대 커밋 금지 (.env.example만 허용)
+.env
+**/.env
+!**/.env.example
+
+# 가상환경·캐시
+venv/
+env/
+.ipynb_checkpoints/
+node_modules/
+lightning_logs/
+
+# 학습된 모델·바이너리 산출물
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.gguf
+*.pkl
+*.h5
+*.onnx
+*.msgpack
+*.db
+*.sqlite
+
+# 아카이브(자기백업 zip·192MB openjdk zip 등)
+*.zip
+*.tar
+*.tar.gz
+*.gz
+*.7z
+*.rar
+
+# 대용량 데이터셋
+**/aclImdb/
+**/ratings_train.txt
+**/ratings_test.txt
+
+# 폰트·로그·JVM 크래시
+*.ttf
+*.otf
+*.log
+hs_err_pid*
+
+# 산출 모델 저장 폴더
+models/
+**/models/*.pt
+**/models/*.pkl
