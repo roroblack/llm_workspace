@@ -1,0 +1,1111 @@
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f5a74-4cb1-74d1-83d1-6f7c281a36f3
+--------
+user
+너는 코드 검수자다. 데이터 탐색·코드 실행 금지. 아래 파일 텍스트만 읽고 판단하라. PDF 정답값(흡입력 4,000Pa, 주행 180분, 제주 왕복 배송비 10,000원)은 확인됐으니 신뢰하라.
+
+읽을 파일:
+- embedding_console_project/실습문제_embedding.txt, code/solutions.py, code/vector_utils.py, test_solutions.py
+- rag_console_project/실습문제_rag개념.txt, code/solutions.py, test_solutions.py
+- rag_qa_console_project/실습문제_rag_qa.txt, code/solutions.py, code/rag_service.py, test_solutions.py
+
+간결히 한국어로:
+1. 각 해답이 문제 요구 충족하는가(문제별 O/X)
+2. 버그/엣지: chunk_text 겹침, most_similar 빈입력/정규화, grade 콤마·단위 정규화
+3. 테스트가 요구를 실제 검증하는가
+4. 최종: 각 프로젝트 완성 여부 + 반드시 고칠 것
+
+codex
+지정한 파일의 텍스트만 읽고 정적 검수하겠습니다. 코드 실행, 테스트 실행, 그 외 데이터 탐색은 하지 않겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$files = @('"'embedding_console_project/실습문제_embedding.txt','embedding_console_project/code/solutions.py','embedding_console_project/code/vector_utils.py','embedding_console_project/test_solutions.py','rag_console_project/실습문제_rag개념.txt','rag_console_project/code/solutions.py','rag_console_project/test_solutions.py','rag_qa_console_project/실습문제_rag_qa.txt','rag_qa_console_project/code/solutions.py','rag_qa_console_project/code/rag_service.py','rag_qa_console_project/test_solutions.py'); foreach ("'$f in $files) { Write-Output "===== $f ====="; Get-Content -LiteralPath $f -Raw -Encoding UTF8 }' in C:\Users\playdata2\Documents\llm_workspace
+ succeeded in 1361ms:
+===== embedding_console_project/실습문제_embedding.txt =====
+실습문제와 해답
+직접 코드를 고쳐 보며 14강 내용을 손에 익힙니다. 먼저 스스로 풀어 본 뒤 해답을 펼쳐 보세요. (이 실습은 GOOGLE_API_KEY가 필요합니다.)
+
+문제 1 — 코사인 유사도 검색기 작성
+most_similar(query, docs, k=3) 함수를 직접 작성하세요.
+
+models/gemini-embedding-001로 docs와 query를 임베딩하고 코사인 유사도 상위 k개를 반환합니다.
+사용 파일: data/faq.csv의 question 컬럼을 docs로 사용
+기대 결과: "배송 얼마나 걸려요?" 질의에 배송 관련 FAQ가 1위로 나오고 유사도 점수가 함께 출력되면 성공.
+
+
+
+문제 2 — 유사/비유사 쌍 비교
+의미가 비슷한 문장 쌍과 무관한 문장 쌍을 각각 임베딩해 코사인 유사도를 계산·비교하세요.
+
+사용 파일: data/reviews.csv의 review_text에서 긍정 리뷰 2개와 무관한 리뷰 1개를 골라 사용
+기대 결과: 비슷한 쌍의 점수 > 무관한 쌍의 점수임을 수치로 보이면 성공.
+===== embedding_console_project/code/solutions.py =====
+# -*- coding: utf-8 -*-
+"""제14강 임베딩 실습문제 해답.
+
+실습문제_embedding.txt 의 두 문제 해답을 구현한다.
+- 문제 1: most_similar(query, docs, k) — 코사인 유사도 상위 k개 검색
+- 문제 2: compare_pairs(...) — 유사/비유사 문장 쌍 코사인 비교
+
+embeddings 인자를 주입할 수 있어(기본은 common.get_embeddings) 오프라인 테스트에서는
+로컬 임베딩을 넣어 로직을 검증하고, 실사용에서는 Gemini(gemini-embedding-001)를 쓴다.
+"""
+
+from __future__ import annotations
+
+import csv
+from typing import Any
+
+from common import DATA
+from vector_utils import cosine_similarity, top_k_indices
+
+
+def _embeddings(embeddings: Any | None):
+    """주입된 임베딩이 없으면 문제 요구대로 Gemini 임베딩을 사용한다."""
+    if embeddings is not None:
+        return embeddings
+    from common import get_embeddings
+
+    return get_embeddings("gemini")
+
+
+def most_similar(query: str, docs: list[str], k: int = 3, embeddings: Any | None = None) -> list[dict]:
+    """query와 docs를 임베딩해 코사인 유사도 상위 k개를 반환한다.
+
+    반환: [{"index", "doc", "score"}] (score 내림차순)
+    """
+    if not query or not query.strip():
+        raise ValueError("query가 비어 있습니다.")
+    if not docs:
+        return []
+    emb = _embeddings(embeddings)
+    doc_vecs = emb.embed_documents(docs)
+    query_vec = emb.embed_query(query)
+    ranked = top_k_indices(query_vec, doc_vecs, k)
+    return [{"index": i, "doc": docs[i], "score": round(score, 4)} for i, score in ranked]
+
+
+def compare_pairs(
+    similar_a: str, similar_b: str, unrelated: str, embeddings: Any | None = None
+) -> dict:
+    """유사한 문장 쌍과 무관한 문장 쌍의 코사인 유사도를 비교한다.
+
+    반환: {"similar_score", "unrelated_score", "ok"} (ok = 유사 쌍 점수 > 무관 쌍 점수)
+    """
+    emb = _embeddings(embeddings)
+    vec_a, vec_b, vec_u = emb.embed_documents([similar_a, similar_b, unrelated])
+    similar_score = cosine_similarity(vec_a, vec_b)
+    unrelated_score = cosine_similarity(vec_a, vec_u)
+    return {
+        "similar_score": round(similar_score, 4),
+        "unrelated_score": round(unrelated_score, 4),
+        "ok": similar_score > unrelated_score,
+    }
+
+
+def _load_column(csv_name: str, column: str) -> list[str]:
+    path = DATA / csv_name
+    with path.open("r", encoding="utf-8-sig", newline="") as f:
+        return [row[column] for row in csv.DictReader(f)]
+
+
+def run_demo(embeddings: Any | None = None) -> None:
+    """faq.csv / reviews.csv로 두 문제를 시연한다 (기본 Gemini, 키 필요)."""
+    # 문제 1: FAQ 질문에서 배송 관련 질의 검색
+    questions = _load_column("faq.csv", "question")
+    print("[문제1] '배송 얼마나 걸려요?' Top-3")
+    for r in most_similar("배송 얼마나 걸려요?", questions, k=3, embeddings=embeddings):
+        print(f"  {r['score']:.4f}  {r['doc']}")
+
+    # 문제 2: 긍정 리뷰 2개(유사) vs 무관 리뷰 1개
+    reviews = _load_column("reviews.csv", "review_text")
+    result = compare_pairs(reviews[0], reviews[1], reviews[-1], embeddings=embeddings)
+    print("\n[문제2] 유사쌍 vs 무관쌍:", result)
+
+
+if __name__ == "__main__":
+    run_demo()
+
+===== embedding_console_project/code/vector_utils.py =====
+# -*- coding: utf-8 -*-
+"""벡터 계산에 공통으로 사용하는 PyTorch 유틸리티 모듈입니다."""
+
+from __future__ import annotations
+
+from typing import Iterable
+
+import torch
+
+
+def to_tensor(values: Iterable[float]) -> torch.Tensor:
+    """숫자 반복 객체를 float32 형식의 1차원 PyTorch 텐서로 변환합니다."""
+    return torch.tensor(list(values), dtype=torch.float32)
+
+
+def cosine_similarity(a: Iterable[float], b: Iterable[float]) -> float:
+    """두 벡터의 코사인 유사도를 계산하여 파이썬 float 값으로 반환합니다."""
+    # 첫 번째 입력 벡터를 PyTorch 텐서로 변환합니다.
+    tensor_a = to_tensor(a)
+    # 두 번째 입력 벡터를 PyTorch 텐서로 변환합니다.
+    tensor_b = to_tensor(b)
+    # 벡터 길이가 다르면 내적을 계산할 수 없으므로 명확한 오류를 발생시킵니다.
+    if tensor_a.numel() != tensor_b.numel():
+        raise ValueError("두 벡터의 차원이 서로 다릅니다.")
+    # 영벡터가 포함되면 0으로 나누는 문제가 생기므로 유사도 0.0을 반환합니다.
+    if torch.linalg.vector_norm(tensor_a) == 0 or torch.linalg.vector_norm(tensor_b) == 0:
+        return 0.0
+    # torch.nn.functional.cosine_similarity를 사용해 두 벡터의 방향 유사도를 계산합니다.
+    score = torch.nn.functional.cosine_similarity(
+        tensor_a.unsqueeze(0), tensor_b.unsqueeze(0), dim=1
+    )
+    # 단일 원소 텐서를 일반 float 값으로 변환해 반환합니다.
+    return float(score.item())
+
+
+def top_k_indices(query_vector: Iterable[float], document_vectors: list[list[float]], k: int = 3) -> list[tuple[int, float]]:
+    """질문 벡터와 가장 유사한 문서 벡터의 인덱스와 점수를 상위 k개 반환합니다."""
+    # 질문 벡터를 1행짜리 텐서로 변환합니다.
+    query = to_tensor(query_vector).unsqueeze(0)
+    # 문서 벡터 목록을 2차원 텐서로 변환합니다.
+    documents = torch.tensor(document_vectors, dtype=torch.float32)
+    # 문서 벡터가 비어 있으면 검색 결과도 빈 목록으로 반환합니다.
+    if documents.numel() == 0:
+        return []
+    # 모든 문서 벡터를 행 단위로 정규화합니다.
+    documents = torch.nn.functional.normalize(documents, p=2, dim=1)
+    # 질문 벡터를 행 단위로 정규화합니다.
+    query = torch.nn.functional.normalize(query, p=2, dim=1)
+    # 정규화된 벡터끼리 행렬 곱을 수행하면 코사인 유사도가 계산됩니다.
+    scores = torch.matmul(documents, query.transpose(0, 1)).squeeze(1)
+    # 요청한 k가 문서 수보다 크지 않도록 실제 반환 개수를 제한합니다.
+    actual_k = min(max(k, 1), scores.numel())
+    # 가장 높은 점수와 해당 인덱스를 구합니다.
+    values, indices = torch.topk(scores, k=actual_k)
+    # 텐서 결과를 사용하기 편한 (인덱스, 점수) 튜플 목록으로 변환합니다.
+    return [(int(index.item()), float(value.item())) for index, value in zip(indices, values)]
+
+===== embedding_console_project/test_solutions.py =====
+# -*- coding: utf-8 -*-
+"""실습해답 검증 (로컬 임베딩 주입, GOOGLE_API_KEY 불필요).
+
+실사용은 Gemini(gemini-embedding-001)지만, 여기서는 로컬 ko-sroberta 임베딩을 주입해
+most_similar / compare_pairs 로직을 오프라인으로 검증한다.
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "code"))
+
+from solutions import compare_pairs, most_similar  # noqa: E402
+
+
+def _local_embeddings():
+    from langchain_huggingface import HuggingFaceEmbeddings
+
+    return HuggingFaceEmbeddings(
+        model_name="jhgan/ko-sroberta-multitask",
+        encode_kwargs={"normalize_embeddings": True},
+    )
+
+
+def main() -> None:
+    emb = _local_embeddings()
+
+    # 문제 1: 배송 질의 → 배송 FAQ가 1위
+    docs = [
+        "배송은 보통 얼마나 걸리나요?",
+        "환불은 어떻게 신청하나요?",
+        "회원 등급 혜택이 궁금해요",
+        "비밀번호를 잊어버렸어요",
+    ]
+    res = most_similar("배송 얼마나 걸려요?", docs, k=3, embeddings=emb)
+    assert res[0]["doc"] == docs[0], f"배송 FAQ가 1위여야 함: {res}"
+    assert res[0]["score"] >= res[-1]["score"], "점수 내림차순이어야 함"
+    print("[문제1] OK 1위:", res[0]["doc"], f"(score {res[0]['score']})")
+
+    # 문제 2: 유사 쌍 점수 > 무관 쌍 점수
+    cmp = compare_pairs("배송이 정말 빨라요", "배송이 빠르고 좋았어요", "가격이 너무 비싸요", embeddings=emb)
+    assert cmp["ok"] is True, f"유사쌍 > 무관쌍이어야 함: {cmp}"
+    print("[문제2] OK", cmp)
+
+    # 엣지: 빈 query
+    try:
+        most_similar("  ", docs, embeddings=emb)
+        raise AssertionError("빈 query는 ValueError여야 함")
+    except ValueError:
+        pass
+
+    print("EMBEDDING_SOLUTIONS_OK")
+
+
+if __name__ == "__main__":
+    main()
+
+===== rag_console_project/실습문제_rag개념.txt =====
+실습문제와 해답
+직접 코드를 고쳐 보며 13강 내용을 손에 익힙니다. 먼저 스스로 풀어 본 뒤 해답을 펼쳐 보세요. (이 강은 임베딩 없이 동작하므로 API 키가 없어도 됩니다.)
+
+문제 1 — 청킹 함수 직접 구현
+chunk_text(text, size=500, overlap=50) 함수를 직접 작성하세요.
+
+글자 수 기준으로 자르되 지정한 overlap만큼 겹치게 합니다.
+사용 파일: data/docs/직원핸드북.pdf (텍스트 추출 후 입력)
+기대 결과: 청크 개수, 그리고 첫 청크와 둘째 청크의 겹치는 50자가 동일함을 검증하면 성공.
+
+
+
+문제 2 — 청크 크기 비교
+chunk_size를 200/500/1000으로 바꿔가며 청크 개수와 평균 길이를 표로 출력하세요.
+
+사용 파일: data/docs/환불교환정책.pdf
+기대 결과: size가 커질수록 청크 수가 줄어드는 경향을 확인하고, "조항 단위 검색에 적합한 크기"를 한 줄로 결론내면 성공.
+
+
+===== rag_console_project/code/solutions.py =====
+# -*- coding: utf-8 -*-
+"""제13강 RAG 청킹 실습문제 해답 (API 키 불필요).
+
+실습문제_rag개념.txt 의 두 문제 해답.
+- 문제 1: chunk_text(text, size, overlap) — 글자 수 기준 겹침 청킹 직접 구현
+- 문제 2: chunk_size_comparison(...) — size별 청크 수·평균 길이 비교
+"""
+
+from __future__ import annotations
+
+
+def chunk_text(text: str, size: int = 500, overlap: int = 50) -> list[str]:
+    """글자 수 기준으로 자르되 overlap만큼 겹치게 나눈다.
+
+    연속한 두 청크는 정확히 overlap 글자만큼 겹친다:
+    chunk[i][-overlap:] == chunk[i+1][:overlap]
+    """
+    if size <= 0:
+        raise ValueError("size는 1 이상이어야 합니다.")
+    if not (0 <= overlap < size):
+        raise ValueError("overlap은 0 이상이고 size보다 작아야 합니다.")
+    if not text:
+        return []
+
+    step = size - overlap
+    chunks: list[str] = []
+    start = 0
+    while start < len(text):
+        chunks.append(text[start : start + size])
+        # 마지막(전체를 덮은) 청크면 종료
+        if start + size >= len(text):
+            break
+        start += step
+    return chunks
+
+
+def chunk_size_comparison(
+    text: str, sizes: tuple[int, ...] = (200, 500, 1000), overlap: int = 50
+) -> list[dict]:
+    """size를 바꿔가며 청크 개수와 평균 길이를 표(리스트)로 반환한다."""
+    rows: list[dict] = []
+    for size in sizes:
+        used_overlap = min(overlap, size - 1)
+        chunks = chunk_text(text, size, used_overlap)
+        avg = round(sum(len(c) for c in chunks) / len(chunks), 1) if chunks else 0.0
+        rows.append({"size": size, "overlap": used_overlap, "count": len(chunks), "avg_len": avg})
+    return rows
+
+
+def _extract_pdf_text(file_name: str) -> str:
+    """docs 폴더의 PDF에서 텍스트를 추출한다 (문제 예시 파일용)."""
+    from common import DOCS
+    from langchain_community.document_loaders import PyPDFLoader
+
+    pages = PyPDFLoader(str(DOCS / file_name)).load()
+    return "\n".join(p.page_content for p in pages)
+
+
+def run_demo() -> None:
+    """직원핸드북/환불교환정책 PDF로 두 문제를 시연한다."""
+    # 문제 1: 겹침 검증
+    text = _extract_pdf_text("직원핸드북.pdf")
+    chunks = chunk_text(text, size=500, overlap=50)
+    print(f"[문제1] 청크 수: {len(chunks)}")
+    if len(chunks) >= 2:
+        same = chunks[0][-50:] == chunks[1][:50]
+        print(f"  첫/둘째 청크 겹침 50자 동일: {same}")
+
+    # 문제 2: size 비교
+    policy = _extract_pdf_text("환불교환정책.pdf")
+    print("\n[문제2] size별 비교")
+    print(f"  {'size':>6} {'청크수':>6} {'평균길이':>8}")
+    for row in chunk_size_comparison(policy):
+        print(f"  {row['size']:>6} {row['count']:>6} {row['avg_len']:>8}")
+    print("  결론: 조항 단위 검색에는 200~500자가 적합(조항이 섞이지 않게 작게).")
+
+
+if __name__ == "__main__":
+    run_demo()
+
+===== rag_console_project/test_solutions.py =====
+# -*- coding: utf-8 -*-
+"""실습해답 검증 (API 키 불필요)."""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "code"))
+
+from solutions import chunk_size_comparison, chunk_text  # noqa: E402
+
+
+def main() -> None:
+    # 문제 1: 겹침 50자 동일
+    text = "".join(chr(0xAC00 + (i % 100)) for i in range(1500))  # 한글 1500자
+    chunks = chunk_text(text, size=500, overlap=50)
+    assert len(chunks) >= 2, "청크가 2개 이상이어야 함"
+    assert chunks[0][-50:] == chunks[1][:50], "첫/둘째 청크 겹침 50자가 동일해야 함"
+    # 전체 커버 확인(마지막 청크가 끝까지)
+    assert chunks[-1].endswith(text[-1]), "마지막 청크가 원문 끝을 포함해야 함"
+    print(f"[문제1] OK 청크수={len(chunks)}, 겹침50자 동일=True")
+
+    # 문제 2: size 커질수록 청크 수 감소
+    rows = chunk_size_comparison("A" * 3000, sizes=(200, 500, 1000), overlap=50)
+    counts = [r["count"] for r in rows]
+    assert counts[0] > counts[1] > counts[2], f"size↑ → count↓ 이어야 함: {rows}"
+    print("[문제2] OK", [(r["size"], r["count"], r["avg_len"]) for r in rows])
+
+    # 엣지: overlap >= size → ValueError
+    for bad in [(10, 10), (10, 20), (0, 0)]:
+        try:
+            chunk_text("x" * 20, size=bad[0], overlap=bad[1])
+            raise AssertionError(f"잘못된 인자 {bad}는 ValueError여야 함")
+        except ValueError:
+            pass
+
+    print("RAG_CONSOLE_SOLUTIONS_OK")
+
+
+if __name__ == "__main__":
+    main()
+
+===== rag_qa_console_project/실습문제_rag_qa.txt =====
+실습문제와 해답
+직접 코드를 고쳐 보며 16강 내용을 손에 익힙니다. 먼저 스스로 풀어 본 뒤 해답을 펼쳐 보세요. (이 실습은 GOOGLE_API_KEY가 필요합니다.)
+
+문제 1 — answer 함수 출처 포함 반환
+answer(question)이 {"answer":..., "sources":[...]} 형태로 반환하도록 만드세요. sources에는 근거 청크의 출처 파일명을 담습니다.
+
+사용 파일: data/docs/환불교환정책.pdf
+기대 결과: "제주 지역 반품 배송비는?" 질문에 정확한 금액을 답하고, sources에 환불교환정책.pdf가 출력되면 성공.
+해답 보기
+문제 2 — 표 값 정답 검증 세트
+정책 PDF에서 답이 정해진 질문 3개와 정답을 dict로 만들고, answer() 결과가 정답을 포함하는지 자동 채점하세요.
+
+사용 파일: data/docs/제품매뉴얼_로봇청소기.pdf (예: 흡입력 값)
+기대 결과: 3문항 중 통과 개수를 2/3 형태로 출력하면 성공.
+===== rag_qa_console_project/code/solutions.py =====
+# -*- coding: utf-8 -*-
+"""제16강 RAG QA 실습문제 해답.
+
+실습문제_rag_qa.txt 의 두 문제 해답.
+- 문제 1: answer(question) → {"answer":..., "sources":[...]}  (rag_service.answer 재사용)
+- 문제 2: grade() — 정답이 정해진 질문 3개로 answer() 결과를 자동 채점
+
+answer()는 GOOGLE_API_KEY가 필요하다(임베딩+LLM). grade()는 answer_fn을 주입할 수 있어
+오프라인 테스트에서는 스텁으로 채점 로직을 검증하고, 실사용에서는 실제 answer()를 쓴다.
+"""
+
+from __future__ import annotations
+
+from typing import Any, Callable
+
+# 문제 1 해답: rag_service.answer 가 이미 {"answer", "sources"} 형태로 반환한다.
+from rag_service import answer  # noqa: F401  (실습 해답의 핵심 함수)
+
+# 문제 2 해답: 정책/매뉴얼 PDF에서 답이 정해진 질문과 정답
+GRADING_SET: list[dict[str, str]] = [
+    # 제품매뉴얼_로봇청소기.pdf
+    {"question": "로봇청소기 CleanX(GCX-100)의 흡입력은 얼마인가요?", "expect": "4000"},
+    {"question": "CleanX 로봇청소기의 최대 주행시간은 몇 분인가요?", "expect": "180"},
+    # 환불교환정책.pdf
+    {"question": "제주 지역 단순변심 반품의 왕복 배송비는 얼마인가요?", "expect": "10000"},
+]
+
+
+def _normalize(text: str) -> str:
+    """숫자 비교를 위해 콤마·공백·원 표기를 제거한다."""
+    return text.replace(",", "").replace(" ", "").replace("원", "")
+
+
+def grade(answer_fn: Callable[[str], dict[str, Any]] | None = None) -> dict[str, Any]:
+    """GRADING_SET으로 answer() 결과가 정답을 포함하는지 자동 채점한다.
+
+    반환: {"score": "2/3", "passed", "total", "details"}
+    """
+    answer_fn = answer_fn or (lambda q: answer(q))
+    details: list[dict[str, Any]] = []
+    passed = 0
+    for item in GRADING_SET:
+        result = answer_fn(item["question"])
+        text = result.get("answer", "") if isinstance(result, dict) else str(result)
+        ok = _normalize(item["expect"]) in _normalize(text)
+        passed += 1 if ok else 0
+        details.append({"question": item["question"], "expect": item["expect"], "ok": ok})
+    return {
+        "score": f"{passed}/{len(GRADING_SET)}",
+        "passed": passed,
+        "total": len(GRADING_SET),
+        "details": details,
+    }
+
+
+def run_demo() -> None:
+    """실제 answer()로 문제1 예시와 문제2 채점을 시연한다 (GOOGLE_API_KEY 필요)."""
+    # 문제 1
+    result = answer("제주 지역 반품 배송비는 얼마인가요?")
+    print("[문제1] answer:", result["answer"])
+    print("        sources:", [s["source"] for s in result["sources"]])
+
+    # 문제 2
+    report = grade()
+    print("\n[문제2] 채점:", report["score"])
+    for d in report["details"]:
+        print(f"  {'O' if d['ok'] else 'X'} {d['question']} (기대 {d['expect']})")
+
+
+if __name__ == "__main__":
+    run_demo()
+
+===== rag_qa_console_project/code/rag_service.py =====
+# -*- coding: utf-8 -*-
+"""RAG QA 서비스 모듈.
+
+이 모듈은 정책 PDF를 로드하고, 청킹하고, 임베딩하여 메모리 검색기를 만든 뒤,
+검색 결과만 근거로 답변하고 출처를 함께 반환하는 기능을 제공합니다.
+
+Windows에서 PyTorch와 FAISS가 서로 다른 OpenMP DLL을 동시에 로드하는 문제를
+방지하기 위해 FAISS 대신 LangChain의 InMemoryVectorStore를 사용합니다.
+"""
+
+# 운영체제와 무관하게 파일명만 추출하기 위해 Path 클래스를 가져옵니다.
+from pathlib import Path
+
+# 타입 힌트에 사용할 Any와 Iterable을 가져옵니다.
+from typing import Any, Iterable
+
+# PyTorch 텐서 연산과 코사인 유사도 계산을 위해 torch를 가져옵니다.
+import torch
+
+# 제공된 공통 모듈에서 문서 경로, 채팅 모델, 임베딩 모델 생성 함수를 가져옵니다.
+from common import DOCS, get_chat, get_embeddings
+
+# PDF 파일을 페이지 단위 Document 객체로 읽기 위해 PyPDFLoader를 가져옵니다.
+from langchain_community.document_loaders import PyPDFLoader
+
+# 별도 네이티브 DLL 없이 동작하는 LangChain 메모리 벡터 저장소를 가져옵니다.
+# FAISS를 사용하지 않으므로 libomp140.x86_64.dll과 libiomp5md.dll 충돌을 피할 수 있습니다.
+from langchain_core.vectorstores import InMemoryVectorStore
+
+# LLM 응답 객체에서 문자열만 추출하기 위해 StrOutputParser를 가져옵니다.
+from langchain_core.output_parsers import StrOutputParser
+
+# 환각 억제용 프롬프트 템플릿을 만들기 위해 ChatPromptTemplate을 가져옵니다.
+from langchain_core.prompts import ChatPromptTemplate
+
+# LCEL에서 입력 질문을 그대로 통과시키기 위해 RunnablePassthrough를 가져옵니다.
+from langchain_core.runnables import RunnablePassthrough
+
+# 긴 문서를 의미 단위 청크로 나누기 위해 RecursiveCharacterTextSplitter를 가져옵니다.
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+
+# 정책 문서에 없는 내용은 추측하지 않도록 명시한 공통 프롬프트를 정의합니다.
+PROMPT = ChatPromptTemplate.from_template(
+    "너는 쇼핑몰 정책 문서를 기반으로 답하는 CS 상담원이다.\n"
+    "아래 [문서] 내용만 근거로 한국어로 정확하고 간결하게 답하라.\n"
+    "문서에 없는 내용은 추측하거나 일반 지식을 섞지 말고 "
+    "'제공된 문서에서 찾을 수 없습니다.'라고 답하라.\n"
+    "답변에 근거가 되는 핵심 조건이나 기간이 있으면 빠뜨리지 말라.\n\n"
+    "[문서]\n{context}\n\n"
+    "[질문]\n{question}\n\n"
+    "[답변]"
+)
+
+
+# 검색기와 LLM을 최초 한 번만 만들어 재사용하기 위한 전역 캐시를 선언합니다.
+_RETRIEVER_CACHE: dict[tuple[str, int], Any] = {}
+
+# 채팅 모델을 제공자별로 최초 한 번만 만들어 재사용하기 위한 전역 캐시를 선언합니다.
+_LLM_CACHE: dict[str, Any] = {}
+
+
+def load_policy_documents() -> list[Any]:
+    """docs 폴더의 모든 PDF를 페이지 단위 Document 리스트로 로드합니다."""
+
+    # 파일명이 달라져도 실행되도록 특정 이름을 하드코딩하지 않고 모든 PDF를 찾습니다.
+    pdf_paths = sorted(DOCS.glob("*.pdf"))
+
+    # PDF가 하나도 없으면 설정 문제를 바로 확인할 수 있도록 예외를 발생시킵니다.
+    if not pdf_paths:
+        raise FileNotFoundError(f"PDF 문서를 찾을 수 없습니다: {DOCS}")
+
+    # 여러 PDF에서 읽은 Document 객체를 누적할 빈 리스트를 만듭니다.
+    documents: list[Any] = []
+
+    # docs 폴더에서 찾은 각 PDF 파일을 차례로 처리합니다.
+    for pdf_path in pdf_paths:
+        # 현재 PDF를 페이지 단위 Document 객체로 읽는 로더를 생성합니다.
+        loader = PyPDFLoader(str(pdf_path))
+
+        # 현재 PDF의 모든 페이지를 읽어 전체 문서 리스트 뒤에 추가합니다.
+        loaded_pages = loader.load()
+
+        # 일부 PDF에서 source metadata가 누락되더라도 출처가 유지되도록 보정합니다.
+        for page in loaded_pages:
+            page.metadata.setdefault("source", str(pdf_path))
+
+        # 현재 PDF에서 읽은 페이지들을 전체 문서 리스트에 추가합니다.
+        documents.extend(loaded_pages)
+
+    # docs 폴더에서 읽은 모든 페이지 Document를 반환합니다.
+    return documents
+
+
+def split_documents(
+    documents: list[Any],
+    chunk_size: int = 500,
+    chunk_overlap: int = 50,
+) -> list[Any]:
+    """페이지 Document를 검색에 적합한 작은 청크로 나눕니다."""
+
+    # 청크 크기와 겹침 크기를 검증하여 잘못된 설정을 조기에 차단합니다.
+    if chunk_size <= 0:
+        raise ValueError("chunk_size는 1 이상이어야 합니다.")
+
+    # 겹침은 음수가 될 수 없고 청크 크기보다 작아야 합니다.
+    if chunk_overlap < 0 or chunk_overlap >= chunk_size:
+        raise ValueError("chunk_overlap은 0 이상이고 chunk_size보다 작아야 합니다.")
+
+    # 단락, 줄바꿈, 공백 순으로 가능한 자연스러운 경계를 찾는 분할기를 생성합니다.
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+    )
+
+    # 원본 metadata를 보존하면서 문서들을 청크 단위로 분할합니다.
+    chunks = splitter.split_documents(documents)
+
+    # 각 청크에 화면 표시용 청크 번호를 추가합니다.
+    for index, chunk in enumerate(chunks):
+        chunk.metadata["chunk_id"] = index
+
+    # 분할이 완료된 청크 리스트를 반환합니다.
+    return chunks
+
+
+def build_vector_store(provider: str = "gemini") -> InMemoryVectorStore:
+    """정책 문서를 임베딩하여 메모리 벡터 저장소를 생성합니다."""
+
+    # PDF 문서를 페이지 단위로 읽습니다.
+    documents = load_policy_documents()
+
+    # 읽은 문서를 기본 설정인 500자, 50자 겹침으로 청킹합니다.
+    chunks = split_documents(documents)
+
+    # common.py를 통해 선택한 제공자의 임베딩 모델을 생성합니다.
+    embeddings = get_embeddings(provider)
+
+    # FAISS 대신 순수 Python 중심의 메모리 벡터 저장소를 생성합니다.
+    vector_store = InMemoryVectorStore(embedding=embeddings)
+
+    # 청크 본문과 metadata를 임베딩하여 메모리 벡터 저장소에 추가합니다.
+    vector_store.add_documents(documents=chunks)
+
+    # 생성한 벡터 저장소를 반환합니다.
+    return vector_store
+
+
+def get_retriever(provider: str = "gemini", k: int = 4) -> Any:
+    """선택한 제공자와 k값에 맞는 검색기를 캐시하여 반환합니다."""
+
+    # 검색 개수는 최소 1개 이상이어야 합니다.
+    if k <= 0:
+        raise ValueError("k는 1 이상이어야 합니다.")
+
+    # 제공자와 k값을 조합해 캐시 키를 만듭니다.
+    cache_key = (provider, k)
+
+    # 아직 해당 검색기가 만들어지지 않았다면 새로 생성합니다.
+    if cache_key not in _RETRIEVER_CACHE:
+        # 선택한 임베딩 제공자로 벡터 저장소를 생성합니다.
+        vector_store = build_vector_store(provider)
+
+        # 벡터 저장소를 질문 입력형 검색기로 변환하고 상위 k개를 반환하도록 설정합니다.
+        _RETRIEVER_CACHE[cache_key] = vector_store.as_retriever(
+            search_kwargs={"k": k}
+        )
+
+    # 캐시에 보관된 검색기를 반환합니다.
+    return _RETRIEVER_CACHE[cache_key]
+
+
+def get_llm(provider: str = "gemini") -> Any:
+    """temperature=0인 채팅 모델을 제공자별로 캐시하여 반환합니다."""
+
+    # 아직 해당 제공자의 채팅 모델이 없다면 새로 생성합니다.
+    if provider not in _LLM_CACHE:
+        # 사실 기반 답변의 일관성을 위해 temperature를 0으로 설정합니다.
+        _LLM_CACHE[provider] = get_chat(provider=provider, temperature=0.0)
+
+    # 캐시에 저장된 채팅 모델을 반환합니다.
+    return _LLM_CACHE[provider]
+
+
+def format_docs(documents: Iterable[Any]) -> str:
+    """검색된 Document들의 본문과 간단한 출처를 하나의 context 문자열로 합칩니다."""
+
+    # 문서별로 정리된 문자열을 저장할 빈 리스트를 만듭니다.
+    blocks: list[str] = []
+
+    # 검색된 각 문서를 차례로 처리합니다.
+    for index, document in enumerate(documents, start=1):
+        # metadata의 전체 경로에서 파일명만 안전하게 추출합니다.
+        source = Path(str(document.metadata.get("source", "알 수 없음"))).name
+
+        # PyPDFLoader의 페이지 번호는 0부터 시작하므로 사용자 표시용으로 1을 더합니다.
+        raw_page = document.metadata.get("page")
+        display_page = raw_page + 1 if isinstance(raw_page, int) else "?"
+
+        # 번호, 파일명, 페이지, 본문을 하나의 근거 블록으로 구성합니다.
+        block = (
+            f"[근거 {index} | {source} | {display_page}페이지]\n"
+            f"{document.page_content.strip()}"
+        )
+
+        # 완성한 근거 블록을 리스트에 추가합니다.
+        blocks.append(block)
+
+    # 각 근거 블록 사이를 빈 줄로 구분해 하나의 context 문자열로 반환합니다.
+    return "\n\n".join(blocks)
+
+
+def extract_sources(documents: Iterable[Any]) -> list[dict[str, Any]]:
+    """검색 문서의 파일명과 페이지를 중복 없이 추출합니다."""
+
+    # 최종 출처 목록을 저장할 빈 리스트를 만듭니다.
+    sources: list[dict[str, Any]] = []
+
+    # 이미 추가한 출처를 빠르게 확인하기 위한 집합을 만듭니다.
+    seen: set[tuple[str, Any]] = set()
+
+    # 검색된 각 문서를 차례로 처리합니다.
+    for document in documents:
+        # 전체 경로가 아닌 파일명만 추출합니다.
+        source = Path(str(document.metadata.get("source", "알 수 없음"))).name
+
+        # 내부 페이지 번호를 가져옵니다.
+        raw_page = document.metadata.get("page")
+
+        # 화면과 JSON 응답에서는 사람이 읽는 1부터 시작하는 페이지 번호로 바꿉니다.
+        display_page = raw_page + 1 if isinstance(raw_page, int) else None
+
+        # 파일명과 페이지 번호를 중복 판단 키로 사용합니다.
+        key = (source, display_page)
+
+        # 아직 추가하지 않은 출처만 결과에 넣습니다.
+        if key not in seen:
+            seen.add(key)
+            sources.append({"source": source, "page": display_page})
+
+    # 중복이 제거된 출처 리스트를 반환합니다.
+    return sources
+
+
+def create_lcel_chain(provider: str = "gemini", k: int = 4) -> Any:
+    """검색→프롬프트→LLM→문자열 변환을 연결한 LCEL 체인을 생성합니다."""
+
+    # 선택한 제공자와 k값으로 검색기를 가져옵니다.
+    retriever = get_retriever(provider=provider, k=k)
+
+    # 선택한 제공자의 채팅 모델을 가져옵니다.
+    llm = get_llm(provider=provider)
+
+    # 질문 하나에서 context와 question 두 입력을 만드는 LCEL 체인을 구성합니다.
+    chain = (
+        {
+            "context": retriever | format_docs,
+            "question": RunnablePassthrough(),
+        }
+        | PROMPT
+        | llm
+        | StrOutputParser()
+    )
+
+    # 완성한 LCEL 체인을 반환합니다.
+    return chain
+
+
+def answer(question: str, provider: str = "gemini", k: int = 4) -> dict[str, Any]:
+    """질문에 대해 문서 근거 답변과 출처를 함께 반환합니다."""
+
+    # 공백만 있는 질문은 API 호출 전에 차단합니다.
+    if not question or not question.strip():
+        raise ValueError("질문을 한 글자 이상 입력해야 합니다.")
+
+    # 출처를 보존하기 위해 검색을 체인 밖에서 먼저 실행합니다.
+    retriever = get_retriever(provider=provider, k=k)
+
+    # 질문과 의미가 가까운 상위 k개 청크를 검색합니다.
+    documents = retriever.invoke(question.strip())
+
+    # 검색된 청크를 LLM 프롬프트에 넣을 하나의 문자열로 합칩니다.
+    context = format_docs(documents)
+
+    # 선택한 제공자의 채팅 모델을 가져옵니다.
+    llm = get_llm(provider=provider)
+
+    # 프롬프트, LLM, 문자열 파서를 연결한 간단한 생성 체인을 만듭니다.
+    generation_chain = PROMPT | llm | StrOutputParser()
+
+    # 검색 문서와 원본 질문을 넣어 근거 제한 답변을 생성합니다.
+    response_text = generation_chain.invoke(
+        {"context": context, "question": question.strip()}
+    )
+
+    # 답변 문자열과 중복 제거된 출처를 딕셔너리로 묶어 반환합니다.
+    return {
+        "answer": response_text,
+        "sources": extract_sources(documents),
+    }
+
+
+def compare_k(question: str, provider: str = "gemini", values: tuple[int, ...] = (2, 4, 6)) -> dict[int, list[Any]]:
+    """여러 k값으로 검색한 청크를 비교할 수 있도록 딕셔너리로 반환합니다."""
+
+    # k값별 검색 결과를 저장할 빈 딕셔너리를 만듭니다.
+    result: dict[int, list[Any]] = {}
+
+    # 지정한 각 k값으로 검색을 반복합니다.
+    for k in values:
+        # 현재 k값에 맞는 검색기를 가져옵니다.
+        retriever = get_retriever(provider=provider, k=k)
+
+        # 현재 질문에 대한 검색 결과를 저장합니다.
+        result[k] = retriever.invoke(question)
+
+    # k값별 검색 결과 딕셔너리를 반환합니다.
+    return result
+
+
+def torch_rerank(question: str, documents: list[Any], provider: str = "gemini", top_n: int = 2) -> list[tuple[float, Any]]:
+    """PyTorch 코사인 유사도로 후보 청크를 다시 정렬합니다."""
+
+    # 반환할 문서 수가 1 이상인지 검증합니다.
+    if top_n <= 0:
+        raise ValueError("top_n은 1 이상이어야 합니다.")
+
+    # 선택한 제공자의 임베딩 모델을 가져옵니다.
+    embeddings = get_embeddings(provider)
+
+    # 사용자 질문 한 개를 검색용 벡터로 변환합니다.
+    question_vector = embeddings.embed_query(question)
+
+    # 후보 청크 본문을 리스트로 추출합니다.
+    document_texts = [document.page_content for document in documents]
+
+    # 여러 후보 청크를 한 번의 배치 호출로 임베딩합니다.
+    document_vectors = embeddings.embed_documents(document_texts)
+
+    # 질문 벡터를 float32 PyTorch 텐서로 변환하고 배치 차원을 추가합니다.
+    q_tensor = torch.tensor(question_vector, dtype=torch.float32).unsqueeze(0)
+
+    # 문서 벡터 목록을 float32 PyTorch 행렬로 변환합니다.
+    d_tensor = torch.tensor(document_vectors, dtype=torch.float32)
+
+    # 질문 벡터를 L2 정규화하여 방향 비교가 가능하도록 만듭니다.
+    q_normalized = torch.nn.functional.normalize(q_tensor, p=2, dim=1)
+
+    # 모든 문서 벡터도 행 단위로 L2 정규화합니다.
+    d_normalized = torch.nn.functional.normalize(d_tensor, p=2, dim=1)
+
+    # 정규화된 질문과 문서 행렬의 내적으로 코사인 유사도를 한 번에 계산합니다.
+    scores = torch.matmul(d_normalized, q_normalized.transpose(0, 1)).squeeze(1)
+
+    # 점수를 Python 실수와 Document 쌍으로 묶습니다.
+    scored_documents = [
+        (float(score.item()), document)
+        for score, document in zip(scores, documents)
+    ]
+
+    # 코사인 유사도가 높은 문서가 앞에 오도록 내림차순 정렬합니다.
+    scored_documents.sort(key=lambda item: item[0], reverse=True)
+
+    # 요청한 상위 top_n개만 반환합니다.
+    return scored_documents[:top_n]
+
+
+def _parse_score(raw_text: str) -> int:
+    """LLM이 반환한 문자열에서 0~10 범위 정수를 안전하게 추출합니다."""
+
+    # 문자열 안의 숫자만 차례로 모읍니다.
+    digits = "".join(character for character in raw_text if character.isdigit())
+
+    # 숫자가 하나도 없다면 가장 낮은 관련도인 0점을 반환합니다.
+    if not digits:
+        return 0
+
+    # 추출한 숫자를 정수로 바꿉니다.
+    score = int(digits)
+
+    # 점수가 0보다 작거나 10보다 커지지 않도록 범위를 제한합니다.
+    return max(0, min(score, 10))
+
+
+def llm_rerank(
+    question: str,
+    documents: list[Any],
+    provider: str = "gemini",
+    top_n: int = 2,
+) -> list[tuple[int, Any]]:
+    """LLM이 후보 청크의 질문 관련도를 0~10점으로 평가해 재정렬합니다."""
+
+    # 반환할 문서 수가 1 이상인지 검증합니다.
+    if top_n <= 0:
+        raise ValueError("top_n은 1 이상이어야 합니다.")
+
+    # 사실 판단의 일관성을 위해 temperature=0인 채팅 모델을 가져옵니다.
+    llm = get_llm(provider)
+
+    # 점수와 문서 쌍을 저장할 빈 리스트를 만듭니다.
+    scored_documents: list[tuple[int, Any]] = []
+
+    # 각 후보 문서를 개별적으로 평가합니다.
+    for document in documents:
+        # 과도한 토큰 사용을 막기 위해 청크 앞부분 700자까지만 평가에 사용합니다.
+        content = document.page_content[:700]
+
+        # LLM이 설명 없이 정수 하나만 반환하도록 매우 제한적인 채점 프롬프트를 만듭니다.
+        scoring_prompt = (
+            "다음 [문서조각]이 [질문]에 직접 답하는 데 얼마나 관련 있는지 "
+            "0부터 10까지의 정수 하나로만 답하라. 설명이나 기호를 출력하지 말라.\n\n"
+            f"[질문]\n{question}\n\n"
+            f"[문서조각]\n{content}\n\n"
+            "[점수]"
+        )
+
+        # 채팅 모델로 관련도 점수를 요청합니다.
+        response = llm.invoke(scoring_prompt)
+
+        # 모델 응답 객체의 content 문자열을 안전하게 가져옵니다.
+        raw_text = str(getattr(response, "content", response))
+
+        # 문자열을 0~10 범위 정수로 변환합니다.
+        score = _parse_score(raw_text)
+
+        # 계산한 점수와 원본 문서를 함께 저장합니다.
+        scored_documents.append((score, document))
+
+    # 점수가 높은 문서가 앞에 오도록 내림차순 정렬합니다.
+    scored_documents.sort(key=lambda item: item[0], reverse=True)
+
+    # 상위 top_n개 결과만 반환합니다.
+    return scored_documents[:top_n]
+
+===== rag_qa_console_project/test_solutions.py =====
+# -*- coding: utf-8 -*-
+"""실습해답 검증 (answer_fn 스텁 주입, GOOGLE_API_KEY 불필요).
+
+answer()는 실키가 필요하므로, 채점 로직(grade)은 스텁 answer_fn으로 검증한다.
+실사용에서는 grade()가 실제 rag_service.answer를 호출한다.
+"""
+import pathlib
+import sys
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent / "code"))
+
+from solutions import GRADING_SET, grade  # noqa: E402
+
+
+def _stub(correct: bool):
+    mapping = {item["question"]: (item["expect"] if correct else "모르겠습니다") for item in GRADING_SET}
+
+    def fn(question: str) -> dict:
+        return {"answer": f"문서에 따르면 정답은 {mapping[question]} 입니다.", "sources": [{"source": "policy.pdf"}]}
+
+    return fn
+
+
+def main() -> None:
+    assert len(GRADING_SET) == 3, "채점 세트는 3문항"
+
+    # 정답 스텁 → 3/3
+    ok = grade(_stub(True))
+    assert ok["score"] == "3/3", ok
+    print("[정답 스텁] 채점:", ok["score"])
+
+    # 오답 스텁 → 0/3
+    ng = grade(_stub(False))
+    assert ng["passed"] == 0, ng
+    print("[오답 스텁] 채점:", ng["score"])
+
+    # 콤마 표기 정규화 확인 (answer가 '10,000원'이어도 expect '10000' 매칭)
+    def comma_fn(q):
+        return {"answer": "제주 왕복 배송비는 10,000원 입니다.", "sources": []}
+
+    one = grade(comma_fn)
+    # 3문항 중 제주 배송비(10000)만 통과해야 함
+    jeju = [d for d in one["details"] if d["expect"] == "10000"][0]
+    assert jeju["ok"] is True, one
+
+    print("RAG_QA_SOLUTIONS_OK")
+
+
+if __name__ == "__main__":
+    main()
+
+
+codex
+정적 검수 결과입니다. PDF 정답값은 제시한 값을 기준으로 판단했습니다.
+
+| 프로젝트 | 문제 1 | 문제 2 |
+|---|---:|---:|
+| embedding | O* | X |
+| rag | O | O |
+| rag_qa | O | O* |
+
+\* 구현 형태는 충족하지만 검증 또는 채점 정확성에 문제가 있습니다.
+
+### embedding_console_project
+
+- 문제 1 O*: `most_similar()`가 문서·질의를 임베딩하고 코사인 유사도 상위 k개와 점수를 반환합니다. 다만 실제 모델이 `gemini-embedding-001`인지는 읽도록 지정된 파일만으로 확인할 수 없습니다.
+- 문제 2 X: `reviews[0]`, `reviews[1]`, `reviews[-1]`을 무조건 선택하므로 “긍정 리뷰 2개와 무관한 리뷰 1개”라는 조건을 보장하지 않습니다.
+
+버그/엣지:
+
+- 빈 `docs`는 `[]`, 빈 query는 `ValueError`로 적절합니다.
+- `k <= 0`을 오류로 처리하지 않고 강제로 1로 바꾸는 동작은 뜻밖입니다.
+- 벡터 L2 정규화와 영벡터 처리는 대체로 안전합니다.
+- 문서 임베딩 개수와 `docs` 개수가 다를 때는 방어가 없습니다.
+
+테스트:
+
+- 합성 문장과 다른 로컬 모델만 사용하므로 `faq.csv`, `reviews.csv`, Gemini 모델 요구를 검증하지 않습니다.
+- 빈 docs, `k <= 0`, 영벡터, 차원 불일치도 검증하지 않습니다.
+
+최종: 미완성. 반드시 리뷰의 긍정/무관 조건을 명시적으로 선택하고, 실제 지정 데이터와 Gemini 모델을 확인하는 통합 테스트를 추가해야 합니다.
+
+### rag_console_project
+
+- 문제 1 O: 위치 기준 step이 `size-overlap`이므로 연속 청크가 지정 길이만큼 겹칩니다.
+- 문제 2 O: 200/500/1000별 개수·평균 길이를 출력하고 결론도 제공합니다.
+
+버그/엣지:
+
+- 일반적인 `overlap > 0`에서는 겹침이 정확합니다.
+- `overlap=0`도 실제 분할은 맞지만, docstring의 `chunk[i][-overlap:]` 식은 `-0 == 0` 때문에 성립하지 않습니다.
+- 짧은 마지막 청크도 앞 청크와 최대 overlap만큼 정상적으로 겹칩니다.
+- `chunk_size_comparison()`은 잘못된 작은 size에서 overlap을 조용히 축소합니다. 호출 오류를 숨길 수 있습니다.
+
+테스트:
+
+- 첫째/둘째 청크만 확인하며 모든 인접 청크의 겹침은 확인하지 않습니다.
+- “끝 문자를 포함한다”만 검사해 중복 제거 후 원문이 정확히 복원되는지는 검증하지 않습니다.
+- 평균 길이 정확성, 표 출력, 결론 문구, 실제 PDF 입력을 검증하지 않습니다.
+
+최종: 해답 구현은 완성. 다만 테스트 완성도는 부족하므로 전체 인접 겹침과 원문 복원 검증을 반드시 추가하는 편이 좋습니다.
+
+### rag_qa_console_project
+
+- 문제 1 O: `answer()`가 `answer`와 `sources`를 반환하며 출처 파일명을 추출합니다.
+- 문제 2 O*: 정답 3개가 `4000`, `180`, `10000`으로 맞고 `n/3` 채점 결과를 반환합니다. 그러나 채점 방식이 느슨합니다.
+
+버그/엣지:
+
+- 콤마·일반 공백·`원`은 제거합니다.
+- `Pa`, `분`은 제거하지 않지만 현재는 부분문자열 비교라 `4,000Pa`, `180분`이 우연히 통과합니다.
+- 부분문자열 방식이라 `14000`이 `4000`으로, `1800분`이 `180분`으로 오채점될 수 있습니다.
+- `4 kPa`, NBSP, 전각 콤마 같은 동등 표기는 처리하지 못합니다.
+- 검색된 상위 k개 전부를 sources로 반환하므로 실제 답변 근거가 아닌 파일도 출처에 포함될 수 있습니다.
+
+테스트:
+
+- `answer()`의 반환 구조와 `환불교환정책.pdf` 출처를 전혀 검증하지 않습니다.
+- 실제 RAG 검색·답변이나 PDF 정답 3개를 검증하지 않고, 정답 자체를 돌려주는 스텁만 검사합니다.
+- 콤마 테스트도 제주 문항 통과만 확인하고 다른 두 문항의 오통과 여부는 확인하지 않습니다.
+- `Pa`, `분`, 숫자 경계, `kPa` 변환을 검증하지 않습니다.
+
+최종: 기능 골격은 있으나 프로젝트 검증 기준으로는 미완성. 반드시 단위별 숫자 추출과 경계 비교를 적용하고, `4,000Pa`, `180분`, `10,000원` 및 출처 파일명을 직접 검증하는 테스트를 추가해야 합니다.
+tokens used
+16,467
+정적 검수 결과입니다. PDF 정답값은 제시한 값을 기준으로 판단했습니다.
+
+| 프로젝트 | 문제 1 | 문제 2 |
+|---|---:|---:|
+| embedding | O* | X |
+| rag | O | O |
+| rag_qa | O | O* |
+
+\* 구현 형태는 충족하지만 검증 또는 채점 정확성에 문제가 있습니다.
+
+### embedding_console_project
+
+- 문제 1 O*: `most_similar()`가 문서·질의를 임베딩하고 코사인 유사도 상위 k개와 점수를 반환합니다. 다만 실제 모델이 `gemini-embedding-001`인지는 읽도록 지정된 파일만으로 확인할 수 없습니다.
+- 문제 2 X: `reviews[0]`, `reviews[1]`, `reviews[-1]`을 무조건 선택하므로 “긍정 리뷰 2개와 무관한 리뷰 1개”라는 조건을 보장하지 않습니다.
+
+버그/엣지:
+
+- 빈 `docs`는 `[]`, 빈 query는 `ValueError`로 적절합니다.
+- `k <= 0`을 오류로 처리하지 않고 강제로 1로 바꾸는 동작은 뜻밖입니다.
+- 벡터 L2 정규화와 영벡터 처리는 대체로 안전합니다.
+- 문서 임베딩 개수와 `docs` 개수가 다를 때는 방어가 없습니다.
+
+테스트:
+
+- 합성 문장과 다른 로컬 모델만 사용하므로 `faq.csv`, `reviews.csv`, Gemini 모델 요구를 검증하지 않습니다.
+- 빈 docs, `k <= 0`, 영벡터, 차원 불일치도 검증하지 않습니다.
+
+최종: 미완성. 반드시 리뷰의 긍정/무관 조건을 명시적으로 선택하고, 실제 지정 데이터와 Gemini 모델을 확인하는 통합 테스트를 추가해야 합니다.
+
+### rag_console_project
+
+- 문제 1 O: 위치 기준 step이 `size-overlap`이므로 연속 청크가 지정 길이만큼 겹칩니다.
+- 문제 2 O: 200/500/1000별 개수·평균 길이를 출력하고 결론도 제공합니다.
+
+버그/엣지:
+
+- 일반적인 `overlap > 0`에서는 겹침이 정확합니다.
+- `overlap=0`도 실제 분할은 맞지만, docstring의 `chunk[i][-overlap:]` 식은 `-0 == 0` 때문에 성립하지 않습니다.
+- 짧은 마지막 청크도 앞 청크와 최대 overlap만큼 정상적으로 겹칩니다.
+- `chunk_size_comparison()`은 잘못된 작은 size에서 overlap을 조용히 축소합니다. 호출 오류를 숨길 수 있습니다.
+
+테스트:
+
+- 첫째/둘째 청크만 확인하며 모든 인접 청크의 겹침은 확인하지 않습니다.
+- “끝 문자를 포함한다”만 검사해 중복 제거 후 원문이 정확히 복원되는지는 검증하지 않습니다.
+- 평균 길이 정확성, 표 출력, 결론 문구, 실제 PDF 입력을 검증하지 않습니다.
+
+최종: 해답 구현은 완성. 다만 테스트 완성도는 부족하므로 전체 인접 겹침과 원문 복원 검증을 반드시 추가하는 편이 좋습니다.
+
+### rag_qa_console_project
+
+- 문제 1 O: `answer()`가 `answer`와 `sources`를 반환하며 출처 파일명을 추출합니다.
+- 문제 2 O*: 정답 3개가 `4000`, `180`, `10000`으로 맞고 `n/3` 채점 결과를 반환합니다. 그러나 채점 방식이 느슨합니다.
+
+버그/엣지:
+
+- 콤마·일반 공백·`원`은 제거합니다.
+- `Pa`, `분`은 제거하지 않지만 현재는 부분문자열 비교라 `4,000Pa`, `180분`이 우연히 통과합니다.
+- 부분문자열 방식이라 `14000`이 `4000`으로, `1800분`이 `180분`으로 오채점될 수 있습니다.
+- `4 kPa`, NBSP, 전각 콤마 같은 동등 표기는 처리하지 못합니다.
+- 검색된 상위 k개 전부를 sources로 반환하므로 실제 답변 근거가 아닌 파일도 출처에 포함될 수 있습니다.
+
+테스트:
+
+- `answer()`의 반환 구조와 `환불교환정책.pdf` 출처를 전혀 검증하지 않습니다.
+- 실제 RAG 검색·답변이나 PDF 정답 3개를 검증하지 않고, 정답 자체를 돌려주는 스텁만 검사합니다.
+- 콤마 테스트도 제주 문항 통과만 확인하고 다른 두 문항의 오통과 여부는 확인하지 않습니다.
+- `Pa`, `분`, 숫자 경계, `kPa` 변환을 검증하지 않습니다.
+
+최종: 기능 골격은 있으나 프로젝트 검증 기준으로는 미완성. 반드시 단위별 숫자 추출과 경계 비교를 적용하고, `4,000Pa`, `180분`, `10,000원` 및 출처 파일명을 직접 검증하는 테스트를 추가해야 합니다.
