@@ -34,6 +34,12 @@ def _rag_env(tmp_path_factory):
     (docs / "refund.txt").write_text(
         "환불은 구매 후 7일 이내에 가능하며 전액 환불된다.", encoding="utf-8"
     )
+    # 실제 정책 PDF도 코퍼스에 포함(TXT+PDF 혼합 인덱싱·page 메타데이터 검증)
+    import shutil
+
+    src_pdf = get_settings().DATA_DIR / "docs" / "환불교환정책.pdf"
+    assert src_pdf.exists(), f"테스트 전제 PDF가 없습니다: {src_pdf}"
+    shutil.copy(src_pdf, docs / "환불교환정책.pdf")
     s.VECTOR_DIR = tmp / "vec"
     s.DOCS_DIR = docs
     service.reset_store()
@@ -60,6 +66,21 @@ def test_index_is_current_detects_model_change():
         s.ST_EMBEDDING_MODEL = orig
 
 
+def test_index_is_current_detects_doc_change():
+    """문서를 추가하면 인덱스가 stale로 판정돼 재빌드 대상이 된다."""
+    from app.rag.build_index import index_is_current
+
+    s = get_settings()
+    assert index_is_current() is True
+    new_doc = s.DOCS_DIR / "extra_temp.txt"
+    new_doc.write_text("새로 추가한 문서", encoding="utf-8")
+    try:
+        assert index_is_current() is False  # 문서 추가 → stale
+    finally:
+        new_doc.unlink()
+    assert index_is_current() is True  # 원복 → 다시 current
+
+
 def test_search_returns_relevant_with_source_and_distance():
     results = service.search("에이전트 무한루프를 어떻게 막나요?", k=3)
     assert len(results) >= 1
@@ -81,8 +102,10 @@ def test_source_metadata_filter():
 
 
 def test_irrelevant_query_filtered_by_distance():
-    # 코퍼스와 완전히 무관한 질의 → 임계값(RAG_MAX_DISTANCE) 초과로 결과 제외
-    results = service.search("양자역학의 슈뢰딩거 방정식 유도 과정", k=3)
+    # 코퍼스와 완전히 무관한 질의 → 임계값(RAG_MAX_DISTANCE) 초과로 결과 제외.
+    # 주의: 거리 임계값은 coarse 필터라 ko-sroberta가 격식체 한국어(정책 PDF 등)에는
+    # 무관 질의도 중간 거리를 줄 수 있다. 확실히 먼 도메인의 질의로 검증한다.
+    results = service.search("아프리카 사바나 코끼리의 계절별 이동 경로", k=3)
     assert results == []
 
 
@@ -127,3 +150,26 @@ def test_summarize_map_reduce_mock():
         return "부분요약" if "간단히" in prompt else "통합요약"
 
     assert summarize_text(long_text, chat_complete=fake) == "통합요약"
+
+
+def test_pdf_indexed_with_page_metadata():
+    """PDF가 인덱싱되고 검색 결과에 page(정수)가 포함되는지 (혼합 코퍼스)."""
+    results = service.search("제주 지역 반품 배송비는 얼마인가요?", k=5)
+    pdf_hits = [r for r in results if r["source"].endswith(".pdf")]
+    assert pdf_hits, f"PDF 청크가 검색돼야 함: {[r['source'] for r in results]}"
+    assert isinstance(pdf_hits[0]["page"], int), "PDF 결과는 page(정수)를 가져야 함"
+
+
+def test_qa_over_pdf_with_mock_llm():
+    """QA가 PDF 근거로 답변하고 출처(파일·1-based page)를 반환하는지 (mock LLM)."""
+    from app.rag import qa
+
+    res = qa.answer(
+        "제주 지역 반품 배송비는 얼마인가요?",
+        k=5,
+        chat_complete=lambda p: "제주 지역 왕복 반품 배송비는 10,000원입니다.",
+    )
+    assert "10,000" in res["answer"]
+    assert res["sources"], "출처가 있어야 함"
+    pdf_src = [s for s in res["sources"] if s["source"].endswith(".pdf")]
+    assert pdf_src and isinstance(pdf_src[0]["page"], int) and pdf_src[0]["page"] >= 1

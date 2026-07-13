@@ -25,6 +25,7 @@ faiss-cpu==1.14.3
 langchain-community==0.4.2
 langchain-huggingface==1.2.2
 langchain-text-splitters==1.1.2
+pypdf==6.14.2
 # Phase 6 (ML: 감성분석 KoELECTRA)
 transformers==5.13.0
 torch==2.12.0

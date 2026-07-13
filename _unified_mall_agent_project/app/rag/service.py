@@ -54,6 +54,7 @@ def search(query: str, k: int | None = None, source: str | None = None) -> list[
         {
             "text": doc.page_content,
             "source": doc.metadata.get("source", ""),
+            "page": doc.metadata.get("page"),  # PDF는 0-based, TXT는 None
             "distance": float(score),  # 거리: 작을수록 유사
         }
         for doc, score in pairs

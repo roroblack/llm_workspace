@@ -59,7 +59,7 @@ pytest -m "llm"                  # 로컬 Gemma/실키 서버 기동 시 라이�
 ## 주요 엔드포인트
 - `POST /api/agent/chat` (수동 ReAct) / `/api/agent/lc-chat` (LangChain)
 - `POST /auth/signup` `/auth/login`, `/api/products`, `/api/orders`, `/api/payments`
-- `POST /api/rag/search` `/api/rag/summarize`
+- `POST /api/rag/search` `/api/rag/summarize` `/api/rag/qa`(근거 기반 답변+출처 인용, TXT/PDF)
 - `POST /api/nlp/intent` `/sentiment` `/recommend`
 - `POST /api/lab/{basic,role,diversity,token-compare,estimate-cost,usecase}`
 - `GET /api/health`

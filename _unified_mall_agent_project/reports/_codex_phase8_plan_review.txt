@@ -1,0 +1,1203 @@
+﻿node.exe : OpenAI Codex v0.144.1
+At C:\Users\playdata2\AppData\Roaming\npm\codex.ps1:22 char:14
++ ...    $input | & "node$exe"  "$basedir/node_modules/@openai/codex/bin/co ...
++                 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (OpenAI Codex v0.144.1:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f5b1c-a731-7e02-b4ad-c35e273f258a
+--------
+user
+?? ??? ?????. ?? ???? Phase 8(RAG QA + PDF ?? ??) ????? ????. ??? ?? ???.
+
+???:
+- _unified_mall_agent_project/plans/2026-07-13_1955_Phase8_RAG_QA_PDF_????.md
+- _unified_mall_agent_project/app/rag/service.py (search ??? ??)
+- _unified_mall_agent_project/app/rag/build_index.py (PDF ?? ??)
+- _unified_mall_agent_project/app/rag/summarize.py (chat_complete ?? ??)
+- _unified_mall_agent_project/RULE.md
+
+?? ??: ?? ????/?? ????? ??? ?. QA? ?? completion?? ?? Gemma? ?? ??.
+
+??? ???? ??? (?? ?? ??):
+1. ?6 ????? 5? ?
+2. ?? ?? ?? ??: build_index? PDF ?? ? TXT ??, search ??? page ??? ?? ??/??? ???
+3. RULE ??: ???? ???????? '?? ? ????'? ???? ???
+4. QA answer? sources ??(?????page None) ?? ??
+5. ?? go/no-go + ?? ? ??? ?? ?
+
+????.
+
+codex
+요청하신 Phase 8 구현을 코드 리뷰 관점에서 점검하겠습니다. 계획서와 `RULE.md`, RAG의 인덱싱·검색·요약 흐름을 함께 읽고, 6개 기준별 점수와 PDF→TXT fallback/page 메타데이터, 
+출처 표기, go/no-go 및 최소 수정안을 근거와 함께 정리하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw '_unified_mall_agent_projec
+t/plans/2026-07-13_1955_Phase8_RAG_QA_PDF_????.md'; Get-Content -Raw '_unified_mall_agent_project/app/rag/service.py'; 
+Get-Content -Raw '_unified_mall_agent_project/app/rag/build_index.py'; Get-Content -Raw '_unified_mall_agent_project/ap
+p/rag/summarize.py'; Get-Content -Raw '_unified_mall_agent_project/RULE.md'" in C:\Users\playdata2\Documents\llm_worksp
+ace
+ succeeded in 1814ms:
+# Phase 8 ?곸꽭 怨꾪쉷 ??RAG QA(洹쇨굅 ?몄슜 ?듬?) 쨌 PDF 濡쒕뵫 蹂닿컯
+
+- ?묒꽦?쇱떆: 2026-07-13 19:55
+- ?곸쐞: `plans/2026-07-12_1511_?듯빀_怨꾪쉷??v2.md` (Phase 5 RAG ?뺤옣)
+- ?≪닔 異쒖쿂: ?ㅻ뒛 異붽???`rag_qa_console_project`(answer+sources), `rag_console_project`(PDF 濡쒕뵫)
+- 諛곌꼍: ?듯빀??寃??`/api/rag/search`)留??덇퀬 **"吏덈Ц?믨렐嫄곌린諛??듬?+異쒖쿂 ?몄슜" QA ?붾뱶?ъ씤?멸? ?놁쓬**. rag_qa `rag_service.answer()`媛 
+?닿구 ?? PDF 濡쒕뵫???놁쓬(Phase5 TXT ?꾩슜 ?댁썡).
+- AI ?뚰듃: **?됰Ц completion?대씪 濡쒖뺄 Gemma濡??쇱씠釉?寃利?媛??*(tool-calling 遺덊븘??
+
+## 1. 紐⑺몴
+1. **RAG QA**: `answer(question)` ??`{answer, sources}` (?섍컖 ?듭젣 ?꾨＼?꾪듃, 異쒖쿂 ?뚯씪쨌?섏씠吏 ?몄슜)
+2. **PDF 濡쒕뵫**: build_index媛 TXT + PDF 紐⑤몢 ?몃뜳??(Phase5 ?댁썡 ?댁냼)
+3. **湲곗〈 ?숈뒿?댁슜 蹂댁〈**: 湲곗〈 rag(embeddings/build_index/service/summarize/search_knowledge_base ?꾧뎄)쨌?붾뱶?ъ씤?맞룻뀒?ㅽ듃 ?꾨? ?좎
+?, ?뚭? ?놁쓬
+
+## 2. ?ㅺ퀎 (湲곗〈 ?ъ궗?? 理쒖냼 異붽?)
+### app/rag/qa.py (?좉퇋)
+- `answer(question, k=None, chat_complete=None)`:
+  - `service.search(question, k)`濡?洹쇨굅 泥?겕 寃??湲곗〈 ?ъ궗?? 嫄곕━ ?꾧퀎媛??꾪꽣 洹몃?濡?
+  - 寃??寃곌낵 ?놁쓬 ??`{"answer": "?쒓났??臾몄꽌?먯꽌 李얠쓣 ???놁뒿?덈떎.", "sources": []}` (?섍컖 ?듭젣)
+  - ?덉쑝硫?洹쇨굅 context 援ъ꽦 ???섍컖?듭젣 ?꾨＼?꾪듃 ??`chat_complete`(?됰Ц) ??`{answer, sources}`
+  - `sources`: 泥?겕 metadata??(source, page) 以묐났 ?쒓굅 紐⑸줉
+  - `chat_complete` 二쇱엯 媛??湲곕낯 = get_chat_client ?됰Ц, summarize? ?숈씪 ?⑦꽩). ?곌껐?ㅽ뙣 InfraError, 鍮?吏덈Ц ValidationErr
+- ?섍컖?듭젣 ?꾨＼?꾪듃: "?꾨옒 [臾몄꽌]???덈뒗 ?댁슜留?洹쇨굅濡??듯븯?? ?놁쑝硫?'?쒓났??臾몄꽌?먯꽌 李얠쓣 ???놁뒿?덈떎.'"
+
+### app/rag/build_index.py (?뺤옣, 湲곗〈 蹂댁〈)
+- `_load_txt_docs` ??`_load_docs`: `*.txt`(湲곗〈 洹몃?濡? **+ `*.pdf`(PyPDFLoader, page metadata 蹂댁〈)**
+- TXT ?숈옉 遺덈?. PDF???섏씠吏蹂?Document??source=?뚯씪紐? page ?좎? ??泥?궧 ??metadata ?꾪뙆
+- 湲곗〈 ?쒓렇?덉쿂/諛섑솚 ?좎?, ?몃뜳??marker 濡쒖쭅 ?좎?
+
+### app/rag/service.py (理쒖냼 ?뺤옣)
+- `search()` 諛섑솚??`page` ?꾨뱶 異붽?(metadata???덉쑝硫?媛? ?놁쑝硫?None). 湲곗〈 ??text/source/distance) ?좎? ??湲곗〈 ?뚯뒪???명솚
+
+### app/routers/rag.py (?붾뱶?ъ씤??異붽?)
+- `POST /api/rag/qa` {question, top_k} ??`{answer, sources}`. 湲곗〈 /search쨌/summarize ?좎?
+
+### ?섏〈??- `pypdf==6.14.2` (?ㅼ튂?? requirements 異붽?
+
+## 3. 湲곗〈 蹂댁〈 泥댄겕由ъ뒪??(?꾨씫 諛⑹?)
+- [ ] 湲곗〈 rag 4紐⑤뱢쨌2?붾뱶?ъ씤?맞톝earch_knowledge_base ?꾧뎄 ?쒓렇?덉쿂 遺덈?
+- [ ] TXT ?몃뜳??寃???뚭? ?놁쓬 (湲곗〈 test_rag ?듦낵)
+- [ ] search 諛섑솚 ?뺤옣? ??異붽?留?湲곗〈 ???좎?)
+- [ ] ?꾩껜 pytest(CI/ml) 湲곗????댁긽 ?듦낵
+- [ ] 怨듬왂吏뫢톀EADME쨌怨꾪쉷??吏꾪뻾??媛깆떊
+
+## 4. ?뚯뒪??- test_qa (ml): mock chat_complete + 濡쒖뺄 ?꾨쿋????answer 援ъ“ {answer, sources}, 愿??吏덈Ц sources 鍮꾩뼱?덉? ?딆쓬, **
+臾닿?/鍮덇?????'李얠쓣 ???놁뒿?덈떎'**(?섍컖?듭젣), 鍮?吏덈Ц ValidationErr
+- PDF: ?꾩떆 PDF???대젮?곕땲 ??data/docs??PDF 異붽? ??build_index ??search媛 PDF ?댁슜 諛섑솚쨌page ?ы븿 (ml). ?먮뒗 rag_qa ?뺤콉 PDF 1媛쒕?
+ data/docs濡??닿???寃利?- ?쇱씠釉?@llm): 濡쒖뺄 Gemma濡?`/api/rag/qa` 洹쇨굅 ?듬? 1嫄?(?됰Ц?대씪 ?ㅼ젣 ?숈옉)
+
+## 5. DoD
+1. `/api/rag/qa`媛 洹쇨굅 湲곕컲 ?듬? + 異쒖쿂(?뚯씪쨌?섏씠吏) 諛섑솚
+2. 臾닿? 吏덈Ц ???섍컖?듭젣 ?묐떟
+3. PDF ?몃뜳?굿룰????숈옉(page ?ы븿)
+4. **湲곗〈 ?뚯뒪???꾨? ?듦낵(?뚭? ?놁쓬)** + ?좉퇋 ?뚯뒪???듦낵
+5. 濡쒖뺄 Gemma ?쇱씠釉?QA 1嫄?6. 怨듬왂吏뫢톀EADME쨌怨꾪쉷?쑣톒istory쨌reports 媛깆떊
+
+## 6. Codex ?쇱쓽 ?ъ씤??- QA瑜?service.search ?ъ궗?⑹쑝濡?援ы쁽?섎뒗 寃?湲곗〈怨??뺥빀?쒓?
+- PDF 濡쒕뵫??build_index???듯빀 ??TXT ?뚭? ?꾪뿕
+- sources page 異붽?媛 湲곗〈 search 怨꾩빟??源⑤뒗媛
+- ?섍컖?듭젣 ?꾨＼?꾪듃쨌鍮덇???泥섎━(?대갚 ?꾨떂 ?뺤씤)
+- rag_qa??rerank???대쾲 踰붿쐞???쒖쇅(YAGNI) ??뱁븳媛
+
+"""RAG ?쒕퉬??(濡쒕뱶 1?? ??PDF4: ?쒕쾭 湲곕룞 ???몃뜳?ㅻ? ??踰덈쭔 濡쒕뱶.
+
+similarity_search_with_score???먯닔??'嫄곕━'(?묒쓣?섎줉 ?좎궗, 肄붿궗?멸낵 諛섎?)?대?濡?諛섑솚 ?꾨뱶紐낆쓣 distance濡??붾떎.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from app.core.config import get_settings
+from app.core.errors import InfraError
+from app.rag.embeddings import get_embeddings
+
+_store = None  # 紐⑤뱢?덈꺼 罹먯떆 (濡쒕뱶 1??
+
+
+def reset_store() -> None:
+    """?뚯뒪??寃⑸━?? 罹먯떆???몃뜳?ㅻ? 鍮꾩슫??"""
+    global _store
+    _store = None
+
+
+def get_store():
+    """VECTOR_DIR??FAISS ?몃뜳?ㅻ? 1??濡쒕뱶??罹먯떆?쒕떎. ?놁쑝硫?紐낇솗???ㅻ쪟."""
+    global _store
+    if _store is not None:
+        return _store
+    from langchain_community.vectorstores import FAISS
+
+    out_dir = get_settings().VECTOR_DIR
+    if not ((out_dir / "index.faiss").exists() and (out_dir / "index.pkl").exists()):
+        raise InfraError(
+            f"FAISS ?몃뜳?ㅺ? ?놁뒿?덈떎: {out_dir}. 癒쇱? build_index瑜??ㅽ뻾?섏꽭??"
+        )
+    # allow_dangerous_deserialization: ?먯껜 ?앹꽦??VECTOR_DIR留?濡쒕뱶?쒕떎???꾩젣 (?좊ː ?뚯뒪)
+    _store = FAISS.load_local(
+        str(out_dir), get_embeddings(), allow_dangerous_deserialization=True
+    )
+    return _store
+
+
+def search(query: str, k: int | None = None, source: str | None = None) -> list[dict[str, Any]]:
+    """吏덈Ц怨??좎궗??泥?겕瑜?嫄곕━ ?ㅻ쫫李⑥닚?쇰줈 諛섑솚?쒕떎. source 硫뷀??꾪꽣 吏??
+
+    嫄곕━媛 RAG_MAX_DISTANCE瑜?珥덇낵?섎뒗(臾닿??? 寃곌낵???쒖쇅?쒕떎(諛⑹뼱).
+    """
+    settings = get_settings()
+    k = k or settings.RAG_TOP_K
+    store = get_store()
+    filter_arg = {"source": source} if source else None
+    pairs = store.similarity_search_with_score(query, k=k, filter=filter_arg)
+    return [
+        {
+            "text": doc.page_content,
+            "source": doc.metadata.get("source", ""),
+            "distance": float(score),  # 嫄곕━: ?묒쓣?섎줉 ?좎궗
+        }
+        for doc, score in pairs
+        if float(score) <= settings.RAG_MAX_DISTANCE
+    ]
+
+
+def add_documents(texts: list[str], sources: list[str]) -> dict:
+    """?몃뜳?ㅼ뿉 臾몄꽌瑜?利앸텇 異붽??섍퀬 ??ν븳??(PDF4 利앸텇 ?낅뜲?댄듃).
+
+    build_index? ?숈씪?섍쾶 泥?궧 ??異붽??쒕떎(湲?臾몄꽌 寃???덉쭏 ?좎?).
+    """
+    if len(texts) != len(sources):
+        raise InfraError("texts? sources 湲몄씠媛 ?ㅻ쫭?덈떎.")
+    from langchain_core.documents import Document
+    from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+    settings = get_settings()
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.CHUNK_SIZE, chunk_overlap=settings.CHUNK_OVERLAP
+    )
+    raw = [Document(page_content=t, metadata={"source": s}) for t, s in zip(texts, sources)]
+    chunks = splitter.split_documents(raw)
+
+    store = get_store()
+    store.add_documents(chunks)
+    store.save_local(str(settings.VECTOR_DIR))
+    return {"added": len(chunks)}
+
+"""?몃뜳??(?ъ쟾 1?? ??PDF4 ?듭떖: ?몃뜳?깃낵 ?쒕퉬??遺꾨━.
+
+data/docs/*.txt ??泥?궧 ??FAISS ?몃뜳????save_local. ?붿껌留덈떎 ?ъ씤?깆떛?섎뒗
+?덊떚?⑦꽩???쇳븯湲??꾪빐 ?쒕퉬??service.py)? 遺꾨━?쒕떎.
+"""
+
+from __future__ import annotations
+
+from pathlib import Path
+
+from langchain_core.documents import Document
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from app.core.config import get_settings
+from app.core.errors import InfraError
+from app.rag.embeddings import get_embeddings
+
+
+def _load_txt_docs(docs_dir: Path) -> list[Document]:
+    if not docs_dir.exists():
+        raise InfraError(f"臾몄꽌 ?대뜑媛 ?놁뒿?덈떎: {docs_dir}")
+    docs: list[Document] = []
+    for path in sorted(docs_dir.glob("*.txt")):
+        text = path.read_text(encoding="utf-8").strip()
+        if text:
+            docs.append(Document(page_content=text, metadata={"source": path.name}))
+    if not docs:
+        raise InfraError(f"?몃뜳?깊븷 txt 臾몄꽌媛 ?놁뒿?덈떎: {docs_dir}")
+    return docs
+
+
+def build_index(docs_dir: Path | None = None, out_dir: Path | None = None) -> dict:
+    """txt 臾몄꽌瑜?泥?궧쨌?꾨쿋?⑺빐 FAISS ?몃뜳?ㅻ? out_dir????ν븳??"""
+    from langchain_community.vectorstores import FAISS
+
+    settings = get_settings()
+    docs_dir = docs_dir or settings.DOCS_DIR
+    out_dir = out_dir or settings.VECTOR_DIR
+
+    docs = _load_txt_docs(docs_dir)
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.CHUNK_SIZE, chunk_overlap=settings.CHUNK_OVERLAP
+    )
+    chunks = splitter.split_documents(docs)
+
+    store = FAISS.from_documents(chunks, get_embeddings())
+    out_dir.mkdir(parents=True, exist_ok=True)
+    store.save_local(str(out_dir))
+    # ?몃뜳?ㅺ? ?대뼡 ?꾨쿋??紐⑤뜽濡?留뚮뱾?댁죱?붿? 湲곕줉(紐⑤뜽 蹂寃????щ퉴???먮떒??
+    (out_dir / ".embedding_model").write_text(settings.ST_EMBEDDING_MODEL, encoding="utf-8")
+    return {"docs": len(docs), "chunks": len(chunks), "out_dir": str(out_dir)}
+
+
+def index_is_current(out_dir: Path | None = None) -> bool:
+    """?붿뒪???몃뜳?ㅺ? ?꾩옱 ?꾨쿋??紐⑤뜽怨??쇱튂?섍퀬 ?꾩쟾?쒖? ?뺤씤?쒕떎."""
+    settings = get_settings()
+    out_dir = out_dir or settings.VECTOR_DIR
+    if not ((out_dir / "index.faiss").exists() and (out_dir / "index.pkl").exists()):
+        return False
+    marker = out_dir / ".embedding_model"
+    return marker.exists() and marker.read_text(encoding="utf-8").strip() == settings.ST_EMBEDDING_MODEL
+
+
+if __name__ == "__main__":
+    print(build_index())
+
+"""臾몄꽌 ?붿빟 (map-reduce, PDF5/langchain_test).
+
+湲??띿뒪?몃? 泥?겕濡??섎닠 泥?겕蹂??붿빟(map) ???듯빀(reduce). 濡쒖뺄 Gemma ?됰Ц ?ъ슜.
+chat_complete 二쇱엯?쇰줈 寃곗젙濡좎쟻 ?뚯뒪??媛??
+"""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+
+from langchain_text_splitters import RecursiveCharacterTextSplitter
+
+from app.core.config import get_settings
+
+ChatComplete = Callable[[str], str]
+
+
+def _default_chat_complete(prompt: str) -> str:
+    from openai import APIConnectionError
+
+    from app.core.errors import InfraError
+    from app.core.llm_clients import get_active_model, get_chat_client
+
+    client = get_chat_client()
+    try:
+        resp = client.chat.completions.create(
+            model=get_active_model(),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=200,
+        )
+    except APIConnectionError as exc:
+        raise InfraError("LLM ?쒕쾭???곌껐?????놁뒿?덈떎.") from exc
+    return resp.choices[0].message.content or ""
+
+
+def summarize_text(text: str, chat_complete: ChatComplete | None = None) -> str:
+    chat_complete = chat_complete or _default_chat_complete
+    settings = get_settings()
+
+    splitter = RecursiveCharacterTextSplitter(
+        chunk_size=settings.CHUNK_SIZE * 3, chunk_overlap=settings.CHUNK_OVERLAP
+    )
+    chunks = splitter.split_text(text)
+
+    if len(chunks) <= 1:
+        return chat_complete(f"?ㅼ쓬 ?댁슜???쒓뎅?대줈 3臾몄옣 ?대궡濡??붿빟?섎씪:\n\n{text}")
+
+    # map: 泥?겕蹂??붿빟
+    partials = [chat_complete(f"?ㅼ쓬???쒓뎅?대줈 媛꾨떒???붿빟?섎씪:\n\n{c}") for c in chunks]
+    # reduce: 遺遺??붿빟 ?듯빀
+    joined = "\n".join(f"- {p}" for p in partials)
+    return chat_complete(f"?ㅼ쓬 遺遺??붿빟?ㅼ쓣 ?쒓뎅?대줈 3臾몄옣 ?대궡濡??듯빀 ?붿빟?섎씪:\n\n{joined}")
+
+# RULE.md ???듯빀 ?꾨줈?앺듃 ?묒뾽 洹쒖튃
+
+> ??臾몄꽌??`_unified_mall_agent_project`?먯꽌 ?섑뻾?섎뒗 **紐⑤뱺 ?묒뾽(?щ엺/AI ?먯씠?꾪듃 怨듯넻)**???곸슜?섎뒗 理쒖긽??洹쒖튃?대떎.
+> ?대뼡 吏?쑣룰퀎?띉룸━?ы듃????臾몄꽌? 異⑸룎?섎㈃ ??臾몄꽌媛 ?곗꽑?쒕떎.
+
+---
+
+## 1. ?좊（?쒕꽕?댁뀡(?섍컖) 諛⑹? 洹쒖튃
+
+### 1.1 洹쇨굅 ?녿뒗 二쇱옣 湲덉?
+- 肄붾뱶, ?뚯씪, API, ?쇱씠釉뚮윭由??숈옉??????쒖닠???뚮뒗 **諛섎뱶???ㅼ젣 ?뚯씪???쎄굅???ㅽ뻾?댁꽌 ?뺤씤????* ?쒖닠?쒕떎.
+- ?뺤씤?섏? ?딆? ?댁슜? "?뺤씤 ?꾩슂"?쇨퀬 紐낆떆?섍퀬, 異붿륫???ъ떎泥섎읆 ?곗? ?딅뒗??
+- ?뚯씪 寃쎈줈쨌?⑥닔紐끒룻겢?섏뒪紐낆쓣 ?몄슜???뚮뒗 ?ㅼ젣 議댁옱瑜??뺤씤?섍퀬 `寃쎈줈:以꾨쾲?? ?뺤떇?쇰줈 ?④릿??
+
+### 1.2 寃利??곗꽑 ?먯튃
+- 肄붾뱶 蹂寃??꾩뿉??**?ㅽ뻾 ?먮뒗 ?뚯뒪?몃줈 ?숈옉??寃利?*?섍퀬, 寃利?寃곌낵(?깃났/?ㅽ뙣 濡쒓렇)瑜?由ы룷?몄뿉 洹몃?濡?湲곕줉?쒕떎.
+- ?뚯뒪?멸? ?ㅽ뙣?섎㈃ ?ㅽ뙣?덈떎怨??뺤쭅?섍쾶 湲곕줉?쒕떎. "?꾨쭏 ??寃껋씠??瑜섏쓽 ?쒖닠 湲덉?.
+- ?몃? ?쇱씠釉뚮윭由?踰꾩쟾쨌API ?쒓렇?덉쿂??requirements.txt ?먮뒗 ?ㅼ젣 ?ㅼ튂 ?섍꼍?먯꽌 ?뺤씤?쒕떎.
+
+### 1.3 異쒖쿂 ?쒓린
+- ?덇굅???꾨줈?앺듃?먯꽌 媛?몄삩 肄붾뱶??**?먮낯 ?꾨줈?앺듃紐낃낵 ?뚯씪 寃쎈줈瑜?二쇱꽍 ?먮뒗 由ы룷?몄뿉 紐낆떆**?쒕떎.
+- 臾몄꽌 ?묒꽦 ??李몄“???뚯씪/由ы룷?몃? 臾몄꽌 ?섎떒 "李몄“" ?덉뿉 ?섏뿴?쒕떎.
+
+---
+
+## 2. ?섎꽕??Harness) ?묒뾽 洹쒖튃
+
+紐⑤뱺 ?묒뾽 ?몄뀡? ?꾨옒 猷⑦봽瑜??곕Ⅸ??
+
+```
+[?묒뾽 ?쒖옉]
+ 1. plans/ ?먯꽌 ?꾩옱 ?좏슚??怨꾪쉷?쒕? ?쎈뒗?? 2. history/ 理쒖떊 ?대젰???쎄퀬 吏곸쟾 ?묒뾽 ?곹깭瑜??뚯븙?쒕떎
+[?묒뾽 ?섑뻾]
+ 3. 怨꾪쉷?쒖쓽 ?대떦 ?④퀎留??섑뻾?쒕떎 (怨꾪쉷???녿뒗 ?묒뾽? 怨꾪쉷??媛깆떊 癒쇱?)
+ 4. 蹂寃???肄붾뱶瑜??泥???젣?섎뒗 寃쎌슦 legacy/ ??蹂댁〈?쒕떎
+ 5. 蹂寃????ㅽ뻾/?뚯뒪?몃줈 寃利앺븳??[?묒뾽 醫낅즺]
+ 6. reports/ ???묒뾽 由ы룷?몃? ?쒖텧?쒕떎 (?꾩닔, ?앸왂 遺덇?)
+ 7. history/ ???묒뾽 ?대젰??異붽??쒕떎
+ 8. 怨꾪쉷 吏꾪뻾 ?곹깭媛 諛붾뚮㈃ plans/ 臾몄꽌瑜?媛깆떊?쒕떎
+```
+
+- ???몄뀡?먯꽌 **怨꾪쉷?쒖뿉 ?뺤쓽??踰붿쐞瑜?珥덇낵?섎뒗 ?묒뾽???섏? ?딅뒗??** 踰붿쐞 蹂寃쎌씠 ?꾩슂?섎㈃ 癒쇱? 怨꾪쉷?쒕? ?섏젙?섍퀬 ?ъ쑀瑜?湲곕줉?쒕떎.
+- ?묒뾽 ?⑥쐞??"寃利?媛?ν븳 理쒖냼 ?⑥쐞"濡?履쇨컿?? ??踰덉뿉 ?щ윭 湲곕뒫???욎뼱 ?묒뾽?섏? ?딅뒗??
+
+---
+
+## 3. 援ы쁽 ?먯튃
+
+### 3.1 ?섎뱶肄붾뵫 湲덉?
+- API ?? 紐⑤뜽紐? 寃쎈줈, DB ?묒냽 ?뺣낫, 留ㅼ쭅 ?섎쾭瑜??뚯뒪 肄붾뱶??吏곸젒 ?곗? ?딅뒗??
+- ?ㅼ젙? `.env` + `config` 紐⑤뱢(pydantic-settings)濡??쇱썝?뷀븳??
+- ?덉쇅: ?뚯뒪??肄붾뱶??怨좎젙 ?낅젰媛? ?곸닔 紐⑤뱢???대쫫 遺숈뿬 ?좎뼵???곸닔.
+
+### 3.2 ?대갚(fallback) 湲덉?
+- ?ㅻ쪟瑜??쇳궎怨??꾩쓽??湲곕낯 ?숈옉?쇰줈 ?泥댄븯??肄붾뱶瑜??묒꽦?섏? ?딅뒗??
+- API ??遺?? ?뚯씪 遺?? DB ?곌껐 ?ㅽ뙣 ?깆? **紐낆떆???덉쇅瑜?諛쒖깮?쒗궎怨?紐낇솗???ㅻ쪟 硫붿떆吏濡??ㅽ뙣**?쒗궓??
+- "???놁쑝硫??곕え ?묐떟", "?ㅽ뙣?섎㈃ 鍮?媛?諛섑솚" 媛숈? ?덇굅???⑦꽩? ?닿? ???쒓굅?쒕떎.
+- ?덉쇅: ?ъ슜?먯뿉寃??ㅻ쪟瑜??덈궡?섎뒗 HTTP ?ㅻ쪟 ?묐떟(4xx/5xx)? ?대갚???꾨땲???뺤긽 ?ㅻ쪟 泥섎━??
+
+### 3.3 瑗??꾩슂??遺遺꾨쭔 援ы쁽 (YAGNI)
+- 怨꾪쉷?쒖뿉 紐낆떆??湲곕뒫留?援ы쁽?쒕떎. "?섏쨷????寃?媛숈?" 肄붾뱶, ?ъ슜?섏? ?딅뒗 ?듭뀡, 二쎌? 肄붾뱶瑜?留뚮뱾吏 ?딅뒗??
+- ?덇굅???꾨줈?앺듃 ?닿? ??**?숈뒿 媛移섍? 寃利앸맂 ?듭떖 濡쒖쭅留?* 媛?몄삤怨? 以묐났 ?ㅼ틦?대뵫? 踰꾨┛??
+- 媛숈? 湲곕뒫????援ы쁽???앷린硫?利됱떆 ?섎굹濡??듯빀?섍퀬 ?섎㉧吏??legacy/濡?蹂대궦??
+
+### 3.4 由ы룷???쒖텧 ?섎Т
+- **紐⑤뱺 ?묒뾽 ?몄뀡? reports/ ??由ы룷???뚯씪 ?쒖텧濡?醫낅즺?쒕떎.** 由ы룷???녿뒗 ?묒뾽? ?꾨즺濡??몄젙?섏? ?딅뒗??
+- 由ы룷?몄뿉??理쒖냼???ㅼ쓬???ы븿?쒕떎:
+  1. ?묒뾽 紐⑺몴 (?대뒓 怨꾪쉷?쒖쓽 ?대뒓 ?④퀎?몄?)
+  2. ?ㅼ젣 ?섑뻾 ?댁슜 (蹂寃??뚯씪 紐⑸줉 ?ы븿)
+  3. 寃利?諛⑸쾿怨?寃곌낵 (?ㅽ뻾/?뚯뒪??濡쒓렇 ?먮Ц ?붿빟)
+  4. 誘명빐寃??댁뒋쨌?ㅼ쓬 ?묒뾽 ?쒖븞
+
+---
+
+## 4. ?대뜑蹂?臾몄꽌 洹쒖튃
+
+| ?대뜑 | ?⑸룄 | 媛깆떊 ?쒖젏 |
+|---|---|---|
+| `plans/` | ?묒뾽 怨꾪쉷?? ?④퀎蹂?紐⑺몴쨌踰붿쐞쨌?꾨즺 湲곗? ?뺤쓽 | ???묒뾽 李⑹닔 ??/ 踰붿쐞 蹂寃???/ ?④퀎 ?꾨즺 泥댄겕 ??|
+| `history/` | ?쒓컙???묒뾽 ?대젰 (臾댁뾿?? ?? ?대뼡 寃곌낵濡? | 留??묒뾽 ?몄뀡 醫낅즺 ??異붽? (?섏젙 湲덉?, 異붽?留? |
+| `legacy/` | ?泥는룻룓湲곕맂 肄붾뱶? 臾몄꽌??蹂댁〈??| 湲곗〈 肄붾뱶瑜??泥???젣?섍린 吏곸쟾 |
+| `reports/` | ?묒뾽 寃곌낵 由ы룷??(寃利?濡쒓렇 ?ы븿) | 留??묒뾽 ?몄뀡 醫낅즺 ??(?꾩닔) |
+
+### 4.1 ?뚯씪紐?洹쒖튃
+- 紐⑤뱺 臾몄꽌 ?뚯씪紐??욎뿉 ?묒꽦 ?쒓컖??遺숈씤?? `YYYY-MM-DD_HHmm_<?쒕ぉ>.md`
+  - ?? `2026-07-12_1430_?꾩껜_?꾨줈?앺듃_遺꾩꽍_由ы룷??md`
+- legacy/ 蹂댁〈 ???먮낯 ?꾩튂瑜??????덇쾶 ?쒕떎: `legacy/<?먮낯?꾨줈?앺듃紐?/<?먮낯寃쎈줈>` 援ъ“ ?좎?.
+
+### 4.2 history 湲곕줉 ?뺤떇
+```markdown
+## YYYY-MM-DD HH:mm ??<?묒뾽 ?쒕ぉ>
+- 怨꾪쉷: <plans/ 臾몄꽌紐? ??<?④퀎>
+- ?섑뻾: <?듭떖 蹂寃??붿빟>
+- 寃利? <?깃났/?ㅽ뙣 + 諛⑸쾿>
+- 由ы룷?? <reports/ ?뚯씪紐?
+```
+
+---
+
+## 5. 湲덉? ?ы빆 ?붿빟 (Quick Reference)
+
+- ???뺤씤 ?????ъ떎???⑥젙?곸쑝濡??쒖닠
+- ??寃利??ㅽ뻾/?뚯뒪?? ?놁씠 "?꾨즺" ?좎뼵
+- ??API ?ㅒ룰꼍濡쑣룸え?몃챸 ?섎뱶肄붾뵫
+- ???ㅻ쪟 ?쇳궎???대갚 / ?곕え 紐⑤뱶 ?먮룞 ?泥?- ??怨꾪쉷??諛뽰쓽 ?꾩쓽 ?묒뾽
+- ??由ы룷???놁씠 ?묒뾽 醫낅즺
+- ???ъ슜?섏? ?딅뒗 肄붾뱶쨌湲곕뒫 ?좎젣 援ы쁽
+- ??history/ 湲곗〈 湲곕줉 ?섏젙 (異붽?留??덉슜)
+
+
+codex
+현재 확인된 핵심은 계획과 실제 코드 사이에 큰 차이가 있다는 점입니다. `service.search()`에는 아직 `page` 반환이 없고, `build_index.py`는 TXT만 로드하므로 PDF→TXT fa
+llback 자체가 구현된 상태가 아닙니다. QA 모듈·라우터·테스트·의존성까지 더 확인해 “부분 구현인지 미구현인지”를 확정하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg --files '_unified_mall_agent_project' | r
+g '(app/rag/qa\\.py|app/routers/rag\\.py|test.*rag|test.*qa|requirements|pyproject|README|reports|history)' ; rg -n \"r
+ag/qa|def answer|PyPDF|pypdf|page|chat_complete|RAG QA\" '_unified_mall_agent_project/app' '_unified_mall_agent_project
+/tests' '_unified_mall_agent_project/requirements*.txt' '_unified_mall_agent_project/pyproject.toml' 2>"'$null' in C:\U
+sers\playdata2\Documents\llm_workspace
+2026-07-13T10:54:15.979394Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 1.6 seconds
+Output:
+_unified_mall_agent_project\tests\test_rag.py
+_unified_mall_agent_project\requirements.txt
+_unified_mall_agent_project\pyproject.toml
+_unified_mall_agent_project\README.md
+_unified_mall_agent_project\history\2026-07-12_1445_????.md
+_unified_mall_agent_project\reports\2026-07-12_1520_???3_????_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1435_??_??_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1430_??_????_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1535_??_????_??_???_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2050_Phase1_??_???.md
+_unified_mall_agent_project\legacy\README.md
+_unified_mall_agent_project\reports\2026-07-13_0035_Phase3.5_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2325_Phase3_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2140_Phase2_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0120_Phase4_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0210_Phase5_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0300_Phase6_??_???.md
+_unified_mall_agent_project\reports\_codex_????_review.txt
+_unified_mall_agent_project\reports\_codex_review_round2_raw.txt
+_unified_mall_agent_project\reports\_codex_review_round1_raw.txt
+_unified_mall_agent_project\reports\_codex_phase8_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase7_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase7_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase6_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase6_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase5_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase5_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase4_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase4_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase3_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase3_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase35_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase35_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase2_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase2_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase1_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase1_impl_review.txt
+_unified_mall_agent_project\reports\_codex_FINAL_review.txt
+_unified_mall_agent_project\reports\_codex_daybyday_review.txt
+_unified_mall_agent_project\reports\2026-07-13_????_????_???.md
+_unified_mall_agent_project\reports\2026-07-13_0440_???_????_??_?????.md
+_unified_mall_agent_project\reports\2026-07-13_0410_??_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0345_Phase7_??_???.md
+_unified_mall_agent_project/app\rag\summarize.py:4:chat_complete 주입으로 결정론적 테스트 가능.
+_unified_mall_agent_project/app\rag\summarize.py:18:def _default_chat_complete(prompt: str) -> str:
+_unified_mall_agent_project/app\rag\summarize.py:37:def summarize_text(text: str, chat_complete: ChatComplete | None = 
+None) -> str:
+_unified_mall_agent_project/app\rag\summarize.py:38:    chat_complete = chat_complete or _default_chat_complete
+_unified_mall_agent_project/app\rag\summarize.py:47:        return chat_complete(f"다음 내용을 한국어로 3문장 이내로 요약하라:\n\n{text}"
+)
+_unified_mall_agent_project/app\rag\summarize.py:50:    partials = [chat_complete(f"다음을 한국어로 간단히 요약하라:\n\n{c}") for c i
+n chunks]
+_unified_mall_agent_project/app\rag\summarize.py:53:    return chat_complete(f"다음 부분 요약들을 한국어로 3문장 이내로 통합 요약하라:\n\n{joi
+ned}")
+_unified_mall_agent_project/app\rag\service.py:55:            "text": doc.page_content,
+_unified_mall_agent_project/app\rag\service.py:78:    raw = [Document(page_content=t, metadata={"source": s}) for t, s 
+in zip(texts, sources)]
+_unified_mall_agent_project/app\rag\build_index.py:26:            docs.append(Document(page_content=text, metadata={"so
+urce": path.name}))
+_unified_mall_agent_project/app\prompts\classifier.py:21:# chat_complete(prompt) -> str
+_unified_mall_agent_project/app\prompts\classifier.py:25:def _default_chat_complete(prompt: str) -> str:
+_unified_mall_agent_project/app\prompts\classifier.py:52:def classify_one(text: str, chat_complete: ChatComplete | None
+ = None) -> str:
+_unified_mall_agent_project/app\prompts\classifier.py:55:    chat_complete = chat_complete or _default_chat_complete
+_unified_mall_agent_project/app\prompts\classifier.py:56:    output = chat_complete(build_classify_prompt(text))
+_unified_mall_agent_project/app\prompts\classifier.py:100:    chat_complete: ChatComplete | None = None,
+_unified_mall_agent_project/app\prompts\classifier.py:109:            normalize_category((chat_complete or _default_cha
+t_complete)(build_classify_prompt(t, fewshot)))
+_unified_mall_agent_project/app\prompts\classifier.py:142:    texts: list[str], chat_complete: ChatComplete | None = No
+ne
+_unified_mall_agent_project/app\prompts\classifier.py:144:    return [classify_one(t, chat_complete) for t in texts]
+_unified_mall_agent_project/tests\test_classifier.py:1:"""분류·정확도·혼동쌍 테스트 (결정론, mock chat_complete)."""
+_unified_mall_agent_project/tests\test_classifier.py:28:    assert classify_one("카드 이중청구", chat_complete=lambda p: "결제"
+) == "결제"
+_unified_mall_agent_project/tests\test_classifier.py:33:        classify_one("   ", chat_complete=lambda p: "결제")
+_unified_mall_agent_project/tests\test_classifier.py:86:    r = improvement_report(texts, labels, base, augmented, chat
+_complete=chat)
+_unified_mall_agent_project/tests\test_rag.py:117:    out = summarize_text("짧은 텍스트", chat_complete=lambda p: "요약 결과")
+_unified_mall_agent_project/tests\test_rag.py:129:    assert summarize_text(long_text, chat_complete=fake) == "통합요약"
+
+ exited 1 in 1560ms:
+_unified_mall_agent_project\tests\test_rag.py
+_unified_mall_agent_project\requirements.txt
+_unified_mall_agent_project\pyproject.toml
+_unified_mall_agent_project\README.md
+_unified_mall_agent_project\history\2026-07-12_1445_????.md
+_unified_mall_agent_project\reports\2026-07-12_1520_???3_????_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1435_??_??_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1430_??_????_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_1535_??_????_??_???_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2050_Phase1_??_???.md
+_unified_mall_agent_project\legacy\README.md
+_unified_mall_agent_project\reports\2026-07-13_0035_Phase3.5_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2325_Phase3_??_???.md
+_unified_mall_agent_project\reports\2026-07-12_2140_Phase2_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0120_Phase4_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0210_Phase5_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0300_Phase6_??_???.md
+_unified_mall_agent_project\reports\_codex_????_review.txt
+_unified_mall_agent_project\reports\_codex_review_round2_raw.txt
+_unified_mall_agent_project\reports\_codex_review_round1_raw.txt
+_unified_mall_agent_project\reports\_codex_phase8_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase7_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase7_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase6_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase6_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase5_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase5_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase4_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase4_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase3_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase3_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase35_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase35_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase2_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase2_impl_review.txt
+_unified_mall_agent_project\reports\_codex_phase1_plan_review.txt
+_unified_mall_agent_project\reports\_codex_phase1_impl_review.txt
+_unified_mall_agent_project\reports\_codex_FINAL_review.txt
+_unified_mall_agent_project\reports\_codex_daybyday_review.txt
+_unified_mall_agent_project\reports\2026-07-13_????_????_???.md
+_unified_mall_agent_project\reports\2026-07-13_0440_???_????_??_?????.md
+_unified_mall_agent_project\reports\2026-07-13_0410_??_??_???.md
+_unified_mall_agent_project\reports\2026-07-13_0345_Phase7_??_???.md
+_unified_mall_agent_project/app\rag\summarize.py:4:chat_complete 주입으로 결정론적 테스트 가능.
+_unified_mall_agent_project/app\rag\summarize.py:18:def _default_chat_complete(prompt: str) -> str:
+_unified_mall_agent_project/app\rag\summarize.py:37:def summarize_text(text: str, chat_complete: ChatComplete | None = 
+None) -> str:
+_unified_mall_agent_project/app\rag\summarize.py:38:    chat_complete = chat_complete or _default_chat_complete
+_unified_mall_agent_project/app\rag\summarize.py:47:        return chat_complete(f"다음 내용을 한국어로 3문장 이내로 요약하라:\n\n{text}"
+)
+_unified_mall_agent_project/app\rag\summarize.py:50:    partials = [chat_complete(f"다음을 한국어로 간단히 요약하라:\n\n{c}") for c i
+n chunks]
+_unified_mall_agent_project/app\rag\summarize.py:53:    return chat_complete(f"다음 부분 요약들을 한국어로 3문장 이내로 통합 요약하라:\n\n{joi
+ned}")
+_unified_mall_agent_project/app\rag\service.py:55:            "text": doc.page_content,
+_unified_mall_agent_project/app\rag\service.py:78:    raw = [Document(page_content=t, metadata={"source": s}) for t, s 
+in zip(texts, sources)]
+_unified_mall_agent_project/app\rag\build_index.py:26:            docs.append(Document(page_content=text, metadata={"so
+urce": path.name}))
+_unified_mall_agent_project/app\prompts\classifier.py:21:# chat_complete(prompt) -> str
+_unified_mall_agent_project/app\prompts\classifier.py:25:def _default_chat_complete(prompt: str) -> str:
+_unified_mall_agent_project/app\prompts\classifier.py:52:def classify_one(text: str, chat_complete: ChatComplete | None
+ = None) -> str:
+_unified_mall_agent_project/app\prompts\classifier.py:55:    chat_complete = chat_complete or _default_chat_complete
+_unified_mall_agent_project/app\prompts\classifier.py:56:    output = chat_complete(build_classify_prompt(text))
+_unified_mall_agent_project/app\prompts\classifier.py:100:    chat_complete: ChatComplete | None = None,
+_unified_mall_agent_project/app\prompts\classifier.py:109:            normalize_category((chat_complete or _default_cha
+t_complete)(build_classify_prompt(t, fewshot)))
+_unified_mall_agent_project/app\prompts\classifier.py:142:    texts: list[str], chat_complete: ChatComplete | None = No
+ne
+_unified_mall_agent_project/app\prompts\classifier.py:144:    return [classify_one(t, chat_complete) for t in texts]
+_unified_mall_agent_project/tests\test_classifier.py:1:"""분류·정확도·혼동쌍 테스트 (결정론, mock chat_complete)."""
+_unified_mall_agent_project/tests\test_classifier.py:28:    assert classify_one("카드 이중청구", chat_complete=lambda p: "결제"
+) == "결제"
+_unified_mall_agent_project/tests\test_classifier.py:33:        classify_one("   ", chat_complete=lambda p: "결제")
+_unified_mall_agent_project/tests\test_classifier.py:86:    r = improvement_report(texts, labels, base, augmented, chat
+_complete=chat)
+_unified_mall_agent_project/tests\test_rag.py:117:    out = summarize_text("짧은 텍스트", chat_complete=lambda p: "요약 결과")
+_unified_mall_agent_project/tests\test_rag.py:129:    assert summarize_text(long_text, chat_complete=fake) == "통합요약"
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "Get-Content -Raw -Encoding utf8 'app/routers
+/rag.py'; Get-Content -Raw -Encoding utf8 'tests/test_rag.py'; Get-Content -Raw -Encoding utf8 'requirements.txt'; Get-
+Content -Raw -Encoding utf8 'pyproject.toml'; git status --short" in C:\Users\playdata2\Documents\llm_workspace\_unifie
+d_mall_agent_project
+ succeeded in 1037ms:
+"""RAG 라우터: 검색 / 요약."""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
+
+from app.rag.service import search
+from app.rag.summarize import summarize_text
+
+router = APIRouter(prefix="/api/rag", tags=["rag"])
+
+
+class SearchRequest(BaseModel):
+    query: str = Field(min_length=1)
+    top_k: int = Field(default=3, ge=1, le=10)
+    source: str | None = None
+
+
+class SummarizeRequest(BaseModel):
+    text: str = Field(min_length=1)
+
+
+@router.post("/search")
+def rag_search(body: SearchRequest) -> dict:
+    return {"results": search(body.query, k=body.top_k, source=body.source)}
+
+
+@router.post("/summarize")
+def rag_summarize(body: SummarizeRequest) -> dict:
+    return {"summary": summarize_text(body.text)}
+
+"""RAG 테스트 (실제 로컬 ko-sroberta 임베딩, 토큰 0).
+
+임시 코퍼스/인덱스로 격리한다 (실 data/vector_store 오염 방지, Codex 지적).
+임베딩 모델 로드로 다소 느릴 수 있으나 외부 토큰은 쓰지 않는다.
+"""
+
+import pytest
+
+from app.core.config import get_settings
+from app.rag import service
+from app.rag.build_index import build_index
+from app.rag.embeddings import get_embeddings
+
+# 실제 임베딩 모델 로드가 필요 → CI 기본 경로에서 제외 (Codex 합의)
+pytestmark = pytest.mark.ml
+
+
+@pytest.fixture(scope="module", autouse=True)
+def _rag_env(tmp_path_factory):
+    s = get_settings()
+    orig_vec, orig_docs = s.VECTOR_DIR, s.DOCS_DIR
+    tmp = tmp_path_factory.mktemp("rag")
+    docs = tmp / "docs"
+    docs.mkdir()
+    (docs / "loop_safety.txt").write_text(
+        "에이전트 무한루프를 막으려면 최대 단계 수를 제한하고 같은 도구를 같은 인자로 "
+        "반복 호출하면 중단한다.",
+        encoding="utf-8",
+    )
+    (docs / "tool_rules.txt").write_text(
+        "좋은 도구는 한 가지 일만 하고 명확한 인자와 구체적인 독스트링을 가진다.",
+        encoding="utf-8",
+    )
+    (docs / "refund.txt").write_text(
+        "환불은 구매 후 7일 이내에 가능하며 전액 환불된다.", encoding="utf-8"
+    )
+    s.VECTOR_DIR = tmp / "vec"
+    s.DOCS_DIR = docs
+    service.reset_store()
+    build_index()
+    yield
+    s.VECTOR_DIR, s.DOCS_DIR = orig_vec, orig_docs
+    service.reset_store()
+
+
+def test_embeddings_object():
+    assert get_embeddings() is not None
+
+
+def test_index_is_current_detects_model_change():
+    from app.rag.build_index import index_is_current
+
+    s = get_settings()
+    assert index_is_current() is True  # 방금 빌드됨
+    orig = s.ST_EMBEDDING_MODEL
+    try:
+        s.ST_EMBEDDING_MODEL = "some/other-model"
+        assert index_is_current() is False  # 모델 바뀌면 stale 감지
+    finally:
+        s.ST_EMBEDDING_MODEL = orig
+
+
+def test_search_returns_relevant_with_source_and_distance():
+    results = service.search("에이전트 무한루프를 어떻게 막나요?", k=3)
+    assert len(results) >= 1
+    assert all("source" in r and "distance" in r for r in results)
+    assert results[0]["source"] == "loop_safety.txt"
+
+
+def test_distance_ascending_order():
+    results = service.search("도구 설계 규칙", k=3)
+    distances = [r["distance"] for r in results]
+    assert distances == sorted(distances)
+
+
+def test_source_metadata_filter():
+    # ko-sroberta는 단어 하나보다 완전한 문장 질의에서 관련 문서를 잘 찾는다
+    results = service.search("환불 정책이 며칠 이내인지 알려주세요", k=5, source="refund.txt")
+    assert len(results) >= 1
+    assert all(r["source"] == "refund.txt" for r in results)
+
+
+def test_irrelevant_query_filtered_by_distance():
+    # 코퍼스와 완전히 무관한 질의 → 임계값(RAG_MAX_DISTANCE) 초과로 결과 제외
+    results = service.search("양자역학의 슈뢰딩거 방정식 유도 과정", k=3)
+    assert results == []
+
+
+def test_save_load_roundtrip_same_results():
+    r1 = service.search("좋은 도구의 조건은 무엇인가요?", k=2)
+    service.reset_store()
+    r2 = service.search("좋은 도구의 조건은 무엇인가요?", k=2)
+    assert [x["text"] for x in r1] == [x["text"] for x in r2]
+
+
+def test_add_documents_incremental_chunked():
+    res = service.add_documents(
+        ["교환은 미개봉 상품에 한해 배송 후 14일 이내에 가능합니다."], ["exchange.txt"]
+    )
+    assert res["added"] >= 1
+    service.reset_store()
+    results = service.search("교환은 며칠 이내에 가능한가요?", k=3)
+    assert any(r["source"] == "exchange.txt" for r in results)
+
+
+def test_search_knowledge_base_tool():
+    from app.tools.commerce_tools import search_knowledge_base
+
+    r = search_knowledge_base(None, "에이전트 무한루프를 어떻게 막나요?")
+    assert r["ok"] is True
+    assert r["count"] >= 1
+
+
+def test_summarize_single_chunk_mock():
+    from app.rag.summarize import summarize_text
+
+    out = summarize_text("짧은 텍스트", chat_complete=lambda p: "요약 결과")
+    assert out == "요약 결과"
+
+
+def test_summarize_map_reduce_mock():
+    from app.rag.summarize import summarize_text
+
+    long_text = "문장. " * 800
+
+    def fake(prompt):
+        return "부분요약" if "간단히" in prompt else "통합요약"
+
+    assert summarize_text(long_text, chat_complete=fake) == "통합요약"
+
+# Phase 1 최소 의존성 (로컬 검증된 버전으로 고정 — RULE 재현성)
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.13.4
+pydantic-settings==2.10.1
+openai==2.44.0
+python-dotenv==1.1.1
+pytest==7.4.4
+httpx==0.28.1
+# Phase 2 (DB·인증)
+sqlalchemy==2.0.41
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.5.0
+python-multipart==0.0.20
+# Phase 3.5 (LangChain 자동화 계층)
+langchain==1.3.12
+langchain-core==1.4.9
+langchain-openai==1.3.4
+langchain-google-genai==4.2.7
+langgraph==1.2.8
+# Phase 5 (RAG) — 로컬 임베딩 + FAISS
+sentence-transformers==5.6.0
+faiss-cpu==1.14.3
+langchain-community==0.4.2
+langchain-huggingface==1.2.2
+langchain-text-splitters==1.1.2
+# Phase 6 (ML: 감성분석 KoELECTRA)
+transformers==5.13.0
+torch==2.12.0
+# Phase 7 (실험실: 토큰 카운트)
+tiktoken==0.13.0
+
+[project]
+name = "unified-mall-agent"
+version = "0.1.0"
+description = "승승장구몰 AI 커머스 에이전트 플랫폼 (통합 프로젝트)"
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+markers = [
+    "llm: 실제 LLM 호출이 필요한 테스트 (기본 CI에서 제외)",
+    "ml: 무거운 로컬 ML 모델 로드가 필요한 테스트 (KoELECTRA/임베딩, 기본 CI에서 제외)",
+]
+
+?? "plans/2026-07-13_1955_Phase8_RAG_QA_PDF_\354\203\201\354\204\270\352\263\204\355\232\215.md"
+?? reports/_codex_phase8_plan_review.txt
+?? "../embedding_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_embedding_\354\233\220\353\263\270.tx
+t"
+?? "../embedding_console_project/\354\213\244\354\212\265\353\254\270\354\240\234\354\231\200 \355\225\264\353\213\265_
+embedding.txt"
+?? "../from_colab_llm/0711-s/0713_RAG_\354\225\204\355\202\244\355\205\215\354\263\220.html"
+?? "../rag_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_rag\352\260\234\353\205\220_\354\233\220\35
+3\263\270.txt"
+?? "../rag_console_project/\354\213\244\354\212\265\353\254\270\354\240\234\354\231\200 \355\225\264\353\213\265_rag.tx
+t"
+?? "../rag_qa_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_rag_qa_\354\233\220\353\263\270.txt"
+?? "../rag_qa_console_project/\354\213\244\354\212\265\353\254\270\354\240\234\354\231\200 \355\225\264\353\213\265_rag
+_qa.txt"
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command "rg -n \"def search|\\\"source\\\"|distance|d
+ef _load_txt_docs|glob\\(\\\"\\*\\.txt|def build_index|docs = _load|def _default_chat_complete|def summarize_text|@rout
+er.post|class .*Request\" app/rag/service.py app/rag/build_index.py app/rag/summarize.py app/routers/rag.py; Get-Conten
+t -Raw -Encoding utf8 app/core/llm_clients.py; Get-Content -Raw -Encoding utf8 app/core/errors.py; rg -n \"RAG_MAX_DIST
+ANCE|RAG_TOP_K|DOCS_DIR|VECTOR_DIR\" app/core/config.py" in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_ag
+ent_project
+2026-07-13T10:54:32.479647Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 0.9 seconds
+Output:
+위치 줄:2 문자:149
++ ... ad|def _default_chat_complete|def summarize_text|@router.post|class . ...
++                                                      ~~~~~~~~~~~~
+식은 파이프라인의 첫 번째 요소로서만 사용할 수 있습니다.
+위치 줄:2 문자:424
++ ... n "RAG_MAX_DISTANCE|RAG_TOP_K|DOCS_DIR|VECTOR_DIR" app/core/config.py
++                                                      ~~~~~~~~~~~~~~~~~~~~
+문자열에 " 종결자가 없습니다.
+위치 줄:2 문자:149
++ ... = _load|def _default_chat_complete|def summarize_text|@router.post|cl ...
++                                                           ~~~~~~~
+식에서 변수를 참조하는 데 스플랫(splat) 연산자 '@'를 사용할 수 없습니다. '@router'은(는) 명령 인수로만 사용할 수 있습니
+다. 식에서 변수를 참조하려면 '$router'을(를) 사용하십시오.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : ExpressionsMustBeFirstInPipeline
+ 
+
+ exited 1 in 884ms:
+위치 줄:2 문자:149
++ ... ad|def _default_chat_complete|def summarize_text|@router.post|class . ...
++                                                      ~~~~~~~~~~~~
+식은 파이프라인의 첫 번째 요소로서만 사용할 수 있습니다.
+위치 줄:2 문자:424
++ ... n "RAG_MAX_DISTANCE|RAG_TOP_K|DOCS_DIR|VECTOR_DIR" app/core/config.py
++                                                      ~~~~~~~~~~~~~~~~~~~~
+문자열에 " 종결자가 없습니다.
+위치 줄:2 문자:149
++ ... = _load|def _default_chat_complete|def summarize_text|@router.post|cl ...
++                                                           ~~~~~~~
+식에서 변수를 참조하는 데 스플랫(splat) 연산자 '@'를 사용할 수 없습니다. '@router'은(는) 명령 인수로만 사용할 수 있습니
+다. 식에서 변수를 참조하려면 '$router'을(를) 사용하십시오.
+    + CategoryInfo          : ParserError: (:) [], ParentContainsErrorRecordException
+    + FullyQualifiedErrorId : ExpressionsMustBeFirstInPipeline
+ 
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$files = @('"'app/rag/service.py','app/rag/b
+uild_index.py','app/rag/summarize.py','app/routers/rag.py','app/core/llm_clients.py','app/core/errors.py','app/core/con
+fig.py'); foreach ("'$f in $files) { Write-Output "FILE $f"; $n=0; Get-Content -Encoding utf8 $f | ForEach-Object { $n+
++; if ($_ -match '"'def search|\"source\"|distance|_load_txt_docs|glob\\(\"\\*\\.txt|def build_index|_default_chat_comp
+lete|def summarize_text|router.post|class .*Request|RAG_MAX_DISTANCE|RAG_TOP_K|DOCS_DIR|VECTOR_DIR|def get_chat_client|
+class .*Error') { \""'${n}:$_" } } }' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 833ms:
+FILE app/rag/service.py
+4:반환 필드명을 distance로 둔다.
+25:    """VECTOR_DIR의 FAISS 인덱스를 1회 로드해 캐시한다. 없으면 명확한 오류."""
+31:    out_dir = get_settings().VECTOR_DIR
+36:    # allow_dangerous_deserialization: 자체 생성한 VECTOR_DIR만 로드한다는 전제 (신뢰 소스)
+43:def search(query: str, k: int | None = None, source: str | None = None) -> list[dict[str, Any]]:
+46:    거리가 RAG_MAX_DISTANCE를 초과하는(무관한) 결과는 제외한다(방어).
+49:    k = k or settings.RAG_TOP_K
+51:    filter_arg = {"source": source} if source else None
+56:            "source": doc.metadata.get("source", ""),
+57:            "distance": float(score),  # 거리: 작을수록 유사
+60:        if float(score) <= settings.RAG_MAX_DISTANCE
+78:    raw = [Document(page_content=t, metadata={"source": s}) for t, s in zip(texts, sources)]
+83:    store.save_local(str(settings.VECTOR_DIR))
+FILE app/rag/build_index.py
+19:def _load_txt_docs(docs_dir: Path) -> list[Document]:
+20:    if not docs_dir.exists():
+21:        raise InfraError(f"문서 폴더가 없습니다: {docs_dir}")
+23:    for path in sorted(docs_dir.glob("*.txt")):
+26:            docs.append(Document(page_content=text, metadata={"source": path.name}))
+28:        raise InfraError(f"인덱싱할 txt 문서가 없습니다: {docs_dir}")
+32:def build_index(docs_dir: Path | None = None, out_dir: Path | None = None) -> dict:
+37:    docs_dir = docs_dir or settings.DOCS_DIR
+38:    out_dir = out_dir or settings.VECTOR_DIR
+40:    docs = _load_txt_docs(docs_dir)
+57:    out_dir = out_dir or settings.VECTOR_DIR
+FILE app/rag/summarize.py
+18:def _default_chat_complete(prompt: str) -> str:
+37:def summarize_text(text: str, chat_complete: ChatComplete | None = None) -> str:
+38:    chat_complete = chat_complete or _default_chat_complete
+FILE app/routers/rag.py
+14:class SearchRequest(BaseModel):
+20:class SummarizeRequest(BaseModel):
+24:@router.post("/search")
+29:@router.post("/summarize")
+FILE app/core/llm_clients.py
+16:def get_chat_client(settings: Settings | None = None) -> OpenAI:
+FILE app/core/errors.py
+14:class AppError(Exception):
+25:class ConfigError(AppError):
+32:class InfraError(AppError):
+39:class LLMOutputError(AppError):
+46:class ValidationErr(AppError):
+53:class AuthErr(AppError):
+60:class ForbiddenErr(AppError):
+67:class NotFoundErr(AppError):
+FILE app/core/config.py
+51:    RAG_TOP_K: int = 3
+53:    RAG_MAX_DISTANCE: float = 1.5
+68:    DOCS_DIR: Path = ROOT_DIR / "data" / "docs"
+69:    VECTOR_DIR: Path = ROOT_DIR / "data" / "vector_store"
+99:            "vector": self.VECTOR_DIR.exists(),
+
+codex
+## 결론: No-Go
+
+현재 저장소는 Phase 8 **계획만 존재하고 구현은 시작되지 않은 상태**입니다. 기존 TXT RAG 검색·요약은 유지되고 있지만, QA API와 PDF 인덱싱, 페이지 출처, 관련 테스트가 없습니다.
+
+### 6개 기준 평가
+
+| 기준 | 점수(5점) | 판정 |
+|---|---:|---|
+| 계획 대비 구현 완성도 | 1 | 핵심 기능 미구현 |
+| 기존 RAG 호환성 | 4 | 기존 TXT 검색·요약은 보존됨 |
+| PDF 인덱싱 | 0 | `*.txt`만 로드 |
+| QA 답변·근거 제한 | 0 | `qa.py`와 QA endpoint 없음 |
+| 출처·페이지 계약 | 1 | `source`만 있고 `page` 없음 |
+| 테스트·검증 가능성 | 1 | 기존 RAG 테스트만 존재 |
+
+**총점: 7/30 — Phase 8 완료 판정 불가**
+
+## 주요 발견 사항
+
+### 1. PDF→TXT fallback
+
+현재 [build_index.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/build_index.py:19)는 
+`_load_txt_docs()`만 제공하고, 23행에서 `*.txt`만 탐색합니다. PDF loader와 `pypdf` 의존성도 없습니다.
+
+권장 동작은 “PDF 로딩에 실패하면 같은 이름의 TXT를 자동 사용”이 아닙니다. `RULE.md`의 fallback 금지는 오류를 숨기고 다른 정상 동작처럼 처리하는 것을 금지하므로:
+
+- PDF 파싱 실패 → 파일명을 포함한 `InfraError`
+- 암호화·손상·텍스트 추출 불가 PDF → 명시적 실패
+- TXT와 PDF가 함께 있으면 둘 다 정상적으로 인덱싱
+- 문서가 하나도 없을 때만 “인덱싱할 TXT/PDF 없음” 오류
+
+가 적절합니다. TXT fallback을 지원하려면 명시적 옵션과 로그·결과 필드가 필요하지만, Phase 8 최소 범위에는 넣지 않는 편이 맞습니다.
+
+### 2. 페이지 메타데이터 손실
+
+[service.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/service.py:53)는 `text`, `so
+urce`, `distance`만 반환합니다. `doc.metadata["page"]`가 있어도 사라집니다.
+
+최소 수정은 다음과 같습니다.
+
+```python
+{
+    "text": doc.page_content,
+    "source": doc.metadata.get("source", ""),
+    "page": doc.metadata.get("page"),
+    "distance": float(score),
+}
+```
+
+주의할 점은 `PyPDFLoader`의 `page`가 일반적으로 **0부터 시작하는 인덱스**라는 것입니다. 사용자에게 보여주는 API라면 1부터 시작하도록 변환하는 것이 자연스럽습니다. 내부 메타데이터는 0-ba
+sed로 유지하고 QA 응답 생성 시 `page + 1`로 변환하는 방식을 권합니다.
+
+### 3. RULE의 fallback 금지 적용
+
+무근거 질문에 정해진 답변을 반환하는 것은 fallback 위반이 아닙니다. 이는 검색 결과가 임계값을 통과하지 못한 경우의 **명시적인 정상 도메인 응답**입니다.
+
+반면 다음은 금지 대상입니다.
+
+- PDF 파싱 실패를 무시하고 TXT만 인덱싱 성공으로 보고
+- LLM 연결 실패 시 빈 문자열이나 고정 QA 답변 반환
+- QA 생성 실패 시 검색 문장을 그대로 답변처럼 반환
+- 손상된 PDF 페이지를 경고 없이 건너뛰기
+
+LLM 연결 실패는 기존 [summarize.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/summarize.p
+y:18)처럼 `InfraError`로 명시적으로 실패해야 합니다.
+
+### 4. QA 답변과 sources 설계
+
+QA 답변의 `sources`는 모델이 생성하게 하면 안 됩니다. 검색 결과 메타데이터에서 서버가 결정론적으로 만들어야 합니다.
+
+권장 계약:
+
+```json
+{
+  "answer": "환불은 구매 후 7일 이내에 가능합니다.",
+  "sources": [
+    {"source": "refund.txt", "page": null},
+    {"source": "policy.pdf", "page": 3}
+  ]
+}
+```
+
+- TXT 문서: `"page": null`
+- PDF 문서: 사용자 기준 1-based 페이지
+- `(source, page)` 기준 중복 제거
+- 검색 결과 순서 유지
+- 검색 결과 없음: 고정 답변과 `sources: []`
+- LLM 실패: 성공 모양의 빈 응답이 아니라 오류
+
+`page`를 생략하기보다 nullable 필드로 유지하면 응답 스키마가 안정적입니다.
+
+또한 답변은 검색된 context만 사용하도록 지시하되, 출처 문서 안의 명령을 따르지 않도록 프롬프트에 명시해야 합니다.
+
+### 5. Gemma completion 사용 가능 여부
+
+가능합니다. 기존 `get_chat_client()`와 `get_active_model()`이 OpenAI 호환 로컬 서버를 사용하므로, QA도 [summarize.py](C:/Users/playdata2/Docu
+ments/llm_workspace/_unified_mall_agent_project/app/rag/summarize.py:18)의 completion 패턴을 재사용할 수 있습니다.
+
+다만 private 함수인 `_default_chat_complete()`를 직접 import하기보다는 공용 completion 함수를 별도 모듈로 추출해 요약과 QA가 함께 쓰는 편이 좋습니다. 최소 변경이 우선
+이면 QA에 같은 작은 wrapper를 두는 것도 허용 가능한 수준입니다.
+
+## Go 조건과 최소 수정안
+
+다음이 모두 충족되기 전에는 No-Go입니다.
+
+1. `app/rag/qa.py` 추가
+   - 빈 질문은 `ValidationErr`
+   - `service.search()` 재사용
+   - 무근거 고정 답변
+   - `(source, page)` 중복 제거
+   - `chat_complete` 주입 지원
+
+2. `build_index.py` 확장
+   - TXT와 PDF 로드
+   - PDF 페이지별 `Document`
+   - `source`, `page` 보존
+   - PDF 오류를 숨기지 않고 `InfraError`
+
+3. `service.search()`에 nullable `page` 추가
+
+4. `POST /api/rag/qa` 추가
+
+5. `pypdf` 및 필요한 PDF loader 의존성 고정
+
+6. 결정론적 테스트 추가
+   - mock completion 기반 QA
+   - 무근거 질문
+   - 빈 질문
+   - TXT의 `page is None`
+   - PDF 검색 결과의 페이지
+   - PDF 파싱 실패
+   - 기존 `test_rag.py` 회귀 테스트
+
+7. 로컬 Gemma live QA 1건과 전체 테스트 결과를 report/history에 기록
+
+정적 검토 기준으로는 설계 방향은 타당하지만, 현재 코드는 Phase 8 DoD를 하나도 완전히 만족하지 못하므로 **구현 진행은 Go, Phase 8 완료·배포는 No-Go**입니다.
+tokens used
+24,302
+## 결론: No-Go
+
+현재 저장소는 Phase 8 **계획만 존재하고 구현은 시작되지 않은 상태**입니다. 기존 TXT RAG 검색·요약은 유지되고 있지만, QA API와 PDF 인덱싱, 페이지 출처, 관련 테스트가 없습니다.
+
+### 6개 기준 평가
+
+| 기준 | 점수(5점) | 판정 |
+|---|---:|---|
+| 계획 대비 구현 완성도 | 1 | 핵심 기능 미구현 |
+| 기존 RAG 호환성 | 4 | 기존 TXT 검색·요약은 보존됨 |
+| PDF 인덱싱 | 0 | `*.txt`만 로드 |
+| QA 답변·근거 제한 | 0 | `qa.py`와 QA endpoint 없음 |
+| 출처·페이지 계약 | 1 | `source`만 있고 `page` 없음 |
+| 테스트·검증 가능성 | 1 | 기존 RAG 테스트만 존재 |
+
+**총점: 7/30 — Phase 8 완료 판정 불가**
+
+## 주요 발견 사항
+
+### 1. PDF→TXT fallback
+
+현재 [build_index.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/build_index.py:19)는 `_load_txt_docs()`만 제공하고, 23행에서 `*.txt`만 탐색합니다. PDF loader와 `pypdf` 의존성도 없습니다.
+
+권장 동작은 “PDF 로딩에 실패하면 같은 이름의 TXT를 자동 사용”이 아닙니다. `RULE.md`의 fallback 금지는 오류를 숨기고 다른 정상 동작처럼 처리하는 것을 금지하므로:
+
+- PDF 파싱 실패 → 파일명을 포함한 `InfraError`
+- 암호화·손상·텍스트 추출 불가 PDF → 명시적 실패
+- TXT와 PDF가 함께 있으면 둘 다 정상적으로 인덱싱
+- 문서가 하나도 없을 때만 “인덱싱할 TXT/PDF 없음” 오류
+
+가 적절합니다. TXT fallback을 지원하려면 명시적 옵션과 로그·결과 필드가 필요하지만, Phase 8 최소 범위에는 넣지 않는 편이 맞습니다.
+
+### 2. 페이지 메타데이터 손실
+
+[service.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/service.py:53)는 `text`, `source`, `distance`만 반환합니다. `doc.metadata["page"]`가 있어도 사라집니다.
+
+최소 수정은 다음과 같습니다.
+
+```python
+{
+    "text": doc.page_content,
+    "source": doc.metadata.get("source", ""),
+    "page": doc.metadata.get("page"),
+    "distance": float(score),
+}
+```
+
+주의할 점은 `PyPDFLoader`의 `page`가 일반적으로 **0부터 시작하는 인덱스**라는 것입니다. 사용자에게 보여주는 API라면 1부터 시작하도록 변환하는 것이 자연스럽습니다. 내부 메타데이터는 0-based로 유지하고 QA 응답 생성 시 `page + 1`로 변환하는 방식을 권합니다.
+
+### 3. RULE의 fallback 금지 적용
+
+무근거 질문에 정해진 답변을 반환하는 것은 fallback 위반이 아닙니다. 이는 검색 결과가 임계값을 통과하지 못한 경우의 **명시적인 정상 도메인 응답**입니다.
+
+반면 다음은 금지 대상입니다.
+
+- PDF 파싱 실패를 무시하고 TXT만 인덱싱 성공으로 보고
+- LLM 연결 실패 시 빈 문자열이나 고정 QA 답변 반환
+- QA 생성 실패 시 검색 문장을 그대로 답변처럼 반환
+- 손상된 PDF 페이지를 경고 없이 건너뛰기
+
+LLM 연결 실패는 기존 [summarize.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/summarize.py:18)처럼 `InfraError`로 명시적으로 실패해야 합니다.
+
+### 4. QA 답변과 sources 설계
+
+QA 답변의 `sources`는 모델이 생성하게 하면 안 됩니다. 검색 결과 메타데이터에서 서버가 결정론적으로 만들어야 합니다.
+
+권장 계약:
+
+```json
+{
+  "answer": "환불은 구매 후 7일 이내에 가능합니다.",
+  "sources": [
+    {"source": "refund.txt", "page": null},
+    {"source": "policy.pdf", "page": 3}
+  ]
+}
+```
+
+- TXT 문서: `"page": null`
+- PDF 문서: 사용자 기준 1-based 페이지
+- `(source, page)` 기준 중복 제거
+- 검색 결과 순서 유지
+- 검색 결과 없음: 고정 답변과 `sources: []`
+- LLM 실패: 성공 모양의 빈 응답이 아니라 오류
+
+`page`를 생략하기보다 nullable 필드로 유지하면 응답 스키마가 안정적입니다.
+
+또한 답변은 검색된 context만 사용하도록 지시하되, 출처 문서 안의 명령을 따르지 않도록 프롬프트에 명시해야 합니다.
+
+### 5. Gemma completion 사용 가능 여부
+
+가능합니다. 기존 `get_chat_client()`와 `get_active_model()`이 OpenAI 호환 로컬 서버를 사용하므로, QA도 [summarize.py](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/rag/summarize.py:18)의 completion 패턴을 재사용할 수 있습니다.
+
+다만 private 함수인 `_default_chat_complete()`를 직접 import하기보다는 공용 completion 함수를 별도 모듈로 추출해 요약과 QA가 함께 쓰는 편이 좋습니다. 최소 변경이 우선이면 QA에 같은 작은 wrapper를 두는 것도 허용 가능한 수준입니다.
+
+## Go 조건과 최소 수정안
+
+다음이 모두 충족되기 전에는 No-Go입니다.
+
+1. `app/rag/qa.py` 추가
+   - 빈 질문은 `ValidationErr`
+   - `service.search()` 재사용
+   - 무근거 고정 답변
+   - `(source, page)` 중복 제거
+   - `chat_complete` 주입 지원
+
+2. `build_index.py` 확장
+   - TXT와 PDF 로드
+   - PDF 페이지별 `Document`
+   - `source`, `page` 보존
+   - PDF 오류를 숨기지 않고 `InfraError`
+
+3. `service.search()`에 nullable `page` 추가
+
+4. `POST /api/rag/qa` 추가
+
+5. `pypdf` 및 필요한 PDF loader 의존성 고정
+
+6. 결정론적 테스트 추가
+   - mock completion 기반 QA
+   - 무근거 질문
+   - 빈 질문
+   - TXT의 `page is None`
+   - PDF 검색 결과의 페이지
+   - PDF 파싱 실패
+   - 기존 `test_rag.py` 회귀 테스트
+
+7. 로컬 Gemma live QA 1건과 전체 테스트 결과를 report/history에 기록
+
+정적 검토 기준으로는 설계 방향은 타당하지만, 현재 코드는 Phase 8 DoD를 하나도 완전히 만족하지 못하므로 **구현 진행은 Go, Phase 8 완료·배포는 No-Go**입니다.
