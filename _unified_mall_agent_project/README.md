@@ -38,7 +38,15 @@ uvicorn app.main:app --reload
 ### 프로바이더 전환
 - 빌드/오프라인: `.env`의 `LLM_PROVIDER=local` (로컬 Gemma, 토큰 0)
 - 실서비스: `LLM_PROVIDER=openai` + `OPENAI_API_KEY`, 또는 `gemini` + `GOOGLE_API_KEY`
-- **로컬 Gemma는 OpenAI tool-calling 미지원** → 도구를 쓰는 ReAct 에이전트의 라이브 도구호출은 OpenAI/Gemini 키 필요. 로컬은 요약·분류·프롬프트 등 평문 작업에 사용.
+- **로컬 Gemma는 OpenAI tool-calling 미지원** → 요약·분류·프롬프트 등 평문 작업에 사용.
+- **로컬에서 tool-calling까지 검증하려면 Qwen 사용**(토큰 0):
+  ```bash
+  LOCAL_GGUF_PATH="<Qwen3.5-4B-Q4_K_M.gguf>" CHAT_FORMAT="chatml-function-calling" \
+  N_CTX=2048 N_BATCH=64 python scripts/local_model_server.py
+  # 앱: LLM_PROVIDER=local, LOCAL_MODEL=qwen3.5-4b → 에이전트가 실제 도구 호출
+  ```
+  Qwen이 OpenAI tool_calls를 반환함을 확인(`debug_notes/2026-07-13_0510_*`). CPU라 느리고 RAM 3GB+ 필요.
+- 참고: 수동 ReAct(`/api/agent/chat`)는 OpenAI 호환(local/openai)만, Gemini는 LangChain 경로(`/api/agent/lc-chat`)에서 지원.
 
 ## 테스트
 

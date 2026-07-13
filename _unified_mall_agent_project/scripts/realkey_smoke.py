@@ -38,21 +38,27 @@ def main() -> None:
 
     db = SessionLocal()
     try:
-        # 1) 수동 ReAct (tool-calling 지원 모델이면 steps가 채워져야 함)
-        from app.agent.react import run_react_agent
-
         q = "P0001 상품의 가격을 알려줘"
-        res = run_react_agent(q, db, max_steps=3)
-        print(f"[manual] stopped_by={res.stopped_by} steps={len(res.steps)}")
-        if res.steps:
-            print(f"[manual] tool used: {res.steps[0].action} -> ok={res.steps[0].observation.get('ok')}")
-        assert res.steps, "실키인데 도구 호출(steps)이 비어 있음 — tool-calling 확인 필요"
 
-        # 2) LangChain 자동 에이전트
+        # 1) 수동 ReAct는 get_chat_client(OpenAI 호환)만 지원 → openai에서만 검증.
+        #    (Gemini는 google-genai라 수동 경로 미지원, LangChain 경로에서 검증)
+        if provider == "openai":
+            from app.agent.react import run_react_agent
+
+            res = run_react_agent(q, db, max_steps=3)
+            print(f"[manual] stopped_by={res.stopped_by} steps={len(res.steps)}")
+            if res.steps:
+                print(f"[manual] tool: {res.steps[0].action} -> ok={res.steps[0].observation.get('ok')}")
+            assert res.steps, "실키인데 도구 호출(steps)이 비어 있음 — tool-calling 확인 필요"
+        else:
+            print("[manual] gemini는 수동 ReAct 경로 미지원 → LangChain 경로로만 검증")
+
+        # 2) LangChain 자동 에이전트 (openai/gemini 모두 지원)
         from app.agent.lc_agent import run_langchain_agent
 
         res2 = run_langchain_agent(q, db, recursion_limit=6)
         print(f"[langchain] stopped_by={res2.stopped_by} steps={len(res2.steps)}")
+        assert res2.steps, "LangChain 에이전트가 도구를 호출하지 않음 — tool-calling 확인 필요"
 
         print("REALKEY_SMOKE_OK")
     finally:

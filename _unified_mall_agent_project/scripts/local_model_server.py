@@ -28,12 +28,16 @@ DEFAULT_GGUF = (
     r"\bb3b92e6f031fa438b409f898dd9f14f499a0cb0\gemma-4-E4B_q4_0-it.gguf"
 )
 
-GGUF_PATH = os.environ.get("GEMMA_GGUF_PATH", DEFAULT_GGUF)
+# GEMMA_GGUF_PATH(하위호환) 또는 LOCAL_GGUF_PATH로 모델 교체 가능.
+GGUF_PATH = os.environ.get("LOCAL_GGUF_PATH") or os.environ.get("GEMMA_GGUF_PATH", DEFAULT_GGUF)
 PORT = int(os.environ.get("LOCAL_MODEL_PORT", "8000"))
 # 이 머신은 여유 RAM이 ~5GB로 빠듯하다. 컴퓨트 버퍼는 배치에 비례하므로 작게 잡는다
 # (debug_notes 2026-07-12_2028 / RAM 제약 노트 참조).
 N_CTX = int(os.environ.get("N_CTX", "1024"))
 N_BATCH = int(os.environ.get("N_BATCH", "32"))
+# tool-calling 지원 모델(Qwen 등)은 CHAT_FORMAT=chatml-function-calling으로 실행.
+# Gemma는 tool-calling 미지원이라 미설정(빈값)으로 둔다.
+CHAT_FORMAT = os.environ.get("CHAT_FORMAT") or None
 
 app = FastAPI(title="Local Gemma (OpenAI-compatible)")
 _llm: Llama | None = None
@@ -42,7 +46,7 @@ _llm: Llama | None = None
 def get_llm() -> Llama:
     global _llm
     if _llm is None:
-        _llm = Llama(
+        kwargs = dict(
             model_path=GGUF_PATH,
             n_ctx=N_CTX,
             n_batch=N_BATCH,
@@ -50,6 +54,9 @@ def get_llm() -> Llama:
             use_mmap=True,
             verbose=False,
         )
+        if CHAT_FORMAT:
+            kwargs["chat_format"] = CHAT_FORMAT
+        _llm = Llama(**kwargs)
     return _llm
 
 
