@@ -315,6 +315,8 @@
 3. **RAG는 요청마다 인덱싱하면 안 된다** — 인덱싱(1회)과 서비스(로드)를 분리.
 4. **FAISS 점수는 거리(작을수록 유사)** — 코사인과 반대라 정렬 실수 주의.
 5. **도구 오류를 조용히 삼키지 말 것** — 구조화된 실패로 에이전트에 알려야 함(폴백 금지).
+6. **`tool_choice`를 빼먹으면 도구가 안 불린다** — OpenAI SDK는 `tool_choice`를 기본 전송하지 않는데, 일부 OpenAI 호환 서버(llama-cpp function-calling 등)는 이게 있어야 도구 호출이 켜진다. `tools`만 보내면 모델이 그냥 텍스트로 답해버린다. 실제 OpenAI에선 `auto`가 기본이라 명시해도 무해하니 **항상 `tool_choice="auto"`를 명시**하는 게 안전하다.
+7. **모델마다 tool-calling 지원이 다르다** — Gemma는 평문만(도구 호출 X), Qwen은 tool-calling 가능(chatml-function-calling). 로컬로 에이전트를 검증하려면 tool-calling 되는 모델을 골라야 한다.
 
 ## 부록 C — 더 읽을 문서
 

@@ -45,7 +45,14 @@ uvicorn app.main:app --reload
   N_CTX=2048 N_BATCH=64 python scripts/local_model_server.py
   # 앱: LLM_PROVIDER=local, LOCAL_MODEL=qwen3.5-4b → 에이전트가 실제 도구 호출
   ```
-  Qwen이 OpenAI tool_calls를 반환함을 확인(`debug_notes/2026-07-13_0510_*`). CPU라 느리고 RAM 3GB+ 필요.
+  **에이전트 tool-calling이 로컬에서 실제 동작함을 검증 완료**(`/api/agent/chat` → `get_price` 도구 호출).
+  근거: `debug_notes/2026-07-13_2130_*`, `reports/2026-07-13_2140_로컬_전체검증_리포트.md`. CPU라 느리고 RAM 3GB+ 필요.
+
+| 모델 | 평문(요약·분류·RAG QA) | tool-calling(에이전트) |
+|---|---|---|
+| Gemma 4 E4B (로컬) | ✅ | ❌ |
+| **Qwen3.5-4B (로컬)** | ✅ | **✅** |
+| OpenAI / Gemini (실키) | ✅ | ✅ |
 - 참고: 수동 ReAct(`/api/agent/chat`)는 OpenAI 호환(local/openai)만, Gemini는 LangChain 경로(`/api/agent/lc-chat`)에서 지원.
 
 ## 테스트

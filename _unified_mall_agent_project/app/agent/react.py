@@ -41,7 +41,13 @@ def _default_chat_fn(messages: list[dict], tools: list[dict]) -> dict:
     model = get_active_model()
     try:
         resp = client.chat.completions.create(
-            model=model, messages=messages, tools=tools, temperature=0
+            model=model,
+            messages=messages,
+            tools=tools,
+            # tool_choice를 명시해야 일부 OpenAI 호환 서버(llama-cpp function-calling
+            # 핸들러 등)가 도구 호출을 활성화한다. 실제 OpenAI에서는 auto가 기본이라 무해.
+            tool_choice="auto",
+            temperature=0,
         )
     except APIConnectionError as exc:
         raise InfraError(
