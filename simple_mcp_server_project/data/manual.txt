@@ -1,0 +1,13 @@
+간단한 MCP 서버 사용 설명서
+
+1. Tool
+- hello: 이름을 전달하면 인사말을 반환합니다.
+- add: 두 숫자를 더합니다.
+- get_current_time: 서버 컴퓨터의 현재 시간을 반환합니다.
+
+2. Resource
+- manual://guide: 이 사용 설명서를 반환합니다.
+- profile://{name}: 이름에 맞춘 예제 프로필을 반환합니다.
+
+3. Prompt
+- summarize_document: 주제와 설명 방식을 입력받아 요약 Prompt를 생성합니다.
