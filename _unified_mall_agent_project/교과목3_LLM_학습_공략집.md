@@ -352,3 +352,24 @@
 **직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작하며, 에이전트의 실제 도구 호출(tool-calling)만 OpenAI/Gemini 키가 필요하다(`scripts/realkey_smoke.py`).
 
 > 구현의 정직한 완료 상태(이월 항목 포함)는 `reports/2026-07-13_0410_최종_통합_리포트.md` 참조.
+
+---
+
+## 부록 E — 복습 레퍼런스 (`reference/`, 날것 패턴 보존)
+
+통합 앱은 깔끔한 추상화라 **날것의 API 디테일이 코드 표면에서 증발**한다(예: `llm_clients.py`가
+gpt-5/o 파라미터 분기·`max_completion_tokens`·`reasoning_effort`·`finish_reason`을 다 감춤).
+그 증발한 패턴을 **개념별 최소·주석·실행가능 예제**로 보존한 것이 `reference/`다.
+
+| # | 개념 | 파일 |
+|---|---|---|
+| 01 | OpenAI Chat Completions 날것(gpt-5/o 분기) | `reference/01_openai_chat_completions_raw.py` |
+| 02 | OpenAI Responses API | `reference/02_openai_responses_api.py` |
+| 03 | Gemini 날것 SDK(google-genai) | `reference/03_gemini_genai_raw.py` |
+| 04 | 프롬프트(few-shot·JSON강제 3방식·인젝션완화) | `reference/04_prompt_engineering.py` |
+| 05 | CoT·자기검증 | `reference/05_cot_self_verify.py` |
+| 06 | Function Calling 수동 루프(tool_choice) | `reference/06_function_calling_manual.py` |
+| 07 | RAG 날것(청킹→FAISS, 인덱싱/서비스 분리) | `reference/07_rag_faiss_raw.py` |
+
+> **복습 동선**: 이 공략집(개념) → `reference/`(날것 코드) → `app/`(통합 형태) → 레거시 폴더(전체 맥락).
+> `reference/README.md`에 정확성 주의(LLM API 변화·프로젝트 휴리스틱 구분)를 함께 담았다.
