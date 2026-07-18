@@ -7,6 +7,7 @@
   - `_0715_LangGraph/agent_workflow_console_project` — StateGraph CS 티켓 워크플로
   - 강의: `from_colab_llm/0714-s/5_MCP이해_서버구축.pdf`
 - 판정: **구현 가능** (mcp 1.28.1 = FastMCP 포함, langgraph 1.2.8 설치됨. 기존 통합 자산을 재사용하므로 자연스러운 확장)
+- **진행 상태(2026-07-18)**: Phase 9(MCP) ✅ **완료·합의**(구현리포트 1617, Codex R1·R2 잔여결함 없음). Phase 10(LangGraph) ⏳ 대기(별도 세션).
 
 ## 0. 구현 가능성 판단 (요약)
 | 대상 | 가능? | 근거 |

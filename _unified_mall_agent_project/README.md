@@ -17,6 +17,7 @@ llm_workspace의 28개 LLM/NLP 실습 프로젝트를 **하나의 실행 가능�
 | `app/rag` | 인덱싱/서비스 분리, FAISS, 로컬 임베딩, 요약 | vector_db, langchain_test |
 | `app/ml` | 의도분류, KoELECTRA 감성분석, 임베딩 추천 | coffee/survey, Bert_sentiment, music |
 | `app/lab` | 파라미터 실험, 토큰/비용, 유즈케이스 | llm_parameter, chatgpt, usage |
+| `app/mcp` | MCP(Model Context Protocol) 서버/클라이언트 — 기존 도구·RAG·ML을 MCP 표준으로 노출(도구 10·리소스 2·프롬프트 1, stdio) | _0714_MCP(simple/rag/enterprise) |
 | `app/static` | 챗 UI(멀티턴 화면 누적, 에이전트 단계 표시) | chatgpt/survey UI |
 
 ## 실행
@@ -69,6 +70,7 @@ pytest -m "llm"                  # 로컬 Gemma/실키 서버 기동 시 라이�
 - `POST /api/rag/search` `/api/rag/summarize` `/api/rag/qa`(근거 기반 답변+출처 인용, TXT/PDF)
 - `POST /api/nlp/intent` `/sentiment` `/recommend`
 - `POST /api/lab/{basic,role,diversity,token-compare,estimate-cost,usecase}`
+- `POST /api/mcp/tools` `/api/mcp/call` (앱이 MCP 클라이언트로 stdio 서버 호출 시연)
 - `GET /api/health`
 
 ## 레거시 프로젝트
@@ -82,3 +84,7 @@ pytest -m "llm"                  # 로컬 Gemma/실키 서버 기동 시 라이�
 - 로컬 Gemma는 CPU 추론이라 느림. RAM 여유 부족 시 로드 실패(→ `debug_notes/` 참조).
 - 토큰 카운트(lab)는 tiktoken cl100k 참고치로 로컬 Gemma 실제 토큰과 다름.
 - 비용 추정은 `PRICE_TABLE` 등록 모델만(로컬은 과금 없음 → 대상 아님).
+- MCP 서버는 `python -m app.mcp.server`(stdio)로도 단독 기동 가능(Claude Desktop 등 외부
+  클라이언트 연결용). 단독 실행은 테이블 생성·seed를 하지 않으므로 DB(`data/mall.db`)가
+  준비돼 있어야 한다(폴백 없음 — 미준비 시 오류 전파). 앱 경유(`/api/mcp/*`)는 학습용
+  시연이라 요청마다 서버 subprocess를 띄운다(운영 구조 아님).

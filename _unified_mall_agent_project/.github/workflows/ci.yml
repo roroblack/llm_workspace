@@ -16,4 +16,4 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - run: pytest -q -m "not llm and not ml"
+      - run: pytest -q -m "not llm and not ml and not mcp"

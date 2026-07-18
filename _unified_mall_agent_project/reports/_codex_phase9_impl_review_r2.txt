@@ -1,0 +1,44 @@
+- 1) MCP 오류의 HTTP 200 누출: 해소
+- 2) DB 오류 무폴백 전파 및 세션 종료 검증: 해소
+- 3) `get_exchange_rate` 세션 미생성 검증: 해소
+- 4) 리소스·프롬프트 메타데이터 검증: 해소
+- 5) stdio 도구 등록 정확성 검증: 해소
+- 6) stdio 오류 계약 검증: 해소
+- 7) `get_exchange_rate`의 DB 타입: 해소
+- 8) 비밀값·비밀 필드명 검사: 해소
+
+`client.py` 검토 결과:
+
+- 정상 결과는 `try` 내부에서 그대로 반환되어 예외로 오분류되지 않음.
+- `isError=False`의 `{ok: false}` 비즈니스 실패는 구조화 결과 및 HTTP 200 계약을 유지함.
+- `except Exception`은 `KeyboardInterrupt`, `SystemExit`, `asyncio.CancelledError` 같은 `BaseException` 계열을 포획하지 않음.
+- `_unwrap`은 첫 예외만 선택하지만, 현재 정규화 계약에서는 나머지 비애플리케이션 예외도 모두 `InfraError`이므로 실질적인 상태 코드 오분류는 없음.
+- `test_db_error_propagates_and_session_closed`는 패치된 `SessionLocal`로 생성된 실제 가짜 세션이 `with_db`에 전달되고, `query()` 예외 후 `finally`의 `close()` 실행까지 정확히 검증함.
+
+잔여 결함 없음.
+
+단, 현재 읽기 전용 실행 환경에 사용 가능한 임시 디렉터리가 없어 pytest 실행은 시작되지 못했으며, 결론은 코드 경로 정적 검토 기준이다.
+tokens used
+28,072
+유효 지적 없음.
+
+- 1) MCP 오류의 HTTP 200 누출: 해소
+- 2) DB 오류 무폴백 전파 및 세션 종료 검증: 해소
+- 3) `get_exchange_rate` 세션 미생성 검증: 해소
+- 4) 리소스·프롬프트 메타데이터 검증: 해소
+- 5) stdio 도구 등록 정확성 검증: 해소
+- 6) stdio 오류 계약 검증: 해소
+- 7) `get_exchange_rate`의 DB 타입: 해소
+- 8) 비밀값·비밀 필드명 검사: 해소
+
+`client.py` 검토 결과:
+
+- 정상 결과는 `try` 내부에서 그대로 반환되어 예외로 오분류되지 않음.
+- `isError=False`의 `{ok: false}` 비즈니스 실패는 구조화 결과 및 HTTP 200 계약을 유지함.
+- `except Exception`은 `KeyboardInterrupt`, `SystemExit`, `asyncio.CancelledError` 같은 `BaseException` 계열을 포획하지 않음.
+- `_unwrap`은 첫 예외만 선택하지만, 현재 정규화 계약에서는 나머지 비애플리케이션 예외도 모두 `InfraError`이므로 실질적인 상태 코드 오분류는 없음.
+- `test_db_error_propagates_and_session_closed`는 패치된 `SessionLocal`로 생성된 실제 가짜 세션이 `with_db`에 전달되고, `query()` 예외 후 `finally`의 `close()` 실행까지 정확히 검증함.
+
+잔여 결함 없음.
+
+단, 현재 읽기 전용 실행 환경에 사용 가능한 임시 디렉터리가 없어 pytest 실행은 시작되지 못했으며, 결론은 코드 경로 정적 검토 기준이다.

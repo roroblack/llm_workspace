@@ -28,6 +28,8 @@ langchain-text-splitters==1.1.2
 pypdf==6.14.2
 # reference/ 복습 레퍼런스(Gemini 날것 SDK) — 직접 사용하므로 명시 고정
 google-genai==2.10.0
+# Phase 9 (MCP 서버/클라이언트)
+mcp[cli]==1.28.1
 # Phase 6 (ML: 감성분석 KoELECTRA)
 transformers==5.13.0
 torch==2.12.0

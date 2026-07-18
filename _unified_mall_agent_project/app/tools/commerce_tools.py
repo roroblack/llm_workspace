@@ -70,8 +70,13 @@ def search_product(db: Session, keyword: str) -> dict[str, Any]:
     return {"ok": True, "count": len(results), "results": results}
 
 
-def get_exchange_rate(db: Session, currency: str) -> dict[str, Any]:
-    """통화 코드의 원화 환율을 조회한다. 인자: currency('USD'/'EUR'/'JPY')."""
+def get_exchange_rate(db: Session | None, currency: str) -> dict[str, Any]:
+    """통화 코드의 원화 환율을 조회한다. 인자: currency('USD'/'EUR'/'JPY').
+
+    환율표는 상수라 db를 사용하지 않는다. 도구 시그니처 일관성(TOOL_MAP의
+    `fn(db, **args)` 디스패치)을 위해 db 인자는 유지하되 타입을 `Session | None`으로
+    두어 세션 없이도 호출 가능함을 정적으로 명시한다(MCP 서버가 None을 넘김).
+    """
     rate = EXCHANGE_RATES.get(currency.upper())
     if rate is None:
         return _fail("currency_not_supported", f"지원하지 않는 통화입니다: {currency}")

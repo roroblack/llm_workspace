@@ -1,7 +1,7 @@
 # 교과목 3(초거대언어모델/LLM) 학습 공략집
 
 > **목적**: 이 문서 하나로 지금까지 진행한 28개 실습 프로젝트와 교과목 3 강의(6개 PDF)의 학습 내용을 하루 만에 복습·정리한다.
-> **구성**: 커리큘럼을 학습 순서(전처리 → 딥러닝 → LLM → 에이전트)대로 12개 스테이지로 나눴다. 각 스테이지는 **① 개념 ② 왜 중요한가 ③ 핵심 원리·코드 감각 ④ 근거 프로젝트/PDF ⑤ 통합 앱 반영 위치** 순.
+> **구성**: 커리큘럼을 학습 순서(전처리 → 딥러닝 → LLM → 에이전트 → MCP)대로 스테이지로 나눴다(1~13 본과정 + 14 MCP 확장). 각 스테이지는 **① 개념 ② 왜 중요한가 ③ 핵심 원리·코드 감각 ④ 근거 프로젝트/PDF ⑤ 통합 앱 반영 위치** 순.
 > **근거**: 각 프로젝트 실제 소스 정독 + 강의 PDF 6종 정독(리포트 `reports/2026-07-12_1430`, `1520`). 추측 없이 확인된 내용만 기록(RULE.md 1).
 
 작성일시: 2026-07-12 15:40
@@ -288,6 +288,39 @@
 
 ---
 
+## 스테이지 14 — MCP(Model Context Protocol) 서버·클라이언트 (_0714_MCP)
+
+**① 개념**: 도구를 "이 앱 안에서만 쓰는 함수"에 가두지 않고, **표준 프로토콜(MCP)로 노출**해
+Claude Desktop 같은 외부 클라이언트나 다른 앱이 그대로 호출할 수 있게 한다. 스테이지 10의
+Function Calling("LLM이 우리 함수를 부른다")에서 한 단계 더 나아가 "우리 도구를 표준으로 공개한다".
+
+**② 왜 중요한가**: Function Calling은 provider·앱마다 파편적이다. MCP는 도구/리소스/프롬프트를
+**공통 규격**으로 정의해, 한 번 만든 도구를 여러 호스트가 재사용한다. "도구의 USB-C" 비유.
+
+**③ 핵심 원리·코드 감각**:
+- `FastMCP("name")` + 데코레이터 3종: `@mcp.tool()`(행동), `@mcp.resource("uri://…")`(읽기 데이터),
+  `@mcp.prompt()`(재사용 프롬프트). 타입힌트가 곧 입력 스키마.
+- **transport = stdio**: 서버는 `python -m app.mcp.server`로 별도 프로세스. 클라이언트는
+  `stdio_client` + `ClientSession`으로 `initialize → list_tools → call_tool`.
+- 반환 계약: 도구가 dict를 주면 `structuredContent`로 실림. **비즈니스 실패**(없는 상품)는
+  `{ok:false}` + `isError=False`(정상 결과)지만, **실제 오류**(DB 미준비·알 수 없는 도구)는
+  `isError=True`/프로토콜 오류 → 삼키지 말고 예외로 승격(무폴백).
+- 별도 프로세스라 DB 세션은 도구 실행마다 열고(`with_db`) 닫는다. 서버 단독 실행은
+  테이블 생성·seed를 하지 않음(앱 lifespan이 없으니) → DB 미준비 시 오류 전파.
+
+**④ 근거 프로젝트/PDF**: `_0714_MCP/`(simple_mcp_server=FastMCP 기초, mcp_rag=MCP+RAG,
+mcp_enterprise=서버+클라이언트), PDF `0714-s/5_MCP이해_서버구축`.
+
+**⑤ 통합 앱 반영**: `app/mcp/server.py`(도구 10=커머스5+RAG2+ML3, 리소스 2, 프롬프트 1),
+`app/mcp/client.py`(stdio), `app/routers/mcp.py`(`/api/mcp/tools`·`/call`). 기존 함수를 얇게
+래핑만(중복 0). external_systems(slack/github/샌드박스)는 범위 밖·보안 위험이라 미이관(YAGNI).
+
+> ⚠️ 함정: OpenAI 호환 서버에서 도구 호출이 안 될 때 `tool_choice="auto"` 누락을 의심하라
+> (스테이지 10). MCP에서도 "실패를 200 성공으로 감싸기"가 대표적 폴백 안티패턴 — `isError`는
+> 반드시 예외로 승격.
+
+---
+
 ## 부록 A — 프로젝트 ↔ 스테이지 빠른 색인
 
 | 프로젝트 | 스테이지 | 한 줄 |
@@ -307,6 +340,7 @@
 | chatgpt / coffee / survey / music | 6~12 | 챗봇 응용(세션·의도·추천) |
 | fastapi_llm_usage | 7 | 기능별 유즈케이스 |
 | react_tools_agent_fastapi | 13 | 통합 베이스(ReAct+RAG+Torch) |
+| _0714_MCP (simple/rag/enterprise) | 14 | MCP 서버·클라이언트(도구 표준 노출) |
 
 ## 부록 B — 반드시 기억할 "함정" 5가지
 
@@ -348,6 +382,7 @@
 | 12 RAG·LangChain | `app/rag/`(인덱싱/서비스 분리·FAISS), `app/agent/lc_agent.py` |
 | 12+ RAG QA(근거인용·PDF) | `app/rag/qa.py`(answer+sources), `app/rag/build_index.py`(TXT+PDF), `POST /api/rag/qa` |
 | 13 통합 | `app/main.py` + 챗 UI `app/static/` |
+| 14 MCP 서버·클라이언트 | `app/mcp/server.py`(도구10·리소스2·프롬프트1·stdio), `app/mcp/client.py`, `POST /api/mcp/tools`·`/call` |
 
 **직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작하며, 에이전트의 실제 도구 호출(tool-calling)만 OpenAI/Gemini 키가 필요하다(`scripts/realkey_smoke.py`).
 

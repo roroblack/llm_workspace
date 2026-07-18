@@ -10,4 +10,5 @@ addopts = "-q"
 markers = [
     "llm: 실제 LLM 호출이 필요한 테스트 (기본 CI에서 제외)",
     "ml: 무거운 로컬 ML 모델 로드가 필요한 테스트 (KoELECTRA/임베딩, 기본 CI에서 제외)",
+    "mcp: MCP stdio 서브프로세스 왕복이 필요한 테스트 (기본 CI에서 제외)",
 ]
