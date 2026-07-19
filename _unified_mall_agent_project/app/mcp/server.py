@@ -17,9 +17,12 @@
 from __future__ import annotations
 
 import json
+import os
 import sys
 from collections.abc import Callable
-from typing import Any, TypeVar
+from typing import Annotated, Any, TypeVar
+
+from pydantic import Field
 
 # Windows 콘솔 stdio를 UTF-8로 (한글 도구 설명·인자 안전)
 if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
@@ -30,6 +33,7 @@ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임포트)
 
+from app.core.errors import AppError  # noqa: E402
 from app.db.database import SessionLocal  # noqa: E402
 from app.db.models import Product  # noqa: E402
 from app.ml import intent as ml_intent  # noqa: E402
@@ -41,19 +45,53 @@ from app.tools import commerce_tools  # noqa: E402
 
 _T = TypeVar("_T")
 
+# top_k는 스키마 수준에서 1~10 범위 검증(범위 밖=인자 검증 오류). None이면 각 함수의
+# 기본값(RAG_TOP_K 등 config)으로 위임 — 매직값 3을 여기서 중복 하드코딩하지 않는다.
+TopK = Annotated[int, Field(ge=1, le=10)]
+
 mcp = FastMCP("seungmall")
+
+
+# 클라이언트가 서브프로세스를 띄우며 넘겨준 1회용 nonce. 이게 있어야만 마커를 신뢰받는다.
+# (없으면=외부 클라이언트 직접 실행 → 마커를 실지 않는다. 위조 불가: 호출자 입력이 nonce를
+#  재현할 수 없으므로 인자에 마커를 심어도 taxonomy를 조작하지 못한다.)
+_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
+
+
+def _encode_apperr(exc: AppError) -> BaseException:
+    """도구 내부 AppError의 error_code를 프로토콜 경계 너머로 보존한다.
+
+    FastMCP가 예외를 문자열화하면 타입이 사라진다. 클라이언트가 원래 타입(422/503 등)을
+    복원할 수 있도록 '[APPERR:<nonce>:<code>]' 마커를 실어 재발생시킨다. nonce는 클라이언트가
+    넘긴 비밀값이라 호출자 입력으로 위조할 수 없다(주입 방지). nonce가 없으면 원본을 그대로
+    전파한다(외부 클라이언트는 우리 taxonomy 복원을 쓰지 않음).
+    """
+    if _APPERR_NONCE:
+        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
+    return exc
 
 
 def with_db(op: Callable[[Any], _T]) -> _T:
     """도구 실행마다 세션을 open/close 하고 결과를 반환한다.
 
-    DB 미준비 등의 예외는 삼키지 않고 그대로 전파한다(폴백 금지).
+    DB 미준비 등의 예외는 삼키지 않고 전파한다(폴백 금지). 도구가 낸 AppError는
+    error_code를 보존해 재발생시킨다.
     """
     db = SessionLocal()
     try:
         return op(db)
+    except AppError as exc:
+        raise _encode_apperr(exc) from exc
     finally:
         db.close()
+
+
+def _guard(op: Callable[[], _T]) -> _T:
+    """세션이 필요 없는 도구용 — AppError의 error_code를 보존해 재발생시킨다."""
+    try:
+        return op()
+    except AppError as exc:
+        raise _encode_apperr(exc) from exc
 
 
 # --------------------------------------------------------------------------
@@ -89,26 +127,32 @@ def get_exchange_rate(currency: str) -> dict[str, Any]:
 
     환율표는 상수라 DB 세션을 만들지 않는다(계획 합의).
     """
-    return commerce_tools.get_exchange_rate(None, currency)  # db 미사용
+    return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 미사용
 
 
 # --------------------------------------------------------------------------
 # RAG 도구 2 (vector_search=검색, rag_qa=근거기반 답변)
 # --------------------------------------------------------------------------
 @mcp.tool()
-def vector_search(query: str, top_k: int = 3, source: str | None = None) -> dict[str, Any]:
-    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k, source(선택)."""
-    results = rag_service.search(query, k=top_k, source=source)
-    return {"ok": True, "count": len(results), "results": results}
+def vector_search(
+    query: str, top_k: TopK | None = None, source: str | None = None
+) -> dict[str, Any]:
+    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k(1~10, 미지정=기본), source(선택)."""
+
+    def _run() -> dict[str, Any]:
+        results = rag_service.search(query, k=top_k, source=source)  # None→RAG_TOP_K
+        return {"ok": True, "count": len(results), "results": results}
+
+    return _guard(_run)
 
 
 @mcp.tool()
-def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
-    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k.
+def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
+    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k(1~10, 미지정=기본).
 
     LLM 호출이 포함된다(설정된 provider 사용). 키/서버 없으면 예외 전파.
     """
-    return rag_qa_mod.answer(question, k=top_k)
+    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None→RAG_TOP_K
 
 
 # --------------------------------------------------------------------------
@@ -117,19 +161,21 @@ def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
 @mcp.tool()
 def analyze_sentiment(text: str) -> dict[str, Any]:
     """리뷰/문의 텍스트의 감성(긍정/부정)을 분석한다(KoELECTRA). 인자: text."""
-    return ml_sentiment.analyze_sentiment(text)
+    return _guard(lambda: ml_sentiment.analyze_sentiment(text))
 
 
 @mcp.tool()
 def classify_intent(text: str) -> dict[str, Any]:
     """고객 문의의 의도를 규칙 기반으로 분류한다. 인자: text."""
-    return ml_intent.classify_intent(text)
+    return _guard(lambda: ml_intent.classify_intent(text))
 
 
 @mcp.tool()
-def recommend_products(query: str, top_k: int = 3) -> dict[str, Any]:
-    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k."""
-    return with_db(lambda db: ml_recommend.recommend_products(db, query, top_k=top_k))
+def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
+    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k(1~10, 미지정=기본)."""
+    # None이면 recommend_products의 자체 기본값에 위임(여기서 3을 재하드코딩하지 않음).
+    kwargs = {} if top_k is None else {"top_k": top_k}
+    return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
 
 
 # --------------------------------------------------------------------------

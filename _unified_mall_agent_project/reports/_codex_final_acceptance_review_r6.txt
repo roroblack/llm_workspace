@@ -1,0 +1,2336 @@
+2026-07-19T03:27:20.320528Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f786a-00e2-7853-af85-ba2066f67814
+--------
+user
+역할: 시니어 리뷰어(최종 인수 6차). 5차의 2건(전역 nonce 재사용/stdout 노출, 휴리스틱 오분류)을 반영했다.
+반영 정확성·잔여 결함만 보고 인수 가부 판정. 이번엔 실제 결함이 없으면 반드시 "인수 가능"을 명시하라.
+
+5차 지적 → 반영:
+1)(높음) 전역 nonce 재사용 + stdout 노출 → **호출별 1회용 nonce**:
+   - app/mcp/client.py: 전역 nonce 제거. `call_tool`이 매 호출 `_new_nonce()`(secrets.token_hex(16)) 발급,
+     `_server_params(nonce)`로 서브프로세스 env에 전달, `_tool_error(name, detail, nonce)`가 그 nonce로만 마커 신뢰.
+     각 호출은 이미 새 서브프로세스. 지난 호출 nonce를 관찰·재사용해도 다음 호출은 다른 nonce라 위조 불가.
+   - 추가로 `_tool_error`는 마커(nonce 포함)를 제거하고 메시지만 반환 → nonce는 HTTP 응답에 노출 안 됨.
+2)(중간) 휴리스틱 오분류 → pydantic 인자오류 고유 시그니처만 인정:
+   `_ARG_VALIDATION_RE = r"\d+ validation error[s]? for \w+Arguments"`. 'validation error'/'field required'가
+   단순 포함돼도(비-Arguments) 422로 안 감(503 유지). unknown-tool은 여전히 "Unknown tool:" 접두사로 422.
+
+검토 파일: app/mcp/client.py, app/mcp/server.py, tests/test_mcp.py, tests/test_mcp_stdio.py.
+
+확인:
+A. 호출자 입력만으로 마커 위조 가능한 경로가 남았는가? (전역 nonce 없음, 호출별 발급, 지난 nonce 재사용 무효 확인)
+B. nonce가 HTTP 응답/반환값에 노출되는가? (_tool_error가 마커 제거하는지)
+C. 휴리스틱: unknown-tool·인자검증(Arguments 시그니처)→422, 그 외(비-AppError, 위조마커, 우연한 'validation error' 포함)→503 유지?
+D. 정상 흐름(정확 nonce 마커 복원, 정상 결과, isError=False 비즈니스실패 200) 회귀 없는가?
+E. 과교정·기타 실제 결함.
+
+출력: 심각도별 유효 지적만. 마지막 줄에 반드시 "인수 가능" 또는 "인수 보류: <사유>". 실제 결함 없으면 "잔여 결함 없음, 인수 가능".
+
+codex
+요청하신 4개 파일의 실제 변경 상태와 테스트를 대조해 A–E만 판정하겠습니다. 먼저 구현·테스트를 읽고, 가능한 범위에서 관련 테스트도 실행하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Raw app/mcp/client.py; "`n---SERVER---`n"; Get-Content -Raw app/mcp/server.py; "`n---TEST_MCP---`n"; Get-Content -Raw tests/test_mcp.py; "`n---TEST_STDIO---`n"; Get-Content -Raw tests/test_mcp_stdio.py' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1430ms:
+"""MCP ?대씪?댁뼵???쒕퉬????stdio濡??곕━ MCP ?쒕쾭???곌껐??紐⑸줉/?몄텧???쒖뿰.
+
+??FastAPI)??MCP ?대씪?댁뼵?멸? ?섏뼱, 蹂꾨룄 ?꾨줈?몄뒪濡?`python -m app.mcp.server`瑜??꾩슦怨?stdio濡??듭떊?쒕떎. "?붿껌留덈떎 ?쒕쾭 subprocess 湲곕룞"? **?숈뒿???쒖뿰**?대ŉ ?댁쁺
+援ъ“媛 ?꾨땲???댁쁺? ?μ닔紐??쒕쾭쨌? ??蹂꾨룄 ?ㅺ퀎).
+
+?대갚 ?놁쓬: ?쒕쾭 湲곕룞/?듭떊 ?ㅽ뙣???덉쇅濡??꾪뙆?쒕떎.
+"""
+
+from __future__ import annotations
+
+import os
+import sys
+from pathlib import Path
+from typing import Any
+
+from mcp import ClientSession, StdioServerParameters
+from mcp.client.stdio import stdio_client
+
+import re
+import secrets
+
+from app.core.errors import (
+    AppError,
+    ConfigError,
+    InfraError,
+    LLMOutputError,
+    ValidationErr,
+)
+
+# ?쒕쾭媛 '[APPERR:<nonce>:<code>]'濡??ㅼ뼱 蹂대궦 ?꾧뎄 ?대? AppError??error_code ?????蹂듭썝??
+_APPERR_BY_CODE: dict[str, type[AppError]] = {
+    ValidationErr.error_code: ValidationErr,
+    ConfigError.error_code: ConfigError,
+    InfraError.error_code: InfraError,
+    LLMOutputError.error_code: LLMOutputError,
+}
+# FastMCP???몄옄 寃利??ㅻ쪟 怨좎쑀 ?뺥깭: "N validation error(s) for <Tool>Arguments".
+# ???쒓렇?덉쿂留??꾨젅?꾩썙???몄옄 ?ㅻ쪟濡??몄젙?쒕떎(?꾧뎄 ?대? 硫붿떆吏???곗뿰??'validation error'媛
+# ?욎뿬??422濡??ㅻ텇瑜섑븯吏 ?딅룄濡??뺣???.
+_ARG_VALIDATION_RE = re.compile(r"\d+ validation error[s]? for \w+Arguments")
+
+
+def _new_nonce() -> str:
+    """?몄텧留덈떎 ?덈줈 諛쒓툒?섎뒗 1?뚯슜 鍮꾨?. ?쒕쾭 ?쒕툕?꾨줈?몄뒪??env濡??섍릿??"""
+    return secrets.token_hex(16)
+
+
+def _apperr_marker_re(nonce: str) -> re.Pattern[str]:
+    """?대쾲 ?몄텧???뺥솗??nonce瑜?媛吏?留덉빱留??좊ː?섎뒗 ?뺢퇋??"""
+    return re.compile(
+        rf"^Error executing tool \S+: \[APPERR:{re.escape(nonce)}:(\w+)\]\s*(.*)", re.S
+    )
+
+# app/mcp/client.py ??parents[2] = ?꾨줈?앺듃 猷⑦듃(= app ?⑦궎吏??遺紐?
+_PROJECT_ROOT = Path(__file__).resolve().parents[2]
+
+
+def _unwrap(exc: BaseException) -> BaseException:
+    """anyio TaskGroup???덉쇅瑜?(Base)ExceptionGroup?쇰줈 媛먯? ???덉뼱 理쒕궡遺 ?덉쇅瑜?爰쇰궦??"""
+    while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+        exc = exc.exceptions[0]
+    return exc
+
+
+def _normalize(exc: BaseException, name: str) -> BaseException:
+    """?꾩넚/?꾨줈?좎퐳 ?덉쇅瑜?????덈뒗 AppError濡??밴꺽?쒕떎(?대갚 ?꾨떂, 紐낆떆???ㅽ뙣).
+
+    - ?대??먯꽌 ?대? ?щ┛ AppError(isError?믩텇瑜섎맂 ?ㅻ쪟 ????洹몃?濡??듦낵.
+    - 洹?諛뽰쓽 ?꾩넚/?곌껐 ?ㅻ쪟??InfraError(503)濡??밴꺽 ???ㅽ뙣瑜?200 ?깃났?쇰줈 媛먯텛吏 ?딅뒗??
+    """
+    leaf = _unwrap(exc)
+    if isinstance(leaf, AppError):
+        return leaf
+    return InfraError(f"MCP ?듭떊/?꾧뎄 ?ㅻ쪟: {name}: {type(leaf).__name__}: {leaf}")
+
+
+def _tool_error(name: str, detail: str, nonce: str) -> AppError:
+    """FastMCP媛 isError=True濡??뚮젮以 ?꾧뎄 ?ㅻ쪟瑜??먯씤蹂???낆쑝濡?蹂듭썝?쒕떎.
+
+    ?곗꽑?쒖쐞:
+    1. ?쒕쾭媛 **?대쾲 ?몄텧???뺥솗??nonce濡?* ?ㅼ? '[APPERR:<nonce>:<code>]' 留덉빱 ???먮옒 AppError
+       ???蹂듭썝. nonce???몄텧留덈떎 ?덈줈 諛쒓툒?섎뒗 1?뚯슜 鍮꾨??대씪, ?몄텧?먭? ?꾧뎄紐??몄옄??留덉빱瑜?       ?ш굅??吏???몄텧??nonce瑜??ъ궗?⑺빐???꾩“ 遺덇?(二쇱엯 諛⑹?).
+    2. FastMCP ?꾨젅?꾩썙???ㅻ쪟: 議댁옱?섏? ?딅뒗 ?꾧뎄쨌pydantic ?몄옄 寃利?怨좎쑀 ?쒓렇?덉쿂) ??ValidationErr(422).
+    3. 洹?諛뽰쓽 ?ㅽ뻾 ?ㅽ뙣(SQLAlchemy ??鍮?AppError, ?꾩“ 留덉빱 ?ы븿) ??InfraError(503).
+    ?꾨줈?좎퐳 寃쎄퀎瑜??섏쑝硫??덉쇅 ??낆씠 ?щ씪吏誘濡?硫붿떆吏濡?蹂듭썝?쒕떎.
+    """
+    m = _apperr_marker_re(nonce).search(detail)
+    if m:
+        code, message = m.group(1), m.group(2).strip()
+        cls = _APPERR_BY_CODE.get(code, InfraError)
+        return cls(f"MCP ?꾧뎄 '{name}': {message}")
+
+    is_user_error = detail.startswith("Unknown tool") or bool(_ARG_VALIDATION_RE.search(detail))
+    if is_user_error:
+        return ValidationErr(f"MCP ?꾧뎄 ?몄텧 ?ㅻ쪟(?대쫫/?몄옄): {name}: {detail}")
+    return InfraError(f"MCP ?꾧뎄 ?ㅽ뻾 ?ㅽ뙣: {name}: {detail}")
+
+
+def _server_params(nonce: str | None = None) -> StdioServerParameters:
+    """?곕━ MCP ?쒕쾭瑜?stdio ?쒕툕?꾨줈?몄뒪濡??꾩슦湲??꾪븳 ?뚮씪誘명꽣.
+
+    - command: ?꾩옱 ?뚯씠???명꽣?꾨━???숈씪 venv 蹂댁옣)
+    - args: `-m app.mcp.server`
+    - cwd/env: ?꾨줈?앺듃 猷⑦듃?먯꽌 ?ㅽ뻾 + PYTHONPATH濡?app ?⑦궎吏 ?꾪룷??蹂댁옣
+    - nonce: ?대쾲 ?몄텧??1?뚯슜 鍮꾨?. ?쒕쾭媛 ?꾧뎄 ?대? AppError瑜??꾩“ 遺덇??섍쾶 ?쒖떇?섎뒗 ???대떎.
+    """
+    env = dict(os.environ)
+    existing = env.get("PYTHONPATH", "")
+    root = str(_PROJECT_ROOT)
+    env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
+    if nonce is not None:
+        env["MCP_APPERR_NONCE"] = nonce
+    return StdioServerParameters(
+        command=sys.executable,
+        args=["-m", "app.mcp.server"],
+        cwd=root,
+        env=env,
+    )
+
+
+async def list_tools() -> list[dict[str, Any]]:
+    """?쒕쾭媛 ?몄텧???꾧뎄 紐⑸줉(name/description/input schema)??諛섑솚?쒕떎."""
+    try:
+        async with stdio_client(_server_params()) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                resp = await session.list_tools()
+                return [
+                    {
+                        "name": t.name,
+                        "description": t.description,
+                        "input_schema": t.inputSchema,
+                    }
+                    for t in resp.tools
+                ]
+    except Exception as e:  # ?꾩넚/?꾨줈?좎퐳 ?ㅽ뙣 ??????덈뒗 ?ㅻ쪟濡??밴꺽(?대갚 ?꾨떂)
+        raise _normalize(e, "list_tools") from e
+
+
+async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+    """?꾧뎄瑜??몄텧?섍퀬 援ъ“??寃곌낵(structuredContent ?곗꽑)瑜?諛섑솚?쒕떎.
+
+    援щ텇(?대갚 湲덉?, RULE 3.2):
+    - **鍮꾩쫰?덉뒪 ?ㅽ뙣**(?녿뒗 ?곹뭹/二쇰Ц ?????꾧뎄媛 {"ok": false, ...} 援ъ“??寃곌낵濡?      諛섑솚?섎ŉ `isError=False`?????뺤긽 寃곌낵濡?洹몃?濡??뚮젮以??HTTP 200).
+    - **?꾧뎄 ?ㅻ쪟**(`isError=True`)??200 ?깃났 遊됲닾濡?媛먯떥吏 ?딄퀬 ?먯씤蹂꾨줈 ?밴꺽?쒕떎:
+      議댁옱?섏? ?딅뒗 ?꾧뎄쨌?몄옄 寃利??ㅽ뙣 ??`ValidationErr`(422), ?ㅼ젣 ?ㅽ뻾 ?ㅽ뙣(DB 誘몄?鍮?      ?? ??`InfraError`(503). (`_tool_error` 李멸퀬)
+    - **?꾩넚/?곌껐 ?ㅻ쪟**??`InfraError`(503). anyio媛 ExceptionGroup?쇰줈 媛먯떥硫??몃옪?쒕떎.
+    """
+    nonce = _new_nonce()  # ?대쾲 ?몄텧 ?꾩슜 1?뚯슜 鍮꾨?(?ъ궗?㈑톝tdout 愿李??쒖뿉???ㅼ쓬 ?몄텧 臾댁쁺??
+    try:
+        async with stdio_client(_server_params(nonce)) as (read, write):
+            async with ClientSession(read, write) as session:
+                await session.initialize()
+                result = await session.call_tool(name, arguments or {})
+                text_blocks = [
+                    getattr(block, "text", None)
+                    for block in getattr(result, "content", [])
+                    if getattr(block, "type", None) == "text"
+                ]
+                text = [t for t in text_blocks if t is not None]
+                if getattr(result, "isError", False):
+                    detail = " ".join(text) or "?????녿뒗 MCP ?꾧뎄 ?ㅻ쪟"
+                    raise _tool_error(name, detail, nonce)
+                # FastMCP??dict 諛섑솚 ?꾧뎄瑜?structuredContent濡??④퍡 ?ㅼ뼱以??
+                return {
+                    "structured": getattr(result, "structuredContent", None),
+                    "text": text,
+                }
+    except Exception as e:
+        raise _normalize(e, name) from e
+
+
+---SERVER---
+
+"""MCP ?쒕쾭 ???듯빀 湲곕뒫??MCP ?쒖? ?꾧뎄/由ъ냼???꾨＼?꾪듃濡??몄텧.
+
+?ㅺ퀎 ?먯튃(RULE쨌怨꾪쉷 ?⑹쓽):
+- 湲곗〈 `app.tools.commerce_tools` / `app.rag` / `app.ml` ?⑥닔瑜?**?뉕쾶 ?섑븨**留??쒕떎(以묐났 湲덉?).
+- ???쒕쾭??**蹂꾨룄 ?꾨줈?몄뒪**濡?stdio ?꾩넚?쒕떎(`python -m app.mcp.server`).
+  FastAPI lifespan???놁쑝誘濡?**?뚯씠釉??앹꽦쨌seed瑜??섏? ?딅뒗??** DB媛 以鍮꾨뤌 ?덉?
+  ?딆쑝硫?SQLAlchemy ?덉쇅媛 洹몃?濡?MCP ?ㅻ쪟濡??꾪뙆?쒕떎(?대갚쨌?먮룞?쒕뵫 湲덉?).
+- DB媛 ?꾩슂???꾧뎄??`with_db`濡??ㅽ뻾留덈떎 ?몄뀡 open/close. `get_exchange_rate`??  DB瑜??곗? ?딆쑝誘濡??몄뀡??留뚮뱾吏 ?딅뒗??
+- ?몄텧 ?꾧뎄??**10媛?怨좎젙**: 而ㅻ㉧?? + RAG2(vector_search/rag_qa) + ML3.
+  `search_knowledge_base`??`vector_search`? 以묐났?대씪 **?쒖쇅**.
+
+二쇱쓽: "?꾧뎄 ?ㅽ뻾留덈떎 subprocess媛 ?몄뀡???щ뒗 援ъ“"??**?숈뒿???쒖뿰**?대ŉ ?댁쁺 援ъ“媛
+?꾨땲???댁쁺? 而ㅻ꽖???쨌?μ닔紐??몄뀡 ?깆쓣 蹂꾨룄 ?ㅺ퀎).
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import sys
+from collections.abc import Callable
+from typing import Annotated, Any, TypeVar
+
+from pydantic import Field
+
+# Windows 肄섏넄 stdio瑜?UTF-8濡?(?쒓? ?꾧뎄 ?ㅻ챸쨌?몄옄 ?덉쟾)
+if sys.platform == "win32":  # pragma: no cover - ?뚮옯??遺꾧린
+    for _stream in (sys.stdin, sys.stdout, sys.stderr):
+        reconfigure = getattr(_stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(encoding="utf-8")
+
+from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 ?ъ꽕?????꾪룷??
+
+from app.core.errors import AppError  # noqa: E402
+from app.db.database import SessionLocal  # noqa: E402
+from app.db.models import Product  # noqa: E402
+from app.ml import intent as ml_intent  # noqa: E402
+from app.ml import recommend as ml_recommend  # noqa: E402
+from app.ml import sentiment as ml_sentiment  # noqa: E402
+from app.rag import qa as rag_qa_mod  # noqa: E402
+from app.rag import service as rag_service  # noqa: E402
+from app.tools import commerce_tools  # noqa: E402
+
+_T = TypeVar("_T")
+
+# top_k???ㅽ궎留??섏??먯꽌 1~10 踰붿쐞 寃利?踰붿쐞 諛??몄옄 寃利??ㅻ쪟). None?대㈃ 媛??⑥닔??# 湲곕낯媛?RAG_TOP_K ??config)?쇰줈 ?꾩엫 ??留ㅼ쭅媛?3???ш린??以묐났 ?섎뱶肄붾뵫?섏? ?딅뒗??
+TopK = Annotated[int, Field(ge=1, le=10)]
+
+mcp = FastMCP("seungmall")
+
+
+# ?대씪?댁뼵?멸? ?쒕툕?꾨줈?몄뒪瑜??꾩슦硫??섍꺼以 1?뚯슜 nonce. ?닿쾶 ?덉뼱?쇰쭔 留덉빱瑜??좊ː諛쏅뒗??
+# (?놁쑝硫??몃? ?대씪?댁뼵??吏곸젒 ?ㅽ뻾 ??留덉빱瑜??ㅼ? ?딅뒗?? ?꾩“ 遺덇?: ?몄텧???낅젰??nonce瑜?#  ?ы쁽?????놁쑝誘濡??몄옄??留덉빱瑜??ъ뼱??taxonomy瑜?議곗옉?섏? 紐삵븳??)
+_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
+
+
+def _encode_apperr(exc: AppError) -> BaseException:
+    """?꾧뎄 ?대? AppError??error_code瑜??꾨줈?좎퐳 寃쎄퀎 ?덈㉧濡?蹂댁〈?쒕떎.
+
+    FastMCP媛 ?덉쇅瑜?臾몄옄?댄솕?섎㈃ ??낆씠 ?щ씪吏꾨떎. ?대씪?댁뼵?멸? ?먮옒 ???422/503 ????    蹂듭썝?????덈룄濡?'[APPERR:<nonce>:<code>]' 留덉빱瑜??ㅼ뼱 ?щ컻?앹떆?⑤떎. nonce???대씪?댁뼵?멸?
+    ?섍릿 鍮꾨?媛믪씠???몄텧???낅젰?쇰줈 ?꾩“?????녿떎(二쇱엯 諛⑹?). nonce媛 ?놁쑝硫??먮낯??洹몃?濡?    ?꾪뙆?쒕떎(?몃? ?대씪?댁뼵?몃뒗 ?곕━ taxonomy 蹂듭썝???곗? ?딆쓬).
+    """
+    if _APPERR_NONCE:
+        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
+    return exc
+
+
+def with_db(op: Callable[[Any], _T]) -> _T:
+    """?꾧뎄 ?ㅽ뻾留덈떎 ?몄뀡??open/close ?섍퀬 寃곌낵瑜?諛섑솚?쒕떎.
+
+    DB 誘몄?鍮??깆쓽 ?덉쇅???쇳궎吏 ?딄퀬 ?꾪뙆?쒕떎(?대갚 湲덉?). ?꾧뎄媛 ??AppError??    error_code瑜?蹂댁〈???щ컻?앹떆?⑤떎.
+    """
+    db = SessionLocal()
+    try:
+        return op(db)
+    except AppError as exc:
+        raise _encode_apperr(exc) from exc
+    finally:
+        db.close()
+
+
+def _guard(op: Callable[[], _T]) -> _T:
+    """?몄뀡???꾩슂 ?녿뒗 ?꾧뎄????AppError??error_code瑜?蹂댁〈???щ컻?앹떆?⑤떎."""
+    try:
+        return op()
+    except AppError as exc:
+        raise _encode_apperr(exc) from exc
+
+
+# --------------------------------------------------------------------------
+# 而ㅻ㉧???꾧뎄 5 (DB ?꾩슂 ??get_exchange_rate留??덉쇅)
+# --------------------------------------------------------------------------
+@mcp.tool()
+def get_price(product_code: str) -> dict[str, Any]:
+    """?곹뭹 肄붾뱶濡??먮ℓ媛瑜?議고쉶?쒕떎. ?몄옄: product_code(?? 'P0001')."""
+    return with_db(lambda db: commerce_tools.get_price(db, product_code))
+
+
+@mcp.tool()
+def get_stock(product_code: str) -> dict[str, Any]:
+    """?곹뭹 肄붾뱶濡??ш퀬 ?섎웾??議고쉶?쒕떎. ?몄옄: product_code(?? 'P0001')."""
+    return with_db(lambda db: commerce_tools.get_stock(db, product_code))
+
+
+@mcp.tool()
+def get_order_status(order_no: str) -> dict[str, Any]:
+    """二쇰Ц踰덊샇濡?二쇰Ц ?곹깭瑜?議고쉶?쒕떎. ?몄옄: order_no."""
+    return with_db(lambda db: commerce_tools.get_order_status(db, order_no))
+
+
+@mcp.tool()
+def search_product(keyword: str) -> dict[str, Any]:
+    """?곹뭹紐??ㅼ썙?쒕줈 ?곹뭹??寃?됲븳?? ?몄옄: keyword."""
+    return with_db(lambda db: commerce_tools.search_product(db, keyword))
+
+
+@mcp.tool()
+def get_exchange_rate(currency: str) -> dict[str, Any]:
+    """?듯솕 肄붾뱶???먰솕 ?섏쑉??議고쉶?쒕떎. ?몄옄: currency('USD'/'EUR'/'JPY').
+
+    ?섏쑉?쒕뒗 ?곸닔??DB ?몄뀡??留뚮뱾吏 ?딅뒗??怨꾪쉷 ?⑹쓽).
+    """
+    return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 誘몄궗??
+
+# --------------------------------------------------------------------------
+# RAG ?꾧뎄 2 (vector_search=寃?? rag_qa=洹쇨굅湲곕컲 ?듬?)
+# --------------------------------------------------------------------------
+@mcp.tool()
+def vector_search(
+    query: str, top_k: TopK | None = None, source: str | None = None
+) -> dict[str, Any]:
+    """?뺤콉쨌留ㅻ돱????吏??臾몄꽌瑜?踰≫꽣 寃?됲븳?? ?몄옄: query, top_k(1~10, 誘몄???湲곕낯), source(?좏깮)."""
+
+    def _run() -> dict[str, Any]:
+        results = rag_service.search(query, k=top_k, source=source)  # None?뭃AG_TOP_K
+        return {"ok": True, "count": len(results), "results": results}
+
+    return _guard(_run)
+
+
+@mcp.tool()
+def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
+    """吏??臾몄꽌 洹쇨굅濡?吏덈Ц???듯븳???섍컖 ?듭젣쨌異쒖쿂 ?몄슜). ?몄옄: question, top_k(1~10, 誘몄???湲곕낯).
+
+    LLM ?몄텧???ы븿?쒕떎(?ㅼ젙??provider ?ъ슜). ???쒕쾭 ?놁쑝硫??덉쇅 ?꾪뙆.
+    """
+    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None?뭃AG_TOP_K
+
+
+# --------------------------------------------------------------------------
+# ML ?꾧뎄 3 (媛먯꽦/?섎룄/異붿쿇)
+# --------------------------------------------------------------------------
+@mcp.tool()
+def analyze_sentiment(text: str) -> dict[str, Any]:
+    """由щ럭/臾몄쓽 ?띿뒪?몄쓽 媛먯꽦(湲띿젙/遺????遺꾩꽍?쒕떎(KoELECTRA). ?몄옄: text."""
+    return _guard(lambda: ml_sentiment.analyze_sentiment(text))
+
+
+@mcp.tool()
+def classify_intent(text: str) -> dict[str, Any]:
+    """怨좉컼 臾몄쓽???섎룄瑜?洹쒖튃 湲곕컲?쇰줈 遺꾨쪟?쒕떎. ?몄옄: text."""
+    return _guard(lambda: ml_intent.classify_intent(text))
+
+
+@mcp.tool()
+def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
+    """吏덉쓽? ?꾨쿋???좎궗?꾨줈 ?곹뭹??異붿쿇?쒕떎. ?몄옄: query, top_k(1~10, 誘몄???湲곕낯)."""
+    # None?대㈃ recommend_products???먯껜 湲곕낯媛믪뿉 ?꾩엫(?ш린??3???ы븯?쒖퐫?⑺븯吏 ?딆쓬).
+    kwargs = {} if top_k is None else {"top_k": top_k}
+    return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
+
+
+# --------------------------------------------------------------------------
+# 由ъ냼??2
+# --------------------------------------------------------------------------
+@mcp.resource("config://runtime", mime_type="application/json")
+def runtime_config() -> str:
+    """?고????ㅼ젙(鍮꾨? ?쒖쇅)??JSON?쇰줈 ?몄텧?쒕떎."""
+    from app.core.config import get_settings
+
+    s = get_settings()
+    payload = {
+        "llm_provider": s.LLM_PROVIDER,
+        "local_model": s.LOCAL_MODEL,
+        "openai_model": s.OPENAI_MODEL,
+        "gemini_model": s.GEMINI_MODEL,
+        "embedding_model": s.ST_EMBEDDING_MODEL,
+        "rag_top_k": s.RAG_TOP_K,
+        "sentiment_model": s.SENTIMENT_MODEL,
+    }
+    return json.dumps(payload, ensure_ascii=False, indent=2)
+
+
+@mcp.resource("catalog://products", mime_type="application/json")
+def product_catalog() -> str:
+    """?곹뭹 移댄깉濡쒓렇瑜?JSON?쇰줈 ?몄텧?쒕떎(?먯껜 ?몄뀡 open/close)."""
+
+    def _load(db: Any) -> list[dict[str, Any]]:
+        rows = db.query(Product).order_by(Product.product_code).all()
+        return [
+            {
+                "product_code": p.product_code,
+                "name": p.name,
+                "category": p.category,
+                "price": p.price,
+            }
+            for p in rows
+        ]
+
+    items = with_db(_load)
+    return json.dumps({"count": len(items), "products": items}, ensure_ascii=False, indent=2)
+
+
+# --------------------------------------------------------------------------
+# ?꾨＼?꾪듃 1
+# --------------------------------------------------------------------------
+@mcp.prompt()
+def grounded_rag_prompt(question: str) -> str:
+    """寃??癒쇱?쨌洹쇨굅留??ъ슜?섎뒗 RAG 吏移??꾨＼?꾪듃瑜??앹꽦?쒕떎."""
+    return (
+        "?덈뒗 ?뱀듅?κ뎄紐?怨좉컼吏??AI?? 諛섎뱶???꾨옒 ?덉감瑜?吏耳쒕씪.\n"
+        "1) 癒쇱? vector_search ?꾧뎄濡?愿??洹쇨굅瑜?寃?됲븳??\n"
+        "2) 寃?됰맂 洹쇨굅???덈뒗 ?댁슜留??ъ슜???듯븳??紐⑤Ⅴ硫?紐⑤Ⅸ?ㅺ퀬 ?듯븳??.\n"
+        "3) ?듬? ?앹뿉 ?ъ슜??異쒖쿂瑜?紐낆떆?쒕떎.\n\n"
+        f"吏덈Ц: {question}"
+    )
+
+
+if __name__ == "__main__":  # pragma: no cover - stdio 吏꾩엯??    mcp.run(transport="stdio")
+
+
+---TEST_MCP---
+
+"""MCP ?쒕쾭 寃곗젙濡??뚯뒪?????깅줉 + ?꾧뎄 濡쒖쭅(LLM/subprocess 遺덊븘??.
+
+FastMCP ?몄뒪?댁뒪瑜?**?명봽濡쒖꽭??*濡??몄텧?쒕떎(`mcp.call_tool`? (blocks, structured)
+?쒗뵆 諛섑솚). 而ㅻ㉧??ML(洹쒖튃) ?꾧뎄????DB濡?寃곗젙濡좎쟻. LLM/紐⑤뜽 濡쒕뱶 ?꾧뎄???ш린??寃利앺븯吏 ?딅뒗??媛곴컖 @llm/@ml, ?ㅻえ?щ뒗 test_mcp_stdio).
+
+?꾨줈?앺듃??async ?뚯뒪???뚮윭洹몄씤???놁쑝誘濡?肄붾（?댁? asyncio.run?쇰줈 援щ룞?쒕떎.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+
+import pytest
+
+from app.core.errors import ConfigError, InfraError, ValidationErr
+from app.mcp import server as mcp_server
+from app.mcp.client import _tool_error
+from app.mcp.server import mcp
+
+# ?뚯뒪?몄슜 怨좎젙 nonce(?몄텧 肄붾뱶媛 諛쒓툒?섎뒗 寃껉낵 ?숈씪 ??븷)
+_TEST_NONCE = "test0nonce0abcdef"
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+# 怨꾪쉷 ?⑹쓽: ?꾧뎄???뺥솗??10媛?而ㅻ㉧?? + RAG2 + ML3), search_knowledge_base ?쒖쇅
+EXPECTED_TOOLS = {
+    "get_price",
+    "get_stock",
+    "get_order_status",
+    "search_product",
+    "get_exchange_rate",
+    "vector_search",
+    "rag_qa",
+    "analyze_sentiment",
+    "classify_intent",
+    "recommend_products",
+}
+
+
+def test_registered_tools_exact_set():
+    tools = _run(mcp.list_tools())
+    names = {t.name for t in tools}
+    assert names == EXPECTED_TOOLS
+    assert "search_knowledge_base" not in names  # vector_search? 以묐났?대씪 ?쒖쇅
+
+
+def test_registered_resources_and_prompt():
+    resources = _run(mcp.list_resources())
+    uris = {str(r.uri) for r in resources}
+    assert uris == {"config://runtime", "catalog://products"}
+    prompts = _run(mcp.list_prompts())
+    assert {p.name for p in prompts} == {"grounded_rag_prompt"}
+
+
+def test_get_price_tool_via_mcp():
+    _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+    assert structured["ok"] is True
+    assert structured["price"] > 0
+
+
+def test_get_price_not_found_is_structured_fail():
+    _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "NOPE"}))
+    assert structured["ok"] is False
+    assert structured["error_code"] == "product_not_found"
+
+
+def test_get_exchange_rate_no_session_needed():
+    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "usd"}))
+    assert structured["ok"] is True
+    assert structured["currency"] == "USD"
+    assert structured["rate"] > 0
+
+
+def test_get_exchange_rate_unsupported():
+    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "XXX"}))
+    assert structured["ok"] is False
+    assert structured["error_code"] == "currency_not_supported"
+
+
+def test_classify_intent_tool_via_mcp():
+    # 洹쒖튃 湲곕컲 ??紐⑤뜽 濡쒕뱶 遺덊븘????寃곗젙濡?    _blocks, structured = _run(mcp.call_tool("classify_intent", {"text": "?섎텋?섍퀬 ?띠뼱??}))
+    assert "intent" in structured
+
+
+def test_runtime_config_resource():
+    content = _run(mcp.read_resource("config://runtime"))
+    items = list(content)
+    payload = json.loads(items[0].content)
+    assert payload["llm_provider"] in {"local", "openai", "gemini"}
+    serialized = json.dumps(payload)
+    # ?ㅼ젣 鍮꾨? 媛믪씠 ?덉? ?딆븘???쒕떎: conftest媛 ?ㅼ젙??SECRET_KEY ?쇳떚?먯씠 ?놁뼱???쒕떎
+    assert "test-secret-key-do-not-use-in-prod" not in serialized
+    # 鍮꾨? ?깃꺽 ?꾨뱶紐낅룄 ?놁뼱???쒕떎
+    low = serialized.lower()
+    assert "api_key" not in low
+    assert "secret" not in low
+
+
+def test_catalog_resource_lists_products():
+    content = _run(mcp.read_resource("catalog://products"))
+    items = list(content)
+    payload = json.loads(items[0].content)
+    assert payload["count"] > 0
+    assert payload["products"][0]["product_code"].startswith("P")
+
+
+# --- FastMCP 怨꾩빟(硫뷀??곗씠?? 寃利?---------------------------------------
+def test_resource_metadata_uri_and_mime():
+    resources = _run(mcp.list_resources())
+    by_uri = {str(r.uri): r for r in resources}
+    assert by_uri["config://runtime"].mimeType == "application/json"
+    assert by_uri["catalog://products"].mimeType == "application/json"
+
+
+def test_prompt_renders_question_and_guidance():
+    res = _run(mcp.get_prompt("grounded_rag_prompt", {"question": "援먰솚?뺤콉 ?뚮젮以?}))
+    assert res.messages
+    text = res.messages[0].content.text
+    assert "援먰솚?뺤콉" in text  # ?몄옄媛 ?ㅼ젣濡??뚮뜑留곷맖
+    assert "vector_search" in text  # 寃??癒쇱? 吏移??ы븿
+
+
+# --- 臾댄뤃諛?怨꾩빟: ?ㅼ젣 ?꾧뎄 ?ㅻ쪟???쇳궎吏 留먭퀬 ?꾪뙆 + ?몄뀡? ?ロ엺??---------
+def test_db_error_propagates_and_session_closed(monkeypatch):
+    """DB ?ㅽ뙣 ???꾧뎄媛 ?ㅻ쪟瑜??꾪뙆?섍퀬(?대갚 湲덉?), with_db媛 ?몄뀡???ル뒗吏 ?뺤씤."""
+
+    class _FakeSession:
+        def __init__(self):
+            self.closed = False
+
+        def query(self, *a, **k):
+            raise RuntimeError("DB DOWN")
+
+        def close(self):
+            self.closed = True
+
+    created: list[_FakeSession] = []
+
+    def _factory():
+        s = _FakeSession()
+        created.append(s)
+        return s
+
+    monkeypatch.setattr(mcp_server, "SessionLocal", _factory)
+    # get_price??with_db ??SessionLocal() ??query()?먯꽌 ?덉쇅 ???꾪뙆?쇱빞 ?쒕떎
+    with pytest.raises(Exception, match="DB DOWN"):
+        _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+    # finally 釉붾줉???몄뀡???レ븯?붽?
+    assert created and created[0].closed is True
+
+
+def test_get_exchange_rate_never_opens_session(monkeypatch):
+    """get_exchange_rate???몄뀡??留뚮뱾吏 ?딅뒗????SessionLocal ?몄텧 ???ㅽ뙣?쒖폒 利앸챸."""
+
+    def _boom():
+        raise AssertionError("get_exchange_rate媛 ?몄뀡??留뚮뱾硫????쒕떎")
+
+    monkeypatch.setattr(mcp_server, "SessionLocal", _boom)
+    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+    assert structured["ok"] is True
+    assert structured["rate"] > 0
+
+
+# --- ?뉗? ?섑븨 怨꾩빟: ?몄옄 ?꾨떖 + top_k None ?꾩엫(?섎뱶肄붾뵫 3 ?놁쓬) --------------
+def test_vector_search_passes_args_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_search(query, k=None, source=None):
+        captured.update(query=query, k=k, source=source)
+        return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
+
+    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+    _b, s = _run(
+        mcp.call_tool("vector_search", {"query": "?섎텋洹쒖젙", "top_k": 5, "source": "policy"})
+    )
+    assert captured == {"query": "?섎텋洹쒖젙", "k": 5, "source": "policy"}
+    assert s["ok"] is True and s["count"] == 1
+
+
+def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
+    captured: dict = {}
+
+    def _fake_search(query, k=None, source=None):
+        captured["k"] = k
+        return []
+
+    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+    _run(mcp.call_tool("vector_search", {"query": "q"}))
+    # top_k 誘몄?????None??洹몃?濡??꾩엫(service媛 RAG_TOP_K濡?寃곗젙). 3???ы븯?쒖퐫?⑺븯吏 ?딆쓬.
+    assert captured["k"] is None
+
+
+def test_rag_qa_passes_args_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_answer(question, k=None):
+        captured.update(question=question, k=k)
+        return {"answer": "a", "sources": []}
+
+    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+    _b, s = _run(mcp.call_tool("rag_qa", {"question": "援먰솚?", "top_k": 2}))
+    assert captured == {"question": "援먰솚?", "k": 2}
+    assert s["answer"] == "a"
+
+
+def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
+    captured: dict = {}
+
+    def _fake_answer(question, k=None):
+        captured["k"] = k
+        return {"answer": "a", "sources": []}
+
+    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+    _run(mcp.call_tool("rag_qa", {"question": "援먰솚?"}))
+    # top_k 誘몄?????None ?꾩엫(qa.answer媛 RAG_TOP_K濡?寃곗젙). 3 ?ы븯?쒖퐫???꾨떂.
+    assert captured["k"] is None
+
+
+def test_recommend_top_k_none_uses_function_default(monkeypatch):
+    captured: dict = {}
+
+    def _fake_reco(db, query, top_k=3):
+        captured.update(query=query, top_k=top_k)
+        return {"ok": True, "items": []}
+
+    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+    _run(mcp.call_tool("recommend_products", {"query": "?붿툩"}))
+    # None?대㈃ recommend_products???먯껜 湲곕낯媛?3) ?ъ슜 ??MCP媛 top_k瑜????섍?
+    assert captured["top_k"] == 3
+
+
+def test_recommend_top_k_passed_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_reco(db, query, top_k=3):
+        captured["top_k"] = top_k
+        return {"ok": True, "items": []}
+
+    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+    _run(mcp.call_tool("recommend_products", {"query": "?붿툩", "top_k": 7}))
+    assert captured["top_k"] == 7
+
+
+def _marker(code: str, msg: str, tool: str = "x", nonce: str = _TEST_NONCE) -> str:
+    """?쒕쾭媛 ?ㅼ젣濡??앹꽦?섎뒗 ?뺥깭???좊ː 媛?ν븳 ?ㅻ쪟 臾몄옄???뺥솗??nonce ?ы븿)."""
+    return f"Error executing tool {tool}: [APPERR:{nonce}:{code}] {msg}"
+
+
+# --- ?ㅻ쪟 taxonomy 蹂듭썝 + 二쇱엯 諛⑹? (_tool_error ?⑥쐞) ----------------------
+def test_tool_error_restores_apperr_code():
+    # ?쒕쾭媛 (?대쾲 ?몄텧???뺥솗??nonce濡? ?ㅼ? 留덉빱 ???먮옒 ???蹂듭썝
+    assert isinstance(
+        _tool_error("rag_qa", _marker("validation_error", "鍮?吏덈Ц", "rag_qa"), _TEST_NONCE),
+        ValidationErr,
+    )
+    assert isinstance(_tool_error("x", _marker("config_error", "?뺤콉 遺덉씪移?), _TEST_NONCE), ConfigError)
+    # 誘몃벑濡?code???덉쟾?섍쾶 InfraError
+    assert isinstance(_tool_error("x", _marker("weird_code", "?"), _TEST_NONCE), InfraError)
+
+
+def test_tool_error_framework_errors():
+    # 議댁옱?섏? ?딅뒗 ?꾧뎄 ??ValidationErr(422)
+    assert isinstance(_tool_error("t", "Unknown tool: t", _TEST_NONCE), ValidationErr)
+    # pydantic ?몄옄 寃利?怨좎쑀 ?쒓렇?덉쿂(N validation error for <Tool>Arguments) ??ValidationErr(422)
+    assert isinstance(
+        _tool_error(
+            "get_price",
+            "Error executing tool get_price: 1 validation error for get_priceArguments\nproduct_code\n  Field required",
+            _TEST_NONCE,
+        ),
+        ValidationErr,
+    )
+    # 洹?諛뽰쓽 ?ㅽ뻾 ?ㅽ뙣 ??InfraError(503)
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: some sqlalchemy error", _TEST_NONCE), InfraError
+    )
+
+
+def test_tool_error_heuristic_is_precise():
+    # 鍮?AppError 硫붿떆吏??'validation error'/'field required'媛 ?곗뿰???욎뿬?? Arguments
+    # ?쒓렇?덉쿂媛 ?꾨땲硫?422濡??ㅻ텇瑜섑븯吏 ?딅뒗??503 ?좎?).
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: upstream validation error from vendor", _TEST_NONCE),
+        InfraError,
+    )
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: field required by remote api", _TEST_NONCE),
+        InfraError,
+    )
+
+
+def test_tool_error_marker_injection_is_ignored():
+    # ?몄텧?먭? ?꾧뎄紐??몄옄??留덉빱瑜??ъ뼱??taxonomy瑜?議곗옉?????녿떎.
+    # 1) unknown-tool ?대쫫??留덉빱 二쇱엯 ??unknown-tool 寃쎈줈濡?ValidationErr(ConfigError ?꾨떂)
+    assert isinstance(
+        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected", _TEST_NONCE),
+        ValidationErr,
+    )
+    # 2) ?꾧뎄 ?ㅽ뻾 ?꾩튂??nonce ?녿뒗 ?꾩“ 留덉빱 ???좊ː ??????InfraError
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected", _TEST_NONCE),
+        InfraError,
+    )
+    # 3) ?由?nonce??遺덉떊(吏???몄텧 nonce ?ъ궗???ы븿)
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected", _TEST_NONCE),
+        InfraError,
+    )
+
+
+---TEST_STDIO---
+
+"""MCP stdio ?뺣났 ?ㅻえ?????ㅼ젣 ?쒕툕?꾨줈?몄뒪 ?쒕쾭瑜?stdio濡?湲곕룞???듭떊.
+
+`@pytest.mark.mcp`: ?쒕툕?꾨줈?몄뒪(?뚯씠???ш린?? 鍮꾩슜???덉뼱 湲곕낯 CI?먯꽌 ?쒖쇅?쒕떎
+(CI = "not llm and not ml and not mcp"). LLM/紐⑤뜽???꾩슂???꾧뎄(rag_qa/analyze_sentiment/
+recommend_products)???ш린???몄텧?섏? ?딅뒗????寃곗젙濡좎쟻 鍮?LLM ?꾧뎄留??뺣났 寃利앺븳??
+
+?쒕툕?꾨줈?몄뒪 ?쒕쾭??conftest媛 留뚮뱺 ?꾩떆 DB(DATABASE_URL ?섍꼍蹂??瑜??대씪?댁뼵?멸?
+env濡?臾쇰젮二쇰?濡??숈씪 ?뚯씪??蹂몃떎. ?쒕쾭???ㅼ뒪濡??뚯씠釉??앹꽦/seed ?섏? ?딅뒗??怨꾪쉷 ?⑹쓽).
+"""
+
+from __future__ import annotations
+
+import asyncio
+
+import pytest
+
+from app.core.errors import ValidationErr
+from app.mcp import client as mcp_client
+from tests.test_mcp import EXPECTED_TOOLS  # ?꾧뎄 ?대쫫 吏묓빀 ?⑥씪 異쒖쿂(以묐났 諛⑹?)
+
+pytestmark = pytest.mark.mcp
+
+
+def _run(coro):
+    return asyncio.run(coro)
+
+
+def test_stdio_list_tools_exact_set():
+    tools = _run(mcp_client.list_tools())
+    names = {t["name"] for t in tools}
+    # ?뺥솗???대쫫 吏묓빀 鍮꾧탳 ???섎せ???꾧뎄媛 ?욎씠硫??ㅽ뙣?댁빞 ?쒕떎
+    assert names == EXPECTED_TOOLS
+    # 媛??꾧뎄媛 ?낅젰 ?ㅽ궎留덈? ?몄텧?섎뒗吏(怨꾩빟)
+    by_name = {t["name"]: t for t in tools}
+    assert "product_code" in by_name["get_price"]["input_schema"]["properties"]
+    assert "currency" in by_name["get_exchange_rate"]["input_schema"]["properties"]
+
+
+def test_stdio_call_get_price():
+    result = _run(mcp_client.call_tool("get_price", {"product_code": "P0001"}))
+    assert result["structured"]["ok"] is True
+    assert result["structured"]["price"] > 0
+
+
+def test_stdio_call_get_exchange_rate():
+    result = _run(mcp_client.call_tool("get_exchange_rate", {"currency": "USD"}))
+    assert result["structured"]["rate"] > 0
+
+
+def test_stdio_business_failure_is_not_error():
+    # ?녿뒗 ?곹뭹 = 鍮꾩쫰?덉뒪 ?ㅽ뙣 ??isError ?꾨떂(援ъ“??ok:False), ?덉쇅濡??밴꺽?섏? ?딅뒗??    result = _run(mcp_client.call_tool("get_price", {"product_code": "NOPE"}))
+    assert result["structured"]["ok"] is False
+    assert result["structured"]["error_code"] == "product_not_found"
+
+
+def test_stdio_unknown_tool_raises_validation_error():
+    # ?????녿뒗 ?꾧뎄 = ?ъ슜???낅젰 ?ㅻ쪟 ??200 ?깃났?쇰줈 媛먯텛吏 ?딄퀬 ValidationErr(422)濡??꾪뙆
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("nonexistent_tool", {}))
+
+
+def test_stdio_missing_required_arg_raises_validation_error():
+    # ?꾩닔 ?몄옄 ?꾨씫 = ?몄옄 寃利??ㅽ뙣 ??ValidationErr(422)
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("get_price", {}))
+
+
+def test_stdio_top_k_out_of_range_raises_validation_error():
+    # top_k 踰붿쐞 諛?0) ???ㅽ궎留?寃利??ㅽ뙣 ??ValidationErr(422). 議곗슜??湲곕낯媛??대갚 ?꾨떂.
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("vector_search", {"query": "?섎텋", "top_k": 0}))
+
+
+def test_stdio_tool_internal_validation_error_maps_422():
+    # ?꾧뎄 ?대??먯꽌 ??ValidationErr(鍮?吏덈Ц)???꾨줈?좎퐳 寃쎄퀎瑜??섏뼱??503???꾨땶
+    # 422濡?蹂듭썝?쇱빞 ?쒕떎(?쒕쾭媛 error_code瑜??ㅼ뼱 蹂대궡怨??대씪?댁뼵?멸? 蹂듭썝).
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+
+
+codex
+구현상 nonce는 `call_tool` 지역 변수로 생성되어 해당 subprocess env와 복원 함수에만 전달되고, 복원 메시지는 마커 전체를 제거합니다. 이제 실제 stdio 오류 문자열이 새 정규식과 정확히 맞는지, 단위·통합 테스트 결과로 확인하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git diff -- app/mcp/client.py app/mcp/server.py tests/test_mcp.py tests/test_mcp_stdio.py; pytest -q tests/test_mcp.py tests/test_mcp_stdio.py -m "mcp or not mcp"' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+2026-07-19T03:27:43.716898Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.8 seconds
+Output:
+diff --git a/_unified_mall_agent_project/app/mcp/client.py b/_unified_mall_agent_project/app/mcp/client.py
+index 006ebda7..003c2543 100644
+--- a/_unified_mall_agent_project/app/mcp/client.py
++++ b/_unified_mall_agent_project/app/mcp/client.py
+@@ -17,7 +17,40 @@ from typing import Any
+ from mcp import ClientSession, StdioServerParameters
+ from mcp.client.stdio import stdio_client
+ 
+-from app.core.errors import AppError, InfraError
++import re
++import secrets
++
++from app.core.errors import (
++    AppError,
++    ConfigError,
++    InfraError,
++    LLMOutputError,
++    ValidationErr,
++)
++
++# 서버가 '[APPERR:<nonce>:<code>]'로 실어 보낸 도구 내부 AppError의 error_code → 타입 복원표.
++_APPERR_BY_CODE: dict[str, type[AppError]] = {
++    ValidationErr.error_code: ValidationErr,
++    ConfigError.error_code: ConfigError,
++    InfraError.error_code: InfraError,
++    LLMOutputError.error_code: LLMOutputError,
++}
++# FastMCP의 인자 검증 오류 고유 형태: "N validation error(s) for <Tool>Arguments".
++# 이 시그니처만 프레임워크 인자 오류로 인정한다(도구 내부 메시지에 우연히 'validation error'가
++# 섞여도 422로 오분류하지 않도록 정밀화).
++_ARG_VALIDATION_RE = re.compile(r"\d+ validation error[s]? for \w+Arguments")
++
++
++def _new_nonce() -> str:
++    """호출마다 새로 발급하는 1회용 비밀. 서버 서브프로세스에 env로 넘긴다."""
++    return secrets.token_hex(16)
++
++
++def _apperr_marker_re(nonce: str) -> re.Pattern[str]:
++    """이번 호출의 정확한 nonce를 가진 마커만 신뢰하는 정규식."""
++    return re.compile(
++        rf"^Error executing tool \S+: \[APPERR:{re.escape(nonce)}:(\w+)\]\s*(.*)", re.S
++    )
+ 
+ # app/mcp/client.py → parents[2] = 프로젝트 루트(= app 패키지의 부모)
+ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+@@ -33,9 +66,8 @@ def _unwrap(exc: BaseException) -> BaseException:
+ def _normalize(exc: BaseException, name: str) -> BaseException:
+     """전송/프로토콜 예외를 타입 있는 AppError로 승격한다(폴백 아님, 명시적 실패).
+ 
+-    - 내부에서 이미 올린 AppError(isError→InfraError 등)는 그대로 통과.
+-    - 그 밖의 McpError/전송 오류는 InfraError(503)로 승격 — 실패를 200 성공으로
+-      감추지 않는다.
++    - 내부에서 이미 올린 AppError(isError→분류된 오류 등)는 그대로 통과.
++    - 그 밖의 전송/연결 오류는 InfraError(503)로 승격 — 실패를 200 성공으로 감추지 않는다.
+     """
+     leaf = _unwrap(exc)
+     if isinstance(leaf, AppError):
+@@ -43,17 +75,43 @@ def _normalize(exc: BaseException, name: str) -> BaseException:
+     return InfraError(f"MCP 통신/도구 오류: {name}: {type(leaf).__name__}: {leaf}")
+ 
+ 
+-def _server_params() -> StdioServerParameters:
++def _tool_error(name: str, detail: str, nonce: str) -> AppError:
++    """FastMCP가 isError=True로 돌려준 도구 오류를 원인별 타입으로 복원한다.
++
++    우선순위:
++    1. 서버가 **이번 호출의 정확한 nonce로** 실은 '[APPERR:<nonce>:<code>]' 마커 → 원래 AppError
++       타입 복원. nonce는 호출마다 새로 발급되는 1회용 비밀이라, 호출자가 도구명/인자에 마커를
++       심거나 지난 호출의 nonce를 재사용해도 위조 불가(주입 방지).
++    2. FastMCP 프레임워크 오류: 존재하지 않는 도구·pydantic 인자 검증(고유 시그니처) → ValidationErr(422).
++    3. 그 밖의 실행 실패(SQLAlchemy 등 비-AppError, 위조 마커 포함) → InfraError(503).
++    프로토콜 경계를 넘으면 예외 타입이 사라지므로 메시지로 복원한다.
++    """
++    m = _apperr_marker_re(nonce).search(detail)
++    if m:
++        code, message = m.group(1), m.group(2).strip()
++        cls = _APPERR_BY_CODE.get(code, InfraError)
++        return cls(f"MCP 도구 '{name}': {message}")
++
++    is_user_error = detail.startswith("Unknown tool") or bool(_ARG_VALIDATION_RE.search(detail))
++    if is_user_error:
++        return ValidationErr(f"MCP 도구 호출 오류(이름/인자): {name}: {detail}")
++    return InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++
++
++def _server_params(nonce: str | None = None) -> StdioServerParameters:
+     """우리 MCP 서버를 stdio 서브프로세스로 띄우기 위한 파라미터.
+ 
+     - command: 현재 파이썬 인터프리터(동일 venv 보장)
+     - args: `-m app.mcp.server`
+     - cwd/env: 프로젝트 루트에서 실행 + PYTHONPATH로 app 패키지 임포트 보장
++    - nonce: 이번 호출용 1회용 비밀. 서버가 도구 내부 AppError를 위조 불가하게 표식하는 데 쓴다.
+     """
+     env = dict(os.environ)
+     existing = env.get("PYTHONPATH", "")
+     root = str(_PROJECT_ROOT)
+     env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
++    if nonce is not None:
++        env["MCP_APPERR_NONCE"] = nonce
+     return StdioServerParameters(
+         command=sys.executable,
+         args=["-m", "app.mcp.server"],
+@@ -87,12 +145,14 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+     구분(폴백 금지, RULE 3.2):
+     - **비즈니스 실패**(없는 상품/주문 등)는 도구가 {"ok": false, ...} 구조화 결과로
+       반환하며 `isError=False`다 → 정상 결과로 그대로 돌려준다(HTTP 200).
+-    - **실제 도구 오류**(도구 내부 예외 → `isError=True`, 또는 알 수 없는 도구·인자
+-      검증 실패 → 프로토콜 McpError)는 200 성공 봉투로 감싸지 않고 `InfraError`로
+-      승격해 전파한다(라우터가 5xx). anyio가 ExceptionGroup으로 감싸면 언랩한다.
++    - **도구 오류**(`isError=True`)는 200 성공 봉투로 감싸지 않고 원인별로 승격한다:
++      존재하지 않는 도구·인자 검증 실패 → `ValidationErr`(422), 실제 실행 실패(DB 미준비
++      등) → `InfraError`(503). (`_tool_error` 참고)
++    - **전송/연결 오류**는 `InfraError`(503). anyio가 ExceptionGroup으로 감싸면 언랩한다.
+     """
++    nonce = _new_nonce()  # 이번 호출 전용 1회용 비밀(재사용·stdout 관찰 시에도 다음 호출 무영향)
+     try:
+-        async with stdio_client(_server_params()) as (read, write):
++        async with stdio_client(_server_params(nonce)) as (read, write):
+             async with ClientSession(read, write) as session:
+                 await session.initialize()
+                 result = await session.call_tool(name, arguments or {})
+@@ -104,7 +164,7 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+                 text = [t for t in text_blocks if t is not None]
+                 if getattr(result, "isError", False):
+                     detail = " ".join(text) or "알 수 없는 MCP 도구 오류"
+-                    raise InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++                    raise _tool_error(name, detail, nonce)
+                 # FastMCP는 dict 반환 도구를 structuredContent로 함께 실어준다.
+                 return {
+                     "structured": getattr(result, "structuredContent", None),
+diff --git a/_unified_mall_agent_project/app/mcp/server.py b/_unified_mall_agent_project/app/mcp/server.py
+index 75e8e3ac..8367cc00 100644
+--- a/_unified_mall_agent_project/app/mcp/server.py
++++ b/_unified_mall_agent_project/app/mcp/server.py
+@@ -17,9 +17,12 @@
+ from __future__ import annotations
+ 
+ import json
++import os
+ import sys
+ from collections.abc import Callable
+-from typing import Any, TypeVar
++from typing import Annotated, Any, TypeVar
++
++from pydantic import Field
+ 
+ # Windows 콘솔 stdio를 UTF-8로 (한글 도구 설명·인자 안전)
+ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+@@ -30,6 +33,7 @@ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+ 
+ from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임포트)
+ 
++from app.core.errors import AppError  # noqa: E402
+ from app.db.database import SessionLocal  # noqa: E402
+ from app.db.models import Product  # noqa: E402
+ from app.ml import intent as ml_intent  # noqa: E402
+@@ -41,21 +45,55 @@ from app.tools import commerce_tools  # noqa: E402
+ 
+ _T = TypeVar("_T")
+ 
++# top_k는 스키마 수준에서 1~10 범위 검증(범위 밖=인자 검증 오류). None이면 각 함수의
++# 기본값(RAG_TOP_K 등 config)으로 위임 — 매직값 3을 여기서 중복 하드코딩하지 않는다.
++TopK = Annotated[int, Field(ge=1, le=10)]
++
+ mcp = FastMCP("seungmall")
+ 
+ 
++# 클라이언트가 서브프로세스를 띄우며 넘겨준 1회용 nonce. 이게 있어야만 마커를 신뢰받는다.
++# (없으면=외부 클라이언트 직접 실행 → 마커를 실지 않는다. 위조 불가: 호출자 입력이 nonce를
++#  재현할 수 없으므로 인자에 마커를 심어도 taxonomy를 조작하지 못한다.)
++_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
++
++
++def _encode_apperr(exc: AppError) -> BaseException:
++    """도구 내부 AppError의 error_code를 프로토콜 경계 너머로 보존한다.
++
++    FastMCP가 예외를 문자열화하면 타입이 사라진다. 클라이언트가 원래 타입(422/503 등)을
++    복원할 수 있도록 '[APPERR:<nonce>:<code>]' 마커를 실어 재발생시킨다. nonce는 클라이언트가
++    넘긴 비밀값이라 호출자 입력으로 위조할 수 없다(주입 방지). nonce가 없으면 원본을 그대로
++    전파한다(외부 클라이언트는 우리 taxonomy 복원을 쓰지 않음).
++    """
++    if _APPERR_NONCE:
++        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
++    return exc
++
++
+ def with_db(op: Callable[[Any], _T]) -> _T:
+     """도구 실행마다 세션을 open/close 하고 결과를 반환한다.
+ 
+-    DB 미준비 등의 예외는 삼키지 않고 그대로 전파한다(폴백 금지).
++    DB 미준비 등의 예외는 삼키지 않고 전파한다(폴백 금지). 도구가 낸 AppError는
++    error_code를 보존해 재발생시킨다.
+     """
+     db = SessionLocal()
+     try:
+         return op(db)
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
+     finally:
+         db.close()
+ 
+ 
++def _guard(op: Callable[[], _T]) -> _T:
++    """세션이 필요 없는 도구용 — AppError의 error_code를 보존해 재발생시킨다."""
++    try:
++        return op()
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
++
++
+ # --------------------------------------------------------------------------
+ # 커머스 도구 5 (DB 필요 — get_exchange_rate만 예외)
+ # --------------------------------------------------------------------------
+@@ -89,26 +127,32 @@ def get_exchange_rate(currency: str) -> dict[str, Any]:
+ 
+     환율표는 상수라 DB 세션을 만들지 않는다(계획 합의).
+     """
+-    return commerce_tools.get_exchange_rate(None, currency)  # db 미사용
++    return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 미사용
+ 
+ 
+ # --------------------------------------------------------------------------
+ # RAG 도구 2 (vector_search=검색, rag_qa=근거기반 답변)
+ # --------------------------------------------------------------------------
+ @mcp.tool()
+-def vector_search(query: str, top_k: int = 3, source: str | None = None) -> dict[str, Any]:
+-    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k, source(선택)."""
+-    results = rag_service.search(query, k=top_k, source=source)
+-    return {"ok": True, "count": len(results), "results": results}
++def vector_search(
++    query: str, top_k: TopK | None = None, source: str | None = None
++) -> dict[str, Any]:
++    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k(1~10, 미지정=기본), source(선택)."""
++
++    def _run() -> dict[str, Any]:
++        results = rag_service.search(query, k=top_k, source=source)  # None→RAG_TOP_K
++        return {"ok": True, "count": len(results), "results": results}
++
++    return _guard(_run)
+ 
+ 
+ @mcp.tool()
+-def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+-    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k.
++def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k(1~10, 미지정=기본).
+ 
+     LLM 호출이 포함된다(설정된 provider 사용). 키/서버 없으면 예외 전파.
+     """
+-    return rag_qa_mod.answer(question, k=top_k)
++    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None→RAG_TOP_K
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -117,19 +161,21 @@ def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+ @mcp.tool()
+ def analyze_sentiment(text: str) -> dict[str, Any]:
+     """리뷰/문의 텍스트의 감성(긍정/부정)을 분석한다(KoELECTRA). 인자: text."""
+-    return ml_sentiment.analyze_sentiment(text)
++    return _guard(lambda: ml_sentiment.analyze_sentiment(text))
+ 
+ 
+ @mcp.tool()
+ def classify_intent(text: str) -> dict[str, Any]:
+     """고객 문의의 의도를 규칙 기반으로 분류한다. 인자: text."""
+-    return ml_intent.classify_intent(text)
++    return _guard(lambda: ml_intent.classify_intent(text))
+ 
+ 
+ @mcp.tool()
+-def recommend_products(query: str, top_k: int = 3) -> dict[str, Any]:
+-    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k."""
+-    return with_db(lambda db: ml_recommend.recommend_products(db, query, top_k=top_k))
++def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k(1~10, 미지정=기본)."""
++    # None이면 recommend_products의 자체 기본값에 위임(여기서 3을 재하드코딩하지 않음).
++    kwargs = {} if top_k is None else {"top_k": top_k}
++    return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/_unified_mall_agent_project/tests/test_mcp.py b/_unified_mall_agent_project/tests/test_mcp.py
+index a944ae51..328644ee 100644
+--- a/_unified_mall_agent_project/tests/test_mcp.py
++++ b/_unified_mall_agent_project/tests/test_mcp.py
+@@ -14,9 +14,14 @@ import json
+ 
+ import pytest
+ 
++from app.core.errors import ConfigError, InfraError, ValidationErr
+ from app.mcp import server as mcp_server
++from app.mcp.client import _tool_error
+ from app.mcp.server import mcp
+ 
++# 테스트용 고정 nonce(호출 코드가 발급하는 것과 동일 역할)
++_TEST_NONCE = "test0nonce0abcdef"
++
+ 
+ def _run(coro):
+     return asyncio.run(coro)
+@@ -160,3 +165,150 @@ def test_get_exchange_rate_never_opens_session(monkeypatch):
+     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+     assert structured["ok"] is True
+     assert structured["rate"] > 0
++
++
++# --- 얇은 래핑 계약: 인자 전달 + top_k None 위임(하드코딩 3 없음) --------------
++def test_vector_search_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured.update(query=query, k=k, source=source)
++        return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _b, s = _run(
++        mcp.call_tool("vector_search", {"query": "환불규정", "top_k": 5, "source": "policy"})
++    )
++    assert captured == {"query": "환불규정", "k": 5, "source": "policy"}
++    assert s["ok"] is True and s["count"] == 1
++
++
++def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured["k"] = k
++        return []
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _run(mcp.call_tool("vector_search", {"query": "q"}))
++    # top_k 미지정 → None을 그대로 위임(service가 RAG_TOP_K로 결정). 3을 재하드코딩하지 않음.
++    assert captured["k"] is None
++
++
++def test_rag_qa_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured.update(question=question, k=k)
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
++    assert captured == {"question": "교환?", "k": 2}
++    assert s["answer"] == "a"
++
++
++def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured["k"] = k
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
++    # top_k 미지정 → None 위임(qa.answer가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
++    assert captured["k"] is None
++
++
++def test_recommend_top_k_none_uses_function_default(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured.update(query=query, top_k=top_k)
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠"}))
++    # None이면 recommend_products의 자체 기본값(3) 사용 — MCP가 top_k를 안 넘김
++    assert captured["top_k"] == 3
++
++
++def test_recommend_top_k_passed_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured["top_k"] = top_k
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠", "top_k": 7}))
++    assert captured["top_k"] == 7
++
++
++def _marker(code: str, msg: str, tool: str = "x", nonce: str = _TEST_NONCE) -> str:
++    """서버가 실제로 생성하는 형태의 신뢰 가능한 오류 문자열(정확한 nonce 포함)."""
++    return f"Error executing tool {tool}: [APPERR:{nonce}:{code}] {msg}"
++
++
++# --- 오류 taxonomy 복원 + 주입 방지 (_tool_error 단위) ----------------------
++def test_tool_error_restores_apperr_code():
++    # 서버가 (이번 호출의 정확한 nonce로) 실은 마커 → 원래 타입 복원
++    assert isinstance(
++        _tool_error("rag_qa", _marker("validation_error", "빈 질문", "rag_qa"), _TEST_NONCE),
++        ValidationErr,
++    )
++    assert isinstance(_tool_error("x", _marker("config_error", "정책 불일치"), _TEST_NONCE), ConfigError)
++    # 미등록 code는 안전하게 InfraError
++    assert isinstance(_tool_error("x", _marker("weird_code", "?"), _TEST_NONCE), InfraError)
++
++
++def test_tool_error_framework_errors():
++    # 존재하지 않는 도구 → ValidationErr(422)
++    assert isinstance(_tool_error("t", "Unknown tool: t", _TEST_NONCE), ValidationErr)
++    # pydantic 인자 검증 고유 시그니처(N validation error for <Tool>Arguments) → ValidationErr(422)
++    assert isinstance(
++        _tool_error(
++            "get_price",
++            "Error executing tool get_price: 1 validation error for get_priceArguments\nproduct_code\n  Field required",
++            _TEST_NONCE,
++        ),
++        ValidationErr,
++    )
++    # 그 밖의 실행 실패 → InfraError(503)
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: some sqlalchemy error", _TEST_NONCE), InfraError
++    )
++
++
++def test_tool_error_heuristic_is_precise():
++    # 비-AppError 메시지에 'validation error'/'field required'가 우연히 섞여도, Arguments
++    # 시그니처가 아니면 422로 오분류하지 않는다(503 유지).
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: upstream validation error from vendor", _TEST_NONCE),
++        InfraError,
++    )
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: field required by remote api", _TEST_NONCE),
++        InfraError,
++    )
++
++
++def test_tool_error_marker_injection_is_ignored():
++    # 호출자가 도구명/인자에 마커를 심어도 taxonomy를 조작할 수 없다.
++    # 1) unknown-tool 이름에 마커 주입 → unknown-tool 경로로 ValidationErr(ConfigError 아님)
++    assert isinstance(
++        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected", _TEST_NONCE),
++        ValidationErr,
++    )
++    # 2) 도구 실행 위치에 nonce 없는 위조 마커 → 신뢰 안 함 → InfraError
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected", _TEST_NONCE),
++        InfraError,
++    )
++    # 3) 틀린 nonce도 불신(지난 호출 nonce 재사용 포함)
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected", _TEST_NONCE),
++        InfraError,
++    )
+diff --git a/_unified_mall_agent_project/tests/test_mcp_stdio.py b/_unified_mall_agent_project/tests/test_mcp_stdio.py
+index 334f1235..6e8167dd 100644
+--- a/_unified_mall_agent_project/tests/test_mcp_stdio.py
++++ b/_unified_mall_agent_project/tests/test_mcp_stdio.py
+@@ -14,7 +14,7 @@ import asyncio
+ 
+ import pytest
+ 
+-from app.core.errors import InfraError
++from app.core.errors import ValidationErr
+ from app.mcp import client as mcp_client
+ from tests.test_mcp import EXPECTED_TOOLS  # 도구 이름 집합 단일 출처(중복 방지)
+ 
+@@ -54,13 +54,26 @@ def test_stdio_business_failure_is_not_error():
+     assert result["structured"]["error_code"] == "product_not_found"
+ 
+ 
+-def test_stdio_unknown_tool_raises_infra_error():
+-    # 알 수 없는 도구(프로토콜 오류) → 200 성공으로 감추지 않고 InfraError로 전파(폴백 금지)
+-    with pytest.raises(InfraError):
++def test_stdio_unknown_tool_raises_validation_error():
++    # 알 수 없는 도구 = 사용자 입력 오류 → 200 성공으로 감추지 않고 ValidationErr(422)로 전파
++    with pytest.raises(ValidationErr):
+         _run(mcp_client.call_tool("nonexistent_tool", {}))
+ 
+ 
+-def test_stdio_missing_required_arg_raises_infra_error():
+-    # 필수 인자 누락(인자 검증 실패) → InfraError로 전파
+-    with pytest.raises(InfraError):
++def test_stdio_missing_required_arg_raises_validation_error():
++    # 필수 인자 누락 = 인자 검증 실패 → ValidationErr(422)
++    with pytest.raises(ValidationErr):
+         _run(mcp_client.call_tool("get_price", {}))
++
++
++def test_stdio_top_k_out_of_range_raises_validation_error():
++    # top_k 범위 밖(0) → 스키마 검증 실패 → ValidationErr(422). 조용히 기본값 폴백 아님.
++    with pytest.raises(ValidationErr):
++        _run(mcp_client.call_tool("vector_search", {"query": "환불", "top_k": 0}))
++
++
++def test_stdio_tool_internal_validation_error_maps_422():
++    # 도구 내부에서 낸 ValidationErr(빈 질문)이 프로토콜 경계를 넘어도 503이 아닌
++    # 422로 복원돼야 한다(서버가 error_code를 실어 보내고 클라이언트가 복원).
++    with pytest.raises(ValidationErr):
++        _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/client.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/tests/test_mcp.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/tests/test_mcp_stdio.py', LF will be replaced by CRLF the next time Git touches it
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+ exited 1 in 2766ms:
+diff --git a/_unified_mall_agent_project/app/mcp/client.py b/_unified_mall_agent_project/app/mcp/client.py
+index 006ebda7..003c2543 100644
+--- a/_unified_mall_agent_project/app/mcp/client.py
++++ b/_unified_mall_agent_project/app/mcp/client.py
+@@ -17,7 +17,40 @@ from typing import Any
+ from mcp import ClientSession, StdioServerParameters
+ from mcp.client.stdio import stdio_client
+ 
+-from app.core.errors import AppError, InfraError
++import re
++import secrets
++
++from app.core.errors import (
++    AppError,
++    ConfigError,
++    InfraError,
++    LLMOutputError,
++    ValidationErr,
++)
++
++# 서버가 '[APPERR:<nonce>:<code>]'로 실어 보낸 도구 내부 AppError의 error_code → 타입 복원표.
++_APPERR_BY_CODE: dict[str, type[AppError]] = {
++    ValidationErr.error_code: ValidationErr,
++    ConfigError.error_code: ConfigError,
++    InfraError.error_code: InfraError,
++    LLMOutputError.error_code: LLMOutputError,
++}
++# FastMCP의 인자 검증 오류 고유 형태: "N validation error(s) for <Tool>Arguments".
++# 이 시그니처만 프레임워크 인자 오류로 인정한다(도구 내부 메시지에 우연히 'validation error'가
++# 섞여도 422로 오분류하지 않도록 정밀화).
++_ARG_VALIDATION_RE = re.compile(r"\d+ validation error[s]? for \w+Arguments")
++
++
++def _new_nonce() -> str:
++    """호출마다 새로 발급하는 1회용 비밀. 서버 서브프로세스에 env로 넘긴다."""
++    return secrets.token_hex(16)
++
++
++def _apperr_marker_re(nonce: str) -> re.Pattern[str]:
++    """이번 호출의 정확한 nonce를 가진 마커만 신뢰하는 정규식."""
++    return re.compile(
++        rf"^Error executing tool \S+: \[APPERR:{re.escape(nonce)}:(\w+)\]\s*(.*)", re.S
++    )
+ 
+ # app/mcp/client.py → parents[2] = 프로젝트 루트(= app 패키지의 부모)
+ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+@@ -33,9 +66,8 @@ def _unwrap(exc: BaseException) -> BaseException:
+ def _normalize(exc: BaseException, name: str) -> BaseException:
+     """전송/프로토콜 예외를 타입 있는 AppError로 승격한다(폴백 아님, 명시적 실패).
+ 
+-    - 내부에서 이미 올린 AppError(isError→InfraError 등)는 그대로 통과.
+-    - 그 밖의 McpError/전송 오류는 InfraError(503)로 승격 — 실패를 200 성공으로
+-      감추지 않는다.
++    - 내부에서 이미 올린 AppError(isError→분류된 오류 등)는 그대로 통과.
++    - 그 밖의 전송/연결 오류는 InfraError(503)로 승격 — 실패를 200 성공으로 감추지 않는다.
+     """
+     leaf = _unwrap(exc)
+     if isinstance(leaf, AppError):
+@@ -43,17 +75,43 @@ def _normalize(exc: BaseException, name: str) -> BaseException:
+     return InfraError(f"MCP 통신/도구 오류: {name}: {type(leaf).__name__}: {leaf}")
+ 
+ 
+-def _server_params() -> StdioServerParameters:
++def _tool_error(name: str, detail: str, nonce: str) -> AppError:
++    """FastMCP가 isError=True로 돌려준 도구 오류를 원인별 타입으로 복원한다.
++
++    우선순위:
++    1. 서버가 **이번 호출의 정확한 nonce로** 실은 '[APPERR:<nonce>:<code>]' 마커 → 원래 AppError
++       타입 복원. nonce는 호출마다 새로 발급되는 1회용 비밀이라, 호출자가 도구명/인자에 마커를
++       심거나 지난 호출의 nonce를 재사용해도 위조 불가(주입 방지).
++    2. FastMCP 프레임워크 오류: 존재하지 않는 도구·pydantic 인자 검증(고유 시그니처) → ValidationErr(422).
++    3. 그 밖의 실행 실패(SQLAlchemy 등 비-AppError, 위조 마커 포함) → InfraError(503).
++    프로토콜 경계를 넘으면 예외 타입이 사라지므로 메시지로 복원한다.
++    """
++    m = _apperr_marker_re(nonce).search(detail)
++    if m:
++        code, message = m.group(1), m.group(2).strip()
++        cls = _APPERR_BY_CODE.get(code, InfraError)
++        return cls(f"MCP 도구 '{name}': {message}")
++
++    is_user_error = detail.startswith("Unknown tool") or bool(_ARG_VALIDATION_RE.search(detail))
++    if is_user_error:
++        return ValidationErr(f"MCP 도구 호출 오류(이름/인자): {name}: {detail}")
++    return InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++
++
++def _server_params(nonce: str | None = None) -> StdioServerParameters:
+     """우리 MCP 서버를 stdio 서브프로세스로 띄우기 위한 파라미터.
+ 
+     - command: 현재 파이썬 인터프리터(동일 venv 보장)
+     - args: `-m app.mcp.server`
+     - cwd/env: 프로젝트 루트에서 실행 + PYTHONPATH로 app 패키지 임포트 보장
++    - nonce: 이번 호출용 1회용 비밀. 서버가 도구 내부 AppError를 위조 불가하게 표식하는 데 쓴다.
+     """
+     env = dict(os.environ)
+     existing = env.get("PYTHONPATH", "")
+     root = str(_PROJECT_ROOT)
+     env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
++    if nonce is not None:
++        env["MCP_APPERR_NONCE"] = nonce
+     return StdioServerParameters(
+         command=sys.executable,
+         args=["-m", "app.mcp.server"],
+@@ -87,12 +145,14 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+     구분(폴백 금지, RULE 3.2):
+     - **비즈니스 실패**(없는 상품/주문 등)는 도구가 {"ok": false, ...} 구조화 결과로
+       반환하며 `isError=False`다 → 정상 결과로 그대로 돌려준다(HTTP 200).
+-    - **실제 도구 오류**(도구 내부 예외 → `isError=True`, 또는 알 수 없는 도구·인자
+-      검증 실패 → 프로토콜 McpError)는 200 성공 봉투로 감싸지 않고 `InfraError`로
+-      승격해 전파한다(라우터가 5xx). anyio가 ExceptionGroup으로 감싸면 언랩한다.
++    - **도구 오류**(`isError=True`)는 200 성공 봉투로 감싸지 않고 원인별로 승격한다:
++      존재하지 않는 도구·인자 검증 실패 → `ValidationErr`(422), 실제 실행 실패(DB 미준비
++      등) → `InfraError`(503). (`_tool_error` 참고)
++    - **전송/연결 오류**는 `InfraError`(503). anyio가 ExceptionGroup으로 감싸면 언랩한다.
+     """
++    nonce = _new_nonce()  # 이번 호출 전용 1회용 비밀(재사용·stdout 관찰 시에도 다음 호출 무영향)
+     try:
+-        async with stdio_client(_server_params()) as (read, write):
++        async with stdio_client(_server_params(nonce)) as (read, write):
+             async with ClientSession(read, write) as session:
+                 await session.initialize()
+                 result = await session.call_tool(name, arguments or {})
+@@ -104,7 +164,7 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+                 text = [t for t in text_blocks if t is not None]
+                 if getattr(result, "isError", False):
+                     detail = " ".join(text) or "알 수 없는 MCP 도구 오류"
+-                    raise InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++                    raise _tool_error(name, detail, nonce)
+                 # FastMCP는 dict 반환 도구를 structuredContent로 함께 실어준다.
+                 return {
+                     "structured": getattr(result, "structuredContent", None),
+diff --git a/_unified_mall_agent_project/app/mcp/server.py b/_unified_mall_agent_project/app/mcp/server.py
+index 75e8e3ac..8367cc00 100644
+--- a/_unified_mall_agent_project/app/mcp/server.py
++++ b/_unified_mall_agent_project/app/mcp/server.py
+@@ -17,9 +17,12 @@
+ from __future__ import annotations
+ 
+ import json
++import os
+ import sys
+ from collections.abc import Callable
+-from typing import Any, TypeVar
++from typing import Annotated, Any, TypeVar
++
++from pydantic import Field
+ 
+ # Windows 콘솔 stdio를 UTF-8로 (한글 도구 설명·인자 안전)
+ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+@@ -30,6 +33,7 @@ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+ 
+ from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임포트)
+ 
++from app.core.errors import AppError  # noqa: E402
+ from app.db.database import SessionLocal  # noqa: E402
+ from app.db.models import Product  # noqa: E402
+ from app.ml import intent as ml_intent  # noqa: E402
+@@ -41,21 +45,55 @@ from app.tools import commerce_tools  # noqa: E402
+ 
+ _T = TypeVar("_T")
+ 
++# top_k는 스키마 수준에서 1~10 범위 검증(범위 밖=인자 검증 오류). None이면 각 함수의
++# 기본값(RAG_TOP_K 등 config)으로 위임 — 매직값 3을 여기서 중복 하드코딩하지 않는다.
++TopK = Annotated[int, Field(ge=1, le=10)]
++
+ mcp = FastMCP("seungmall")
+ 
+ 
++# 클라이언트가 서브프로세스를 띄우며 넘겨준 1회용 nonce. 이게 있어야만 마커를 신뢰받는다.
++# (없으면=외부 클라이언트 직접 실행 → 마커를 실지 않는다. 위조 불가: 호출자 입력이 nonce를
++#  재현할 수 없으므로 인자에 마커를 심어도 taxonomy를 조작하지 못한다.)
++_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
++
++
++def _encode_apperr(exc: AppError) -> BaseException:
++    """도구 내부 AppError의 error_code를 프로토콜 경계 너머로 보존한다.
++
++    FastMCP가 예외를 문자열화하면 타입이 사라진다. 클라이언트가 원래 타입(422/503 등)을
++    복원할 수 있도록 '[APPERR:<nonce>:<code>]' 마커를 실어 재발생시킨다. nonce는 클라이언트가
++    넘긴 비밀값이라 호출자 입력으로 위조할 수 없다(주입 방지). nonce가 없으면 원본을 그대로
++    전파한다(외부 클라이언트는 우리 taxonomy 복원을 쓰지 않음).
++    """
++    if _APPERR_NONCE:
++        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
++    return exc
++
++
+ def with_db(op: Callable[[Any], _T]) -> _T:
+     """도구 실행마다 세션을 open/close 하고 결과를 반환한다.
+ 
+-    DB 미준비 등의 예외는 삼키지 않고 그대로 전파한다(폴백 금지).
++    DB 미준비 등의 예외는 삼키지 않고 전파한다(폴백 금지). 도구가 낸 AppError는
++    error_code를 보존해 재발생시킨다.
+     """
+     db = SessionLocal()
+     try:
+         return op(db)
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
+     finally:
+         db.close()
+ 
+ 
++def _guard(op: Callable[[], _T]) -> _T:
++    """세션이 필요 없는 도구용 — AppError의 error_code를 보존해 재발생시킨다."""
++    try:
++        return op()
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
++
++
+ # --------------------------------------------------------------------------
+ # 커머스 도구 5 (DB 필요 — get_exchange_rate만 예외)
+ # --------------------------------------------------------------------------
+@@ -89,26 +127,32 @@ def get_exchange_rate(currency: str) -> dict[str, Any]:
+ 
+     환율표는 상수라 DB 세션을 만들지 않는다(계획 합의).
+     """
+-    return commerce_tools.get_exchange_rate(None, currency)  # db 미사용
++    return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 미사용
+ 
+ 
+ # --------------------------------------------------------------------------
+ # RAG 도구 2 (vector_search=검색, rag_qa=근거기반 답변)
+ # --------------------------------------------------------------------------
+ @mcp.tool()
+-def vector_search(query: str, top_k: int = 3, source: str | None = None) -> dict[str, Any]:
+-    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k, source(선택)."""
+-    results = rag_service.search(query, k=top_k, source=source)
+-    return {"ok": True, "count": len(results), "results": results}
++def vector_search(
++    query: str, top_k: TopK | None = None, source: str | None = None
++) -> dict[str, Any]:
++    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k(1~10, 미지정=기본), source(선택)."""
++
++    def _run() -> dict[str, Any]:
++        results = rag_service.search(query, k=top_k, source=source)  # None→RAG_TOP_K
++        return {"ok": True, "count": len(results), "results": results}
++
++    return _guard(_run)
+ 
+ 
+ @mcp.tool()
+-def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+-    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k.
++def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k(1~10, 미지정=기본).
+ 
+     LLM 호출이 포함된다(설정된 provider 사용). 키/서버 없으면 예외 전파.
+     """
+-    return rag_qa_mod.answer(question, k=top_k)
++    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None→RAG_TOP_K
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -117,19 +161,21 @@ def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+ @mcp.tool()
+ def analyze_sentiment(text: str) -> dict[str, Any]:
+     """리뷰/문의 텍스트의 감성(긍정/부정)을 분석한다(KoELECTRA). 인자: text."""
+-    return ml_sentiment.analyze_sentiment(text)
++    return _guard(lambda: ml_sentiment.analyze_sentiment(text))
+ 
+ 
+ @mcp.tool()
+ def classify_intent(text: str) -> dict[str, Any]:
+     """고객 문의의 의도를 규칙 기반으로 분류한다. 인자: text."""
+-    return ml_intent.classify_intent(text)
++    return _guard(lambda: ml_intent.classify_intent(text))
+ 
+ 
+ @mcp.tool()
+-def recommend_products(query: str, top_k: int = 3) -> dict[str, Any]:
+-    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k."""
+-    return with_db(lambda db: ml_recommend.recommend_products(db, query, top_k=top_k))
++def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k(1~10, 미지정=기본)."""
++    # None이면 recommend_products의 자체 기본값에 위임(여기서 3을 재하드코딩하지 않음).
++    kwargs = {} if top_k is None else {"top_k": top_k}
++    return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/_unified_mall_agent_project/tests/test_mcp.py b/_unified_mall_agent_project/tests/test_mcp.py
+index a944ae51..328644ee 100644
+--- a/_unified_mall_agent_project/tests/test_mcp.py
++++ b/_unified_mall_agent_project/tests/test_mcp.py
+@@ -14,9 +14,14 @@ import json
+ 
+ import pytest
+ 
++from app.core.errors import ConfigError, InfraError, ValidationErr
+ from app.mcp import server as mcp_server
++from app.mcp.client import _tool_error
+ from app.mcp.server import mcp
+ 
++# 테스트용 고정 nonce(호출 코드가 발급하는 것과 동일 역할)
++_TEST_NONCE = "test0nonce0abcdef"
++
+ 
+ def _run(coro):
+     return asyncio.run(coro)
+@@ -160,3 +165,150 @@ def test_get_exchange_rate_never_opens_session(monkeypatch):
+     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+     assert structured["ok"] is True
+     assert structured["rate"] > 0
++
++
++# --- 얇은 래핑 계약: 인자 전달 + top_k None 위임(하드코딩 3 없음) --------------
++def test_vector_search_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured.update(query=query, k=k, source=source)
++        return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _b, s = _run(
++        mcp.call_tool("vector_search", {"query": "환불규정", "top_k": 5, "source": "policy"})
++    )
++    assert captured == {"query": "환불규정", "k": 5, "source": "policy"}
++    assert s["ok"] is True and s["count"] == 1
++
++
++def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured["k"] = k
++        return []
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _run(mcp.call_tool("vector_search", {"query": "q"}))
++    # top_k 미지정 → None을 그대로 위임(service가 RAG_TOP_K로 결정). 3을 재하드코딩하지 않음.
++    assert captured["k"] is None
++
++
++def test_rag_qa_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured.update(question=question, k=k)
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
++    assert captured == {"question": "교환?", "k": 2}
++    assert s["answer"] == "a"
++
++
++def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured["k"] = k
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
++    # top_k 미지정 → None 위임(qa.answer가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
++    assert captured["k"] is None
++
++
++def test_recommend_top_k_none_uses_function_default(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured.update(query=query, top_k=top_k)
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠"}))
++    # None이면 recommend_products의 자체 기본값(3) 사용 — MCP가 top_k를 안 넘김
++    assert captured["top_k"] == 3
++
++
++def test_recommend_top_k_passed_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured["top_k"] = top_k
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠", "top_k": 7}))
++    assert captured["top_k"] == 7
++
++
++def _marker(code: str, msg: str, tool: str = "x", nonce: str = _TEST_NONCE) -> str:
++    """서버가 실제로 생성하는 형태의 신뢰 가능한 오류 문자열(정확한 nonce 포함)."""
++    return f"Error executing tool {tool}: [APPERR:{nonce}:{code}] {msg}"
++
++
++# --- 오류 taxonomy 복원 + 주입 방지 (_tool_error 단위) ----------------------
++def test_tool_error_restores_apperr_code():
++    # 서버가 (이번 호출의 정확한 nonce로) 실은 마커 → 원래 타입 복원
++    assert isinstance(
++        _tool_error("rag_qa", _marker("validation_error", "빈 질문", "rag_qa"), _TEST_NONCE),
++        ValidationErr,
++    )
++    assert isinstance(_tool_error("x", _marker("config_error", "정책 불일치"), _TEST_NONCE), ConfigError)
++    # 미등록 code는 안전하게 InfraError
++    assert isinstance(_tool_error("x", _marker("weird_code", "?"), _TEST_NONCE), InfraError)
++
++
++def test_tool_error_framework_errors():
++    # 존재하지 않는 도구 → ValidationErr(422)
++    assert isinstance(_tool_error("t", "Unknown tool: t", _TEST_NONCE), ValidationErr)
++    # pydantic 인자 검증 고유 시그니처(N validation error for <Tool>Arguments) → ValidationErr(422)
++    assert isinstance(
++        _tool_error(
++            "get_price",
++            "Error executing tool get_price: 1 validation error for get_priceArguments\nproduct_code\n  Field required",
++            _TEST_NONCE,
++        ),
++        ValidationErr,
++    )
++    # 그 밖의 실행 실패 → InfraError(503)
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: some sqlalchemy error", _TEST_NONCE), InfraError
++    )
++
++
++def test_tool_error_heuristic_is_precise():
++    # 비-AppError 메시지에 'validation error'/'field required'가 우연히 섞여도, Arguments
++    # 시그니처가 아니면 422로 오분류하지 않는다(503 유지).
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: upstream validation error from vendor", _TEST_NONCE),
++        InfraError,
++    )
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: field required by remote api", _TEST_NONCE),
++        InfraError,
++    )
++
++
++def test_tool_error_marker_injection_is_ignored():
++    # 호출자가 도구명/인자에 마커를 심어도 taxonomy를 조작할 수 없다.
++    # 1) unknown-tool 이름에 마커 주입 → unknown-tool 경로로 ValidationErr(ConfigError 아님)
++    assert isinstance(
++        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected", _TEST_NONCE),
++        ValidationErr,
++    )
++    # 2) 도구 실행 위치에 nonce 없는 위조 마커 → 신뢰 안 함 → InfraError
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected", _TEST_NONCE),
++        InfraError,
++    )
++    # 3) 틀린 nonce도 불신(지난 호출 nonce 재사용 포함)
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected", _TEST_NONCE),
++        InfraError,
++    )
+diff --git a/_unified_mall_agent_project/tests/test_mcp_stdio.py b/_unified_mall_agent_project/tests/test_mcp_stdio.py
+index 334f1235..6e8167dd 100644
+--- a/_unified_mall_agent_project/tests/test_mcp_stdio.py
++++ b/_unified_mall_agent_project/tests/test_mcp_stdio.py
+@@ -14,7 +14,7 @@ import asyncio
+ 
+ import pytest
+ 
+-from app.core.errors import InfraError
++from app.core.errors import ValidationErr
+ from app.mcp import client as mcp_client
+ from tests.test_mcp import EXPECTED_TOOLS  # 도구 이름 집합 단일 출처(중복 방지)
+ 
+@@ -54,13 +54,26 @@ def test_stdio_business_failure_is_not_error():
+     assert result["structured"]["error_code"] == "product_not_found"
+ 
+ 
+-def test_stdio_unknown_tool_raises_infra_error():
+-    # 알 수 없는 도구(프로토콜 오류) → 200 성공으로 감추지 않고 InfraError로 전파(폴백 금지)
+-    with pytest.raises(InfraError):
++def test_stdio_unknown_tool_raises_validation_error():
++    # 알 수 없는 도구 = 사용자 입력 오류 → 200 성공으로 감추지 않고 ValidationErr(422)로 전파
++    with pytest.raises(ValidationErr):
+         _run(mcp_client.call_tool("nonexistent_tool", {}))
+ 
+ 
+-def test_stdio_missing_required_arg_raises_infra_error():
+-    # 필수 인자 누락(인자 검증 실패) → InfraError로 전파
+-    with pytest.raises(InfraError):
++def test_stdio_missing_required_arg_raises_validation_error():
++    # 필수 인자 누락 = 인자 검증 실패 → ValidationErr(422)
++    with pytest.raises(ValidationErr):
+         _run(mcp_client.call_tool("get_price", {}))
++
++
++def test_stdio_top_k_out_of_range_raises_validation_error():
++    # top_k 범위 밖(0) → 스키마 검증 실패 → ValidationErr(422). 조용히 기본값 폴백 아님.
++    with pytest.raises(ValidationErr):
++        _run(mcp_client.call_tool("vector_search", {"query": "환불", "top_k": 0}))
++
++
++def test_stdio_tool_internal_validation_error_maps_422():
++    # 도구 내부에서 낸 ValidationErr(빈 질문)이 프로토콜 경계를 넘어도 503이 아닌
++    # 422로 복원돼야 한다(서버가 error_code를 실어 보내고 클라이언트가 복원).
++    with pytest.raises(ValidationErr):
++        _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/client.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/tests/test_mcp.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/tests/test_mcp_stdio.py', LF will be replaced by CRLF the next time Git touches it
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$env:PYTHONDONTWRITEBYTECODE='"'1'; @'
+import asyncio
+from app.mcp import client
+from app.core.errors import ValidationErr
+
+async def main():
+    for name, args in [
+        ('nonexistent_tool', {}),
+        ('get_price', {}),
+        ('vector_search', {'query': 'x', 'top_k': 0}),
+        ('get_price', {'product_code': 'NOPE'}),
+        ('get_exchange_rate', {'currency': 'USD'}),
+    ]:
+        try:
+            value = await client.call_tool(name, args)
+            print(name, 'OK', value)
+        except Exception as exc:
+            print(name, 'ERR', type(exc).__name__, str(exc))
+
+asyncio.run(main())
+'@ | python -" in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 3335ms:
+nonexistent_tool ERR InfraError MCP 통신/도구 오류: nonexistent_tool: FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+get_price ERR InfraError MCP 통신/도구 오류: get_price: FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+vector_search ERR InfraError MCP 통신/도구 오류: vector_search: FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+get_price ERR InfraError MCP 통신/도구 오류: get_price: FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+get_exchange_rate ERR InfraError MCP 통신/도구 오류: get_exchange_rate: FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+2026-07-19T03:28:11.973093Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+정적 대조에서는 A·B의 신뢰 경계와 마커 제거가 의도대로입니다. 다만 현재 샌드박스가 임시 파일 생성을 막아 pytest와 stdio subprocess가 시작 전에 실패하므로, SDK의 실제 오류 포맷과 테스트 커버리지를 소스 수준에서 추가 확인해 환경 실패와 제품 결함을 분리하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$mcpRoot = (python -c "import mcp, pathlib; print(pathlib.Path(mcp.__file__).parent)"); rg -n --glob '"'*.py' \"Unknown tool|validation error|Error executing tool|isError\" "'$mcpRoot app tests; rg -n "class (AppError|ValidationErr|ConfigError|InfraError|LLMOutputError)|exception_handler|status_code" app/core app | Select-Object -First 160' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 2326ms:
+tests\test_mcp_stdio.py:51:    # 없는 상품 = 비즈니스 실패 → isError 아님(구조화 ok:False), 예외로 승격되지 않는다
+tests\test_mcp.py:252:    return f"Error executing tool {tool}: [APPERR:{nonce}:{code}] {msg}"
+tests\test_mcp.py:269:    assert isinstance(_tool_error("t", "Unknown tool: t", _TEST_NONCE), ValidationErr)
+tests\test_mcp.py:270:    # pydantic 인자 검증 고유 시그니처(N validation error for <Tool>Arguments) → ValidationErr(422)
+tests\test_mcp.py:274:            "Error executing tool get_price: 1 validation error for get_priceArguments\nproduct_code\n  Field required",
+tests\test_mcp.py:281:        _tool_error("x", "Error executing tool x: some sqlalchemy error", _TEST_NONCE), InfraError
+tests\test_mcp.py:286:    # 비-AppError 메시지에 'validation error'/'field required'가 우연히 섞여도, Arguments
+tests\test_mcp.py:289:        _tool_error("x", "Error executing tool x: upstream validation error from vendor", _TEST_NONCE),
+tests\test_mcp.py:293:        _tool_error("x", "Error executing tool x: field required by remote api", _TEST_NONCE),
+tests\test_mcp.py:302:        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected", _TEST_NONCE),
+tests\test_mcp.py:307:        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected", _TEST_NONCE),
+tests\test_mcp.py:312:        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected", _TEST_NONCE),
+app\mcp\client.py:38:# FastMCP의 인자 검증 오류 고유 형태: "N validation error(s) for <Tool>Arguments".
+app\mcp\client.py:39:# 이 시그니처만 프레임워크 인자 오류로 인정한다(도구 내부 메시지에 우연히 'validation error'가
+app\mcp\client.py:41:_ARG_VALIDATION_RE = re.compile(r"\d+ validation error[s]? for \w+Arguments")
+app\mcp\client.py:52:        rf"^Error executing tool \S+: \[APPERR:{re.escape(nonce)}:(\w+)\]\s*(.*)", re.S
+app\mcp\client.py:69:    - 내부에서 이미 올린 AppError(isError→분류된 오류 등)는 그대로 통과.
+app\mcp\client.py:79:    """FastMCP가 isError=True로 돌려준 도구 오류를 원인별 타입으로 복원한다.
+app\mcp\client.py:95:    is_user_error = detail.startswith("Unknown tool") or bool(_ARG_VALIDATION_RE.search(detail))
+app\mcp\client.py:147:      반환하며 `isError=False`다 → 정상 결과로 그대로 돌려준다(HTTP 200).
+app\mcp\client.py:148:    - **도구 오류**(`isError=True`)는 200 성공 봉투로 감싸지 않고 원인별로 승격한다:
+app\mcp\client.py:165:                if getattr(result, "isError", False):
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\types.py:1135:    isError: bool | None = None
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\types.py:1369:    isError: bool = False
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\shared\session.py:381:                            # For request validation errors, send a proper JSON-RPC error
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\shared\session.py:429:                            # For other validation errors, log and continue
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py:478:                isError=True,
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py:538:                            return self._make_error_result(f"Input validation error: {e.message}")
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py:569:                                "Output validation error: outputSchema defined but no structured output returned"
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py:575:                                return self._make_error_result(f"Output validation error: {e.message}")
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py:582:                            isError=False,
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\auth\handlers\authorize.py:170:                # For client_id validation errors, return direct error (no redirect)
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\auth\handlers\authorize.py:181:                # For redirect_uri validation errors, return direct error (no redirect)
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\client\session.py:412:        if not result.isError:
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\tools\tool_manager.py:78:            raise ToolError(f"Unknown tool: {name}")
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\tools\tool_manager.py:91:            raise ToolError(f"Unknown tool: {name}")
+C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\tools\base.py:117:            raise ToolError(f"Error executing tool {self.name}: {e}") from e
+app/core\errors.py:14:class AppError(Exception):
+app/core\errors.py:25:class ConfigError(AppError):
+app/core\errors.py:32:class InfraError(AppError):
+app/core\errors.py:39:class LLMOutputError(AppError):
+app/core\errors.py:46:class ValidationErr(AppError):
+app/core\errors.py:74:def register_exception_handlers(app: FastAPI) -> None:
+app/core\errors.py:77:    @app.exception_handler(AppError)
+app/core\errors.py:80:            status_code=exc.http_status,
+app\main.py:17:from app.core.errors import register_exception_handlers
+app\main.py:60:    register_exception_handlers(app)
+app\core\errors.py:14:class AppError(Exception):
+app\core\errors.py:25:class ConfigError(AppError):
+app\core\errors.py:32:class InfraError(AppError):
+app\core\errors.py:39:class LLMOutputError(AppError):
+app\core\errors.py:46:class ValidationErr(AppError):
+app\core\errors.py:74:def register_exception_handlers(app: FastAPI) -> None:
+app\core\errors.py:77:    @app.exception_handler(AppError)
+app\core\errors.py:80:            status_code=exc.http_status,
+
+2026-07-19T03:28:36.934534Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$files = @('"'C:\\Users\\playdata2\\anaconda3\\Lib\\site-packages\\mcp\\server\\lowlevel\\server.py','C:\\Users\\playdata2\\anaconda3\\Lib\\site-packages\\mcp\\server\\fastmcp\\tools\\tool_manager.py','C:\\Users\\playdata2\\anaconda3\\Lib\\site-packages\\mcp\\server\\fastmcp\\tools\\base.py','C:\\Users\\playdata2\\anaconda3\\Lib\\site-packages\\mcp\\server\\fastmcp\\server.py'); foreach ("'$f in $files) { "--- $f ---"; $lines=Get-Content $f; if ($f -like '"'*lowlevel*') {"'$lines[460..550]} elseif ($f -like '"'*tool_manager*') {"'$lines[60..105]} elseif ($f -like '"'*base.py') {"'$lines[90..125]} else {rg -n "call_tool|ToolError|ValidationError" $f} }' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1316ms:
+--- C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\lowlevel\server.py ---
+                    # Clear and refresh the entire tool cache
+                    self._tool_cache.clear()
+                    for tool in result:
+                        validate_and_warn_tool_name(tool.name)
+                        self._tool_cache[tool.name] = tool
+                    return types.ServerResult(types.ListToolsResult(tools=result))
+
+            self.request_handlers[types.ListToolsRequest] = handler
+            return func
+
+        return decorator
+
+    def _make_error_result(self, error_message: str) -> types.ServerResult:
+        """Create a ServerResult with an error CallToolResult."""
+        return types.ServerResult(
+            types.CallToolResult(
+                content=[types.TextContent(type="text", text=error_message)],
+                isError=True,
+            )
+        )
+
+    async def _get_cached_tool_definition(self, tool_name: str) -> types.Tool | None:
+        """Get tool definition from cache, refreshing if necessary.
+
+        Returns the Tool object if found, None otherwise.
+        """
+        if tool_name not in self._tool_cache:
+            if types.ListToolsRequest in self.request_handlers:
+                logger.debug("Tool cache miss for %s, refreshing cache", tool_name)
+                await self.request_handlers[types.ListToolsRequest](None)
+
+        tool = self._tool_cache.get(tool_name)
+        if tool is None:
+            logger.warning("Tool '%s' not listed, no validation will be performed", tool_name)
+
+        return tool
+
+    def call_tool(self, *, validate_input: bool = True):
+        """Register a tool call handler.
+
+        Args:
+            validate_input: If True, validates input against inputSchema. Default is True.
+
+        The handler validates input against inputSchema (if validate_input=True), calls the tool function,
+        and builds a CallToolResult with the results:
+        - Unstructured content (iterable of ContentBlock): returned in content
+        - Structured content (dict): returned in structuredContent, serialized JSON text returned in content
+        - Both: returned in content and structuredContent
+
+        If outputSchema is defined, validates structuredContent or errors if missing.
+        """
+
+        def decorator(
+            func: Callable[
+                ...,
+                Awaitable[
+                    UnstructuredContent
+                    | StructuredContent
+                    | CombinationContent
+                    | types.CallToolResult
+                    | types.CreateTaskResult
+                ],
+            ],
+        ):
+            logger.debug("Registering handler for CallToolRequest")
+
+            async def handler(req: types.CallToolRequest):
+                try:
+                    tool_name = req.params.name
+                    arguments = req.params.arguments or {}
+                    tool = await self._get_cached_tool_definition(tool_name)
+
+                    # input validation
+                    if validate_input and tool:
+                        try:
+                            jsonschema.validate(instance=arguments, schema=tool.inputSchema)
+                        except jsonschema.ValidationError as e:
+                            return self._make_error_result(f"Input validation error: {e.message}")
+
+                    # tool call
+                    results = await func(tool_name, arguments)
+
+                    # output normalization
+                    unstructured_content: UnstructuredContent
+                    maybe_structured_content: StructuredContent | None
+                    if isinstance(results, types.CallToolResult):
+                        return types.ServerResult(results)
+                    elif isinstance(results, types.CreateTaskResult):
+                        # Task-augmented execution returns task info instead of result
+                        return types.ServerResult(results)
+                    elif isinstance(results, tuple) and len(results) == 2:
+--- C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\tools\tool_manager.py ---
+            description=description,
+            annotations=annotations,
+            icons=icons,
+            meta=meta,
+            structured_output=structured_output,
+        )
+        existing = self._tools.get(tool.name)
+        if existing:
+            if self.warn_on_duplicate_tools:
+                logger.warning(f"Tool already exists: {tool.name}")
+            return existing
+        self._tools[tool.name] = tool
+        return tool
+
+    def remove_tool(self, name: str) -> None:
+        """Remove a tool by name."""
+        if name not in self._tools:
+            raise ToolError(f"Unknown tool: {name}")
+        del self._tools[name]
+
+    async def call_tool(
+        self,
+        name: str,
+        arguments: dict[str, Any],
+        context: Context[ServerSessionT, LifespanContextT, RequestT] | None = None,
+        convert_result: bool = False,
+    ) -> Any:
+        """Call a tool by name with arguments."""
+        tool = self.get_tool(name)
+        if not tool:
+            raise ToolError(f"Unknown tool: {name}")
+
+        return await tool.run(arguments, context=context, convert_result=convert_result)
+--- C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\tools\base.py ---
+        )
+
+    async def run(
+        self,
+        arguments: dict[str, Any],
+        context: Context[ServerSessionT, LifespanContextT, RequestT] | None = None,
+        convert_result: bool = False,
+    ) -> Any:
+        """Run the tool with arguments."""
+        try:
+            result = await self.fn_metadata.call_fn_with_arg_validation(
+                self.fn,
+                self.is_async,
+                arguments,
+                {self.context_kwarg: context} if self.context_kwarg is not None else None,
+            )
+
+            if convert_result:
+                result = self.fn_metadata.convert_result(result)
+
+            return result
+        except UrlElicitationRequiredError:
+            # Re-raise UrlElicitationRequiredError so it can be properly handled
+            # as an MCP error response with code -32042
+            raise
+        except Exception as e:
+            raise ToolError(f"Error executing tool {self.name}: {e}") from e
+
+
+def _is_async_callable(obj: Any) -> bool:
+    while isinstance(obj, functools.partial):  # pragma: no cover
+        obj = obj.func
+
+    return inspect.iscoroutinefunction(obj) or (
+        callable(obj) and inspect.iscoroutinefunction(getattr(obj, "__call__", None))
+    )
+--- C:\Users\playdata2\anaconda3\Lib\site-packages\mcp\server\fastmcp\server.py ---
+308:        self._mcp_server.call_tool(validate_input=False)(self.call_tool)
+343:    async def call_tool(self, name: str, arguments: dict[str, Any]) -> Sequence[ContentBlock] | dict[str, Any]:
+346:        return await self._tool_manager.call_tool(name, arguments, context=context, convert_result=True)
+442:            ToolError: If the tool does not exist
+
+2026-07-19T03:28:48.272622Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$env:PYTHONDONTWRITEBYTECODE='"'1'; @'
+import asyncio
+from app.mcp.server import mcp
+
+async def main():
+    for name, args in [('nonexistent_tool', {}), ('get_price', {}), ('vector_search', {'query':'x','top_k':0})]:
+        try:
+            value = await mcp.call_tool(name,args)
+            print(name, 'RETURN', repr(value))
+        except Exception as exc:
+            print(name, 'RAISE', type(exc).__name__, str(exc))
+asyncio.run(main())
+'@ | python -" in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 2752ms:
+nonexistent_tool RAISE ToolError Unknown tool: nonexistent_tool
+get_price RAISE ToolError Error executing tool get_price: 1 validation error for get_priceArguments
+product_code
+  Field required [type=missing, input_value={}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.13/v/missing
+vector_search RAISE ToolError Error executing tool vector_search: 1 validation error for vector_searchArguments
+top_k
+  Input should be greater than or equal to 1 [type=greater_than_equal, input_value=0, input_type=int]
+    For further information visit https://errors.pydantic.dev/2.13/v/greater_than_equal
+
+2026-07-19T03:28:59.443299Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$env:PYTHONDONTWRITEBYTECODE='"'1'; @'
+from app.mcp.client import _new_nonce, _tool_error
+from app.core.errors import ConfigError, InfraError, ValidationErr
+
+n1, n2 = _new_nonce(), _new_nonce()
+assert n1 "'!= n2 and len(n1) == len(n2) == 32
+trusted = f'"'Error executing tool x: [APPERR:{n2}:config_error] secret-free-message'
+e = _tool_error('x', trusted, n2)
+assert isinstance(e, ConfigError)
+assert n2 not in str(e) and '[APPERR:' not in str(e)
+assert isinstance(_tool_error('x', trusted, n1), InfraError)
+assert isinstance(_tool_error('x', 'upstream validation error', n2), InfraError)
+assert isinstance(_tool_error('x', 'field required', n2), InfraError)
+assert isinstance(_tool_error('x', '1 validation error for xArguments', n2), ValidationErr)
+assert isinstance(_tool_error('x', 'Unknown tool: x', n2), ValidationErr)
+print('nonce/taxonomy assertions passed')
+'@ | python -" in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 2314ms:
+nonce/taxonomy assertions passed
+
+2026-07-19T03:29:14.351913Z ERROR codex_models_manager::manager: failed to renew cache TTL: missing field `supports_reasoning_summaries` at line 88 column 5
+codex
+심각도별 유효 지적 없음.
+
+A–E 모두 반영 정확성을 확인했습니다. 호출별 nonce가 서로 다르고, 과거 nonce 마커는 `InfraError`로 처리되며, 정상 복원 시 응답 메시지에서 nonce와 마커가 제거됩니다. 오류 분류와 정상·비즈니스 실패 흐름에도 잔여 결함이 없습니다.
+
+잔여 결함 없음, 인수 가능
+tokens used
+45,414
+심각도별 유효 지적 없음.
+
+A–E 모두 반영 정확성을 확인했습니다. 호출별 nonce가 서로 다르고, 과거 nonce 마커는 `InfraError`로 처리되며, 정상 복원 시 응답 메시지에서 nonce와 마커가 제거됩니다. 오류 분류와 정상·비즈니스 실패 흐름에도 잔여 결함이 없습니다.
+
+잔여 결함 없음, 인수 가능

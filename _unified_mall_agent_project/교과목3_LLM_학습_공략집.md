@@ -401,7 +401,7 @@ LangGraph는 흐름을 **관찰·검증·재현 가능**하게 드러낸다. 분
 
 ## 부록 D — 통합 프로젝트로의 구현 결과 (스테이지 → 실제 코드)
 
-이 공략집의 개념들은 `_unified_mall_agent_project/`에 **실행 가능한 코드로 구현**됐다(Phase 0~7, 테스트 124개 통과). 개념을 코드로 확인하려면:
+이 공략집의 개념들은 `_unified_mall_agent_project/`에 **실행 가능한 코드로 구현**됐다(Phase 0~10 완료, 결정론 테스트 182개 통과 = CI 154 + mcp 8 + ml 20; LLM 라이브 테스트는 별도 마커). 개념을 코드로 확인하려면:
 
 | 스테이지(개념) | 통합 앱 구현 위치 |
 |---|---|
@@ -419,7 +419,7 @@ LangGraph는 흐름을 **관찰·검증·재현 가능**하게 드러낸다. 분
 | 14 MCP 서버·클라이언트 | `app/mcp/server.py`(도구10·리소스2·프롬프트1·stdio), `app/mcp/client.py`, `POST /api/mcp/tools`·`/call` |
 | 15 LangGraph 워크플로 | `app/workflow/ticket_graph.py`(StateGraph 조건분기), `rules.py`(규칙상수), `POST /api/workflow/ticket` |
 
-**직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작하며, 에이전트의 실제 도구 호출(tool-calling)만 OpenAI/Gemini 키가 필요하다(`scripts/realkey_smoke.py`).
+**직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작한다. 에이전트의 실제 도구 호출(tool-calling)은 **Gemma가 미지원**이라, tool-calling 지원 로컬 모델(예: Qwen3.5-4B + `chat_format=chatml-function-calling`)로 검증하거나(토큰 0) 실키(OpenAI/Gemini, `scripts/realkey_smoke.py`)로 확인한다. RAG QA·분류·워크플로 등 평문 생성은 Gemma로 충분하다.
 
 > 구현의 정직한 완료 상태(이월 항목 포함)는 `reports/2026-07-13_0410_최종_통합_리포트.md` 참조.
 

@@ -1,0 +1,2166 @@
+2026-07-19T03:19:48.659180Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: medium
+reasoning summaries: none
+session id: 019f7863-1b9c-7df2-84f3-79d0981cd7c3
+--------
+user
+역할: 시니어 리뷰어(최종 인수 5차). 4차의 마커 위조(문자열 채널 스푸핑) 지적을 근본 반영했다.
+반영 정확성·잔여 결함만 보고 인수 가부 판정.
+
+4차 지적: 앵커만으론 부족 — 비-AppError 메시지가 사용자 인자를 선두에 포함해 '[APPERR:code]...'로
+시작하면 여전히 taxonomy 조작 가능(문자열 채널은 근본적으로 위조 가능).
+
+반영(위조 불가 nonce):
+- 클라이언트 app/mcp/client.py: 모듈 로드 시 `_APPERR_NONCE = secrets.token_hex(16)` 생성.
+  `_server_params()`가 서브프로세스 env에 `MCP_APPERR_NONCE`로 전달. 마커 정규식은
+  `^Error executing tool \S+: \[APPERR:{정확한 nonce}:(\w+)\] (.*)`만 신뢰.
+- 서버 app/mcp/server.py: `_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")`.
+  `_encode_apperr`는 nonce 있을 때만 `[APPERR:<nonce>:<code>]`로 재발생, 없으면 원본 AppError 전파.
+- 테스트 tests/test_mcp.py: 정확 nonce 마커→타입 복원, unknown/pydantic→ValidationErr, 비-AppError→InfraError,
+  주입(nonce 없는 위조 마커/틀린 nonce)→InfraError(ConfigError 조작 실패).
+
+확인:
+A. 이제 호출자 입력만으로 마커를 위조할 수 있는 경로가 남았는가? (nonce는 클라이언트 프로세스 내
+   secrets 난수라 호출자·서버 stdout 관찰로 재현 불가한가?)
+B. 정상 내부오류(정확 nonce) 복원과 프레임워크오류(unknown/pydantic)→422, 비-AppError→503가 유지되는가?
+C. nonce 미설정(외부 클라이언트 직접 실행) 시 서버가 원본 전파하고, 우리 클라이언트 경로엔 영향 없는가?
+D. 과교정/회귀/기타 실제 결함.
+
+출력: 심각도별 유효 지적만. 마지막 줄 "인수 가능" 또는 "인수 보류: <사유>". 없으면 "잔여 결함 없음, 인수 가능".
+
+codex
+요청하신 5차 최종 인수 관점으로 실제 변경분과 테스트를 대조하겠습니다. 구현 경로, 예외 직렬화 경계, nonce 노출 가능성, 테스트 실행 결과만 근거로 판정하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'git status --short; git diff -- app/mcp/client.py app/mcp/server.py tests/test_mcp.py; rg -n "APPERR|MCP_APPERR_NONCE|_server_params|_encode_apperr|call_tool|Error executing tool" app tests' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1151ms:
+ M README.md
+ M app/main.py
+ M app/mcp/client.py
+ M app/mcp/server.py
+ M pyproject.toml
+ M tests/test_mcp.py
+ M tests/test_mcp_stdio.py
+ M tests/test_workflow.py
+ M "\352\265\220\352\263\274\353\252\2513_LLM_\355\225\231\354\212\265_\352\263\265\353\236\265\354\247\221.md"
+ D ../agent_loop_basic_console_project/.env.example
+ D ../agent_loop_basic_console_project/.gitignore
+ D ../agent_loop_basic_console_project/README.md
+ D ../agent_loop_basic_console_project/code/common.py
+ D ../agent_loop_basic_console_project/code/data_tools.py
+ D ../agent_loop_basic_console_project/code/gemini_agent_loop.py
+ D ../agent_loop_basic_console_project/code/local_agent_loop.py
+ D ../agent_loop_basic_console_project/code/openai_agent_loop.py
+ D ../agent_loop_basic_console_project/code/torch_inventory.py
+ D ../agent_loop_basic_console_project/data/inventory.csv
+ D ../agent_loop_basic_console_project/main.py
+ D ../agent_loop_basic_console_project/requirements.txt
+ D ../coffee_order_chatbot_app/.env.example
+ D ../coffee_order_chatbot_app/.gitignore
+ D ../coffee_order_chatbot_app/README.md
+ D ../coffee_order_chatbot_app/app/__init__.py
+ D ../coffee_order_chatbot_app/app/database.py
+ D ../coffee_order_chatbot_app/app/main.py
+ D ../coffee_order_chatbot_app/app/menu_data.py
+ D ../coffee_order_chatbot_app/app/models.py
+ D ../coffee_order_chatbot_app/app/openai_service.py
+ D ../coffee_order_chatbot_app/app/order_service.py
+ D ../coffee_order_chatbot_app/app/routers/__init__.py
+ D ../coffee_order_chatbot_app/app/routers/auth.py
+ D ../coffee_order_chatbot_app/app/routers/menus.py
+ D ../coffee_order_chatbot_app/app/routers/orders.py
+ D ../coffee_order_chatbot_app/app/routers/payments.py
+ D ../coffee_order_chatbot_app/app/schemas.py
+ D ../coffee_order_chatbot_app/app/security.py
+ D ../coffee_order_chatbot_app/app/services/__init__.py
+ D ../coffee_order_chatbot_app/app/services/menu_service.py
+ D ../coffee_order_chatbot_app/app/services/order_service.py
+ D ../coffee_order_chatbot_app/app/services/payment_service.py
+ D ../coffee_order_chatbot_app/app/services/user_service.py
+ D ../coffee_order_chatbot_app/app/static/app.js
+ D ../coffee_order_chatbot_app/app/static/style.css
+ D ../coffee_order_chatbot_app/app/templates/index.html
+ D ../coffee_order_chatbot_app/app/torch_model.py
+ D ../coffee_order_chatbot_app/requirements.txt
+ D ../coffee_order_chatbot_app/run.py
+ D "../coffee_order_chatbot_app/\354\213\244\354\212\265\353\202\264\354\232\251.md"
+ D ../cot_console_project/.gitignore
+ D ../cot_console_project/README.md
+ D ../cot_console_project/data/buggy_script.py
+ D ../cot_console_project/data/competitor_data.csv
+ D ../cot_console_project/data/config.yaml
+ D ../cot_console_project/data/cs_inquiries.csv
+ D ../cot_console_project/data/customers.csv
+ D "../cot_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../cot_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../cot_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../cot_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../cot_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../cot_console_project/data/exchange_rates.csv
+ D ../cot_console_project/data/faq.csv
+ D ../cot_console_project/data/inventory.csv
+ D ../cot_console_project/data/marketing_brief.csv
+ D ../cot_console_project/data/math_word_problems.csv
+ D ../cot_console_project/data/monthly_sales.csv
+ D ../cot_console_project/data/orders.csv
+ D ../cot_console_project/data/products.csv
+ D ../cot_console_project/data/project_tasks.csv
+ D ../cot_console_project/data/reviews.csv
+ D ../cot_console_project/data/sales_daily.csv
+ D ../cot_console_project/data/support_tickets.csv
+ D ../cot_console_project/data/user_profiles.json
+ D ../cot_console_project/requirements.txt
+ D ../cot_console_project/src/common.py
+ D ../cot_console_project/src/llm_clients.py
+ D ../cot_console_project/src/main.py
+ D ../cot_console_project/src/torch_metrics.py
+ D ../embedding_console_project/.env.example
+ D ../embedding_console_project/.gitignore
+ D ../embedding_console_project/README.md
+ D ../embedding_console_project/code/common.py
+ D ../embedding_console_project/code/main.py
+ D ../embedding_console_project/code/solutions.py
+ D ../embedding_console_project/code/vector_utils.py
+ D ../embedding_console_project/data/docs/employee_handbook.txt
+ D ../embedding_console_project/data/faq.csv
+ D ../embedding_console_project/data/reviews.csv
+ D ../embedding_console_project/requirements.txt
+ D ../embedding_console_project/test_solutions.py
+ D "../embedding_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_embedding.txt"
+ D ../fastapi_board_mysql_project/.env.example
+ D ../fastapi_board_mysql_project/.gitignore
+ D ../fastapi_board_mysql_project/README.md
+ D ../fastapi_board_mysql_project/app/__init__.py
+ D ../fastapi_board_mysql_project/app/database.py
+ D ../fastapi_board_mysql_project/app/main.py
+ D ../fastapi_board_mysql_project/app/models.py
+ D ../fastapi_board_mysql_project/app/routers/__init__.py
+ D ../fastapi_board_mysql_project/app/routers/auth.py
+ D ../fastapi_board_mysql_project/app/routers/boards.py
+ D ../fastapi_board_mysql_project/app/routers/menus.py
+ D ../fastapi_board_mysql_project/app/routers/orders.py
+ D ../fastapi_board_mysql_project/app/routers/payments.py
+ D ../fastapi_board_mysql_project/app/schemas.py
+ D ../fastapi_board_mysql_project/app/security.py
+ D ../fastapi_board_mysql_project/app/services/__init__.py
+ D ../fastapi_board_mysql_project/app/services/menu_service.py
+ D ../fastapi_board_mysql_project/app/services/order_service.py
+ D ../fastapi_board_mysql_project/app/services/payment_service.py
+ D ../fastapi_board_mysql_project/app/services/user_service.py
+ D ../fastapi_board_mysql_project/mysql_init.sql
+ D ../fastapi_board_mysql_project/requirements.txt
+ D ../fastapi_board_mysql_project/run_server.bat
+ D "../fastapi_board_mysql_project/\354\213\244\354\212\265\353\202\264\354\232\251.md"
+ D ../fastapi_langchain_test_project/.gitignore
+ D ../fastapi_langchain_test_project/README.md
+ D ../fastapi_langchain_test_project/app/__init__.py
+ D ../fastapi_langchain_test_project/app/core/__init__.py
+ D ../fastapi_langchain_test_project/app/core/config.py
+ D ../fastapi_langchain_test_project/app/main.py
+ D ../fastapi_langchain_test_project/app/routers/__init__.py
+ D ../fastapi_langchain_test_project/app/routers/summarize_router.py
+ D ../fastapi_langchain_test_project/app/services/__init__.py
+ D ../fastapi_langchain_test_project/app/services/pdf_service.py
+ D ../fastapi_langchain_test_project/app/services/summarize_service.py
+ D ../fastapi_langchain_test_project/ori/config.py
+ D ../fastapi_langchain_test_project/ori/main.py
+ D ../fastapi_langchain_test_project/ori/pdf_service.py
+ D ../fastapi_langchain_test_project/ori/summarize_router.py
+ D ../fastapi_langchain_test_project/ori/summarize_service.py
+ D ../fastapi_langchain_test_project/pytest.ini
+ D ../fastapi_langchain_test_project/reports/final_report.md
+ D ../fastapi_langchain_test_project/reports/implementation_plan.md
+ D ../fastapi_langchain_test_project/reports/project_checklist.md
+ D ../fastapi_langchain_test_project/requirements.txt
+ D ../fastapi_langchain_test_project/tests/__init__.py
+ D ../fastapi_langchain_test_project/tests/test_pdf_service.py
+ D ../fastapi_langchain_test_project/tests/test_split_text.py
+ D ../fastapi_llm_usage_app/.env.example
+ D ../fastapi_llm_usage_app/README.md
+ D ../fastapi_llm_usage_app/app/__init__.py
+ D ../fastapi_llm_usage_app/app/api/__init__.py
+ D ../fastapi_llm_usage_app/app/api/llm_router.py
+ D ../fastapi_llm_usage_app/app/core/__init__.py
+ D ../fastapi_llm_usage_app/app/core/config.py
+ D ../fastapi_llm_usage_app/app/main.py
+ D ../fastapi_llm_usage_app/app/schemas/__init__.py
+ D ../fastapi_llm_usage_app/app/schemas/llm_schema.py
+ D ../fastapi_llm_usage_app/app/services/__init__.py
+ D ../fastapi_llm_usage_app/app/services/gemini_service.py
+ D ../fastapi_llm_usage_app/app/services/openai_service.py
+ D ../fastapi_llm_usage_app/app/services/prompt_factory.py
+ D ../fastapi_llm_usage_app/app/static/app.js
+ D ../fastapi_llm_usage_app/app/static/index.html
+ D ../fastapi_llm_usage_app/app/static/style.css
+ D ../fastapi_llm_usage_app/requirements.txt
+ D "../from_colab_llm/0711-s/4_RAG_\354\225\204\355\202\244\355\205\215\354\263\220.pdf"
+ D ../function_calling_console_project/.env.example
+ D ../function_calling_console_project/.gitignore
+ D ../function_calling_console_project/README.md
+ D ../function_calling_console_project/code/common.py
+ D ../function_calling_console_project/code/gemini_app.py
+ D ../function_calling_console_project/code/main.py
+ D ../function_calling_console_project/code/openai_app.py
+ D ../function_calling_console_project/code/tools.py
+ D ../function_calling_console_project/data/buggy_script.py
+ D ../function_calling_console_project/data/competitor_data.csv
+ D ../function_calling_console_project/data/config.yaml
+ D ../function_calling_console_project/data/cs_inquiries.csv
+ D ../function_calling_console_project/data/customers.csv
+ D "../function_calling_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../function_calling_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../function_calling_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../function_calling_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../function_calling_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../function_calling_console_project/data/exchange_rates.csv
+ D ../function_calling_console_project/data/faq.csv
+ D ../function_calling_console_project/data/inventory.csv
+ D ../function_calling_console_project/data/marketing_brief.csv
+ D ../function_calling_console_project/data/math_word_problems.csv
+ D ../function_calling_console_project/data/monthly_sales.csv
+ D ../function_calling_console_project/data/orders.csv
+ D ../function_calling_console_project/data/products.csv
+ D ../function_calling_console_project/data/project_tasks.csv
+ D ../function_calling_console_project/data/reviews.csv
+ D ../function_calling_console_project/data/sales_daily.csv
+ D ../function_calling_console_project/data/support_tickets.csv
+ D ../function_calling_console_project/data/user_profiles.json
+ D ../function_calling_console_project/requirements.txt
+ D ../openai_music_recommend_chatbot/README.md
+ D ../openai_music_recommend_chatbot/app/__init__.py
+ D ../openai_music_recommend_chatbot/app/api/__init__.py
+ D ../openai_music_recommend_chatbot/app/api/chat_router.py
+ D ../openai_music_recommend_chatbot/app/core/__init__.py
+ D ../openai_music_recommend_chatbot/app/core/config.py
+ D ../openai_music_recommend_chatbot/app/data/music_dataset.json
+ D ../openai_music_recommend_chatbot/app/main.py
+ D ../openai_music_recommend_chatbot/app/recommender/__init__.py
+ D ../openai_music_recommend_chatbot/app/recommender/music_recommender.py
+ D ../openai_music_recommend_chatbot/app/schemas/__init__.py
+ D ../openai_music_recommend_chatbot/app/schemas/chat_schema.py
+ D ../openai_music_recommend_chatbot/app/services/__init__.py
+ D ../openai_music_recommend_chatbot/app/services/openai_service.py
+ D ../openai_music_recommend_chatbot/app/static/app.js
+ D ../openai_music_recommend_chatbot/app/static/style.css
+ D ../openai_music_recommend_chatbot/app/templates/index.html
+ D ../openai_music_recommend_chatbot/requirements.txt
+ D ../openai_music_recommend_chatbot/scripts/google_video_url_collector.py
+ D ../planning_agent_console_project/.env.example
+ D ../planning_agent_console_project/.gitignore
+ D ../planning_agent_console_project/README.md
+ D ../planning_agent_console_project/code/common.py
+ D ../planning_agent_console_project/code/gemini_app.py
+ D ../planning_agent_console_project/code/main.py
+ D ../planning_agent_console_project/code/openai_app.py
+ D ../planning_agent_console_project/code/planning_core.py
+ D ../planning_agent_console_project/code/smoke_test_llms.py
+ D ../planning_agent_console_project/code/torch_demo.py
+ D ../planning_agent_console_project/data/buggy_script.py
+ D ../planning_agent_console_project/data/competitor_data.csv
+ D ../planning_agent_console_project/data/config.yaml
+ D ../planning_agent_console_project/data/cs_inquiries.csv
+ D ../planning_agent_console_project/data/customers.csv
+ D "../planning_agent_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../planning_agent_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../planning_agent_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../planning_agent_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../planning_agent_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../planning_agent_console_project/data/exchange_rates.csv
+ D ../planning_agent_console_project/data/faq.csv
+ D ../planning_agent_console_project/data/inventory.csv
+ D ../planning_agent_console_project/data/marketing_brief.csv
+ D ../planning_agent_console_project/data/math_word_problems.csv
+ D ../planning_agent_console_project/data/monthly_sales.csv
+ D ../planning_agent_console_project/data/orders.csv
+ D ../planning_agent_console_project/data/products.csv
+ D ../planning_agent_console_project/data/project_tasks.csv
+ D ../planning_agent_console_project/data/reviews.csv
+ D ../planning_agent_console_project/data/sales_daily.csv
+ D ../planning_agent_console_project/data/sample_goals.txt
+ D ../planning_agent_console_project/data/support_tickets.csv
+ D ../planning_agent_console_project/data/user_profiles.json
+ D ../planning_agent_console_project/requirements.txt
+ D ../prompt_console_project/.env.example
+ D ../prompt_console_project/.gitignore
+ D ../prompt_console_project/README.md
+ D ../prompt_console_project/data/buggy_script.py
+ D ../prompt_console_project/data/competitor_data.csv
+ D ../prompt_console_project/data/config.yaml
+ D ../prompt_console_project/data/cs_inquiries.csv
+ D ../prompt_console_project/data/customers.csv
+ D ../prompt_console_project/data/docs/source_html/03_zero-shot-vs-few-shot.html
+ D "../prompt_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../prompt_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../prompt_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../prompt_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../prompt_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../prompt_console_project/data/exchange_rates.csv
+ D ../prompt_console_project/data/faq.csv
+ D ../prompt_console_project/data/inventory.csv
+ D ../prompt_console_project/data/marketing_brief.csv
+ D ../prompt_console_project/data/math_word_problems.csv
+ D ../prompt_console_project/data/monthly_sales.csv
+ D ../prompt_console_project/data/orders.csv
+ D ../prompt_console_project/data/products.csv
+ D ../prompt_console_project/data/project_tasks.csv
+ D ../prompt_console_project/data/reviews.csv
+ D ../prompt_console_project/data/sales_daily.csv
+ D ../prompt_console_project/data/support_tickets.csv
+ D ../prompt_console_project/data/user_profiles.json
+ D ../prompt_console_project/requirements.txt
+ D ../prompt_console_project/src/common.py
+ D ../prompt_console_project/src/html_code_reader.py
+ D ../prompt_console_project/src/llm_clients.py
+ D ../prompt_console_project/src/main.py
+ D ../prompt_console_project/src/torch_demo.py
+ D ../rag_console_project/.env.example
+ D ../rag_console_project/.gitignore
+ D ../rag_console_project/README.md
+ D ../rag_console_project/code/common.py
+ D ../rag_console_project/code/features/__init__.py
+ D ../rag_console_project/code/features/document_service.py
+ D ../rag_console_project/code/features/llm_service.py
+ D ../rag_console_project/code/features/local_vector_service.py
+ D ../rag_console_project/code/features/menu_actions.py
+ D ../rag_console_project/code/main.py
+ D ../rag_console_project/code/solutions.py
+ D "../rag_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../rag_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../rag_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../rag_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../rag_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../rag_console_project/data/faq.csv
+ D ../rag_console_project/data/notice.txt
+ D ../rag_console_project/data/policy.md
+ D ../rag_console_project/requirements.txt
+ D ../rag_console_project/test_solutions.py
+ D "../rag_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_rag\352\260\234\353\205\220.txt"
+ D ../rag_qa_console_project/.env.example
+ D ../rag_qa_console_project/.gitignore
+ D ../rag_qa_console_project/README.md
+ D ../rag_qa_console_project/code/common.py
+ D ../rag_qa_console_project/code/main.py
+ D ../rag_qa_console_project/code/rag_service.py
+ D ../rag_qa_console_project/code/solutions.py
+ D ../rag_qa_console_project/data/buggy_script.py
+ D ../rag_qa_console_project/data/competitor_data.csv
+ D ../rag_qa_console_project/data/config.yaml
+ D ../rag_qa_console_project/data/cs_inquiries.csv
+ D ../rag_qa_console_project/data/customers.csv
+ D "../rag_qa_console_project/data/docs/\353\251\244\353\262\204\354\213\255\354\240\225\354\261\205.pdf"
+ D "../rag_qa_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\353\241\234\353\264\207\354\262\255\354\206\214\352\270\260.pdf"
+ D "../rag_qa_console_project/data/docs/\354\240\234\355\222\210\353\247\244\353\211\264\354\226\274_\354\212\244\353\247\210\355\212\270\354\233\214\354\271\230.pdf"
+ D "../rag_qa_console_project/data/docs/\354\247\201\354\233\220\355\225\270\353\223\234\353\266\201.pdf"
+ D "../rag_qa_console_project/data/docs/\355\231\230\353\266\210\352\265\220\355\231\230\354\240\225\354\261\205.pdf"
+ D ../rag_qa_console_project/data/exchange_rates.csv
+ D ../rag_qa_console_project/data/faq.csv
+ D ../rag_qa_console_project/data/inventory.csv
+ D ../rag_qa_console_project/data/marketing_brief.csv
+ D ../rag_qa_console_project/data/math_word_problems.csv
+ D ../rag_qa_console_project/data/monthly_sales.csv
+ D ../rag_qa_console_project/data/orders.csv
+ D ../rag_qa_console_project/data/products.csv
+ D ../rag_qa_console_project/data/project_tasks.csv
+ D ../rag_qa_console_project/data/reviews.csv
+ D ../rag_qa_console_project/data/sales_daily.csv
+ D ../rag_qa_console_project/data/support_tickets.csv
+ D ../rag_qa_console_project/data/user_profiles.json
+ D ../rag_qa_console_project/requirements.txt
+ D ../rag_qa_console_project/test_solutions.py
+ D "../rag_qa_console_project/\354\213\244\354\212\265\353\254\270\354\240\234_rag_qa.txt"
+ D ../react_tools_agent_fastapi_project/.env.example
+ D ../react_tools_agent_fastapi_project/.gitignore
+ D ../react_tools_agent_fastapi_project/README.md
+ D ../react_tools_agent_fastapi_project/app/__init__.py
+ D ../react_tools_agent_fastapi_project/app/core/__init__.py
+ D ../react_tools_agent_fastapi_project/app/core/config.py
+ D ../react_tools_agent_fastapi_project/app/main.py
+ D ../react_tools_agent_fastapi_project/app/routers/__init__.py
+ D ../react_tools_agent_fastapi_project/app/routers/api.py
+ D ../react_tools_agent_fastapi_project/app/schemas.py
+ D ../react_tools_agent_fastapi_project/app/services/__init__.py
+ D ../react_tools_agent_fastapi_project/app/services/gemini_service.py
+ D ../react_tools_agent_fastapi_project/app/services/react_agent.py
+ D ../react_tools_agent_fastapi_project/app/services/tools_service.py
+ D ../react_tools_agent_fastapi_project/app/services/torch_service.py
+ D ../react_tools_agent_fastapi_project/app/services/vector_db.py
+ D ../react_tools_agent_fastapi_project/app/static/app.js
+ D ../react_tools_agent_fastapi_project/app/static/index.html
+ D ../react_tools_agent_fastapi_project/app/static/style.css
+ D ../react_tools_agent_fastapi_project/common.py
+ D ../react_tools_agent_fastapi_project/data/docs/loop_safety.txt
+ D ../react_tools_agent_fastapi_project/data/docs/react_agent_overview.txt
+ D ../react_tools_agent_fastapi_project/data/docs/tool_design_rules.txt
+ D ../react_tools_agent_fastapi_project/data/inventory.csv
+ D ../react_tools_agent_fastapi_project/data/orders.csv
+ D ../react_tools_agent_fastapi_project/data/products.csv
+ D ../react_tools_agent_fastapi_project/requirements.txt
+ D ../simple_mcp_server_project/.gitignore
+ D ../simple_mcp_server_project/README.md
+ D ../simple_mcp_server_project/__init__.py
+ D ../simple_mcp_server_project/data/manual.txt
+ D ../simple_mcp_server_project/requirements.txt
+ D ../simple_mcp_server_project/server.py
+ D "../simple_mcp_server_project/\354\204\234\353\262\204 \354\230\210\354\240\234.md"
+ D ../survey_chatbot_app/.env.example
+ D ../survey_chatbot_app/.gitignore
+ D ../survey_chatbot_app/README.md
+ D ../survey_chatbot_app/app/api/chat.py
+ D ../survey_chatbot_app/app/core/config.py
+ D ../survey_chatbot_app/app/data/survey_questions.json
+ D ../survey_chatbot_app/app/main.py
+ D ../survey_chatbot_app/app/schemas/chat.py
+ D ../survey_chatbot_app/app/services/chatbot_service.py
+ D ../survey_chatbot_app/app/services/openai_service.py
+ D ../survey_chatbot_app/app/services/survey_service.py
+ D ../survey_chatbot_app/app/static/app.js
+ D ../survey_chatbot_app/app/static/style.css
+ D ../survey_chatbot_app/app/templates/index.html
+ D ../survey_chatbot_app/requirements.txt
+ D ../survey_chatbot_app/run.py
+ D ../tool_system_console_project/.env.example
+ D ../tool_system_console_project/.gitignore
+ D ../tool_system_console_project/README.md
+ D ../tool_system_console_project/app/common.py
+ D ../tool_system_console_project/app/data_tools.py
+ D ../tool_system_console_project/app/gemini_tools.py
+ D ../tool_system_console_project/app/main.py
+ D ../tool_system_console_project/app/openai_tools.py
+ D ../tool_system_console_project/app/torch_demo.py
+ D ../tool_system_console_project/data/inventory.csv
+ D ../tool_system_console_project/data/orders.csv
+ D ../tool_system_console_project/data/products.csv
+ D ../tool_system_console_project/requirements.txt
+?? ../_0707_llm/
+?? ../_0709_langchain/
+?? ../_0710_prompt_engineering/
+?? ../_0713_rag/
+?? ../_0714_MCP/
+?? ../_0715_LangGraph/
+?? ../_0716_LagnGraph2/
+?? ../_unified_mall_2/
+?? "reports/2026-07-18_1745_\354\265\234\354\242\205_\354\235\270\354\210\230\354\240\220\352\262\200_\353\260\230\354\230\201_\353\246\254\355\217\254\355\212\270.md"
+?? reports/_codex_final_acceptance_review.txt
+?? reports/_codex_final_acceptance_review_r2.txt
+?? reports/_codex_final_acceptance_review_r3.txt
+?? reports/_codex_final_acceptance_review_r4.txt
+?? reports/_codex_final_acceptance_review_r5.txt
+?? ../from_colab_llm/0713-s/
+?? ../from_colab_llm/0714-s/
+diff --git a/_unified_mall_agent_project/app/mcp/client.py b/_unified_mall_agent_project/app/mcp/client.py
+index 006ebda7..e71b96ff 100644
+--- a/_unified_mall_agent_project/app/mcp/client.py
++++ b/_unified_mall_agent_project/app/mcp/client.py
+@@ -17,7 +17,31 @@ from typing import Any
+ from mcp import ClientSession, StdioServerParameters
+ from mcp.client.stdio import stdio_client
+ 
+-from app.core.errors import AppError, InfraError
++import re
++import secrets
++
++from app.core.errors import (
++    AppError,
++    ConfigError,
++    InfraError,
++    LLMOutputError,
++    ValidationErr,
++)
++
++# 서버가 '[APPERR:<nonce>:<code>]'로 실어 보낸 도구 내부 AppError의 error_code → 타입 복원표.
++_APPERR_BY_CODE: dict[str, type[AppError]] = {
++    ValidationErr.error_code: ValidationErr,
++    ConfigError.error_code: ConfigError,
++    InfraError.error_code: InfraError,
++    LLMOutputError.error_code: LLMOutputError,
++}
++# 1회용 비밀 nonce. 서버 서브프로세스에 환경변수로 넘겨, 서버가 마커에 실어 보낸다.
++# 호출자 입력은 이 nonce를 알 수 없으므로 도구명/인자에 '[APPERR:..]'를 심어도 위조 불가.
++_APPERR_NONCE = secrets.token_hex(16)
++# 마커는 (1) FastMCP 도구 실행 오류 접두사 뒤에서 (2) 정확한 nonce를 가진 것만 신뢰한다.
++_APPERR_RE = re.compile(
++    rf"^Error executing tool \S+: \[APPERR:{re.escape(_APPERR_NONCE)}:(\w+)\]\s*(.*)", re.S
++)
+ 
+ # app/mcp/client.py → parents[2] = 프로젝트 루트(= app 패키지의 부모)
+ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+@@ -33,9 +57,8 @@ def _unwrap(exc: BaseException) -> BaseException:
+ def _normalize(exc: BaseException, name: str) -> BaseException:
+     """전송/프로토콜 예외를 타입 있는 AppError로 승격한다(폴백 아님, 명시적 실패).
+ 
+-    - 내부에서 이미 올린 AppError(isError→InfraError 등)는 그대로 통과.
+-    - 그 밖의 McpError/전송 오류는 InfraError(503)로 승격 — 실패를 200 성공으로
+-      감추지 않는다.
++    - 내부에서 이미 올린 AppError(isError→분류된 오류 등)는 그대로 통과.
++    - 그 밖의 전송/연결 오류는 InfraError(503)로 승격 — 실패를 200 성공으로 감추지 않는다.
+     """
+     leaf = _unwrap(exc)
+     if isinstance(leaf, AppError):
+@@ -43,6 +66,33 @@ def _normalize(exc: BaseException, name: str) -> BaseException:
+     return InfraError(f"MCP 통신/도구 오류: {name}: {type(leaf).__name__}: {leaf}")
+ 
+ 
++def _tool_error(name: str, detail: str) -> AppError:
++    """FastMCP가 isError=True로 돌려준 도구 오류를 원인별 타입으로 복원한다.
++
++    우선순위:
++    1. 서버가 **정확한 nonce로** 실은 '[APPERR:<nonce>:<code>]' 마커 → 원래 AppError 타입
++       복원(ValidationErr/ConfigError/InfraError 등). nonce 없거나 틀리면 신뢰하지 않음(주입 방지).
++    2. FastMCP 프레임워크 오류: 존재하지 않는 도구·pydantic 인자 검증 실패 → ValidationErr(422).
++    3. 그 밖의 실행 실패(SQLAlchemy 등 비-AppError, 위조 마커 포함) → InfraError(503).
++    프로토콜 경계를 넘으면 예외 타입이 사라지므로 메시지로 복원한다.
++    """
++    m = _APPERR_RE.search(detail)
++    if m:
++        code, message = m.group(1), m.group(2).strip()
++        cls = _APPERR_BY_CODE.get(code, InfraError)
++        return cls(f"MCP 도구 '{name}': {message}")
++
++    low = detail.lower()
++    is_user_error = (
++        detail.startswith("Unknown tool")  # 존재하지 않는 도구
++        or "validation error" in low  # pydantic 인자 검증 실패(필수 누락·범위 밖 등)
++        or "field required" in low
++    )
++    if is_user_error:
++        return ValidationErr(f"MCP 도구 호출 오류(이름/인자): {name}: {detail}")
++    return InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++
++
+ def _server_params() -> StdioServerParameters:
+     """우리 MCP 서버를 stdio 서브프로세스로 띄우기 위한 파라미터.
+ 
+@@ -54,6 +104,8 @@ def _server_params() -> StdioServerParameters:
+     existing = env.get("PYTHONPATH", "")
+     root = str(_PROJECT_ROOT)
+     env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
++    # 도구 내부 AppError의 taxonomy를 위조 불가하게 보존하기 위한 비밀 nonce.
++    env["MCP_APPERR_NONCE"] = _APPERR_NONCE
+     return StdioServerParameters(
+         command=sys.executable,
+         args=["-m", "app.mcp.server"],
+@@ -87,9 +139,10 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+     구분(폴백 금지, RULE 3.2):
+     - **비즈니스 실패**(없는 상품/주문 등)는 도구가 {"ok": false, ...} 구조화 결과로
+       반환하며 `isError=False`다 → 정상 결과로 그대로 돌려준다(HTTP 200).
+-    - **실제 도구 오류**(도구 내부 예외 → `isError=True`, 또는 알 수 없는 도구·인자
+-      검증 실패 → 프로토콜 McpError)는 200 성공 봉투로 감싸지 않고 `InfraError`로
+-      승격해 전파한다(라우터가 5xx). anyio가 ExceptionGroup으로 감싸면 언랩한다.
++    - **도구 오류**(`isError=True`)는 200 성공 봉투로 감싸지 않고 원인별로 승격한다:
++      존재하지 않는 도구·인자 검증 실패 → `ValidationErr`(422), 실제 실행 실패(DB 미준비
++      등) → `InfraError`(503). (`_tool_error` 참고)
++    - **전송/연결 오류**는 `InfraError`(503). anyio가 ExceptionGroup으로 감싸면 언랩한다.
+     """
+     try:
+         async with stdio_client(_server_params()) as (read, write):
+@@ -104,7 +157,7 @@ async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[
+                 text = [t for t in text_blocks if t is not None]
+                 if getattr(result, "isError", False):
+                     detail = " ".join(text) or "알 수 없는 MCP 도구 오류"
+-                    raise InfraError(f"MCP 도구 실행 실패: {name}: {detail}")
++                    raise _tool_error(name, detail)
+                 # FastMCP는 dict 반환 도구를 structuredContent로 함께 실어준다.
+                 return {
+                     "structured": getattr(result, "structuredContent", None),
+diff --git a/_unified_mall_agent_project/app/mcp/server.py b/_unified_mall_agent_project/app/mcp/server.py
+index 75e8e3ac..8367cc00 100644
+--- a/_unified_mall_agent_project/app/mcp/server.py
++++ b/_unified_mall_agent_project/app/mcp/server.py
+@@ -17,9 +17,12 @@
+ from __future__ import annotations
+ 
+ import json
++import os
+ import sys
+ from collections.abc import Callable
+-from typing import Any, TypeVar
++from typing import Annotated, Any, TypeVar
++
++from pydantic import Field
+ 
+ # Windows 콘솔 stdio를 UTF-8로 (한글 도구 설명·인자 안전)
+ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+@@ -30,6 +33,7 @@ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
+ 
+ from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임포트)
+ 
++from app.core.errors import AppError  # noqa: E402
+ from app.db.database import SessionLocal  # noqa: E402
+ from app.db.models import Product  # noqa: E402
+ from app.ml import intent as ml_intent  # noqa: E402
+@@ -41,21 +45,55 @@ from app.tools import commerce_tools  # noqa: E402
+ 
+ _T = TypeVar("_T")
+ 
++# top_k는 스키마 수준에서 1~10 범위 검증(범위 밖=인자 검증 오류). None이면 각 함수의
++# 기본값(RAG_TOP_K 등 config)으로 위임 — 매직값 3을 여기서 중복 하드코딩하지 않는다.
++TopK = Annotated[int, Field(ge=1, le=10)]
++
+ mcp = FastMCP("seungmall")
+ 
+ 
++# 클라이언트가 서브프로세스를 띄우며 넘겨준 1회용 nonce. 이게 있어야만 마커를 신뢰받는다.
++# (없으면=외부 클라이언트 직접 실행 → 마커를 실지 않는다. 위조 불가: 호출자 입력이 nonce를
++#  재현할 수 없으므로 인자에 마커를 심어도 taxonomy를 조작하지 못한다.)
++_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
++
++
++def _encode_apperr(exc: AppError) -> BaseException:
++    """도구 내부 AppError의 error_code를 프로토콜 경계 너머로 보존한다.
++
++    FastMCP가 예외를 문자열화하면 타입이 사라진다. 클라이언트가 원래 타입(422/503 등)을
++    복원할 수 있도록 '[APPERR:<nonce>:<code>]' 마커를 실어 재발생시킨다. nonce는 클라이언트가
++    넘긴 비밀값이라 호출자 입력으로 위조할 수 없다(주입 방지). nonce가 없으면 원본을 그대로
++    전파한다(외부 클라이언트는 우리 taxonomy 복원을 쓰지 않음).
++    """
++    if _APPERR_NONCE:
++        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
++    return exc
++
++
+ def with_db(op: Callable[[Any], _T]) -> _T:
+     """도구 실행마다 세션을 open/close 하고 결과를 반환한다.
+ 
+-    DB 미준비 등의 예외는 삼키지 않고 그대로 전파한다(폴백 금지).
++    DB 미준비 등의 예외는 삼키지 않고 전파한다(폴백 금지). 도구가 낸 AppError는
++    error_code를 보존해 재발생시킨다.
+     """
+     db = SessionLocal()
+     try:
+         return op(db)
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
+     finally:
+         db.close()
+ 
+ 
++def _guard(op: Callable[[], _T]) -> _T:
++    """세션이 필요 없는 도구용 — AppError의 error_code를 보존해 재발생시킨다."""
++    try:
++        return op()
++    except AppError as exc:
++        raise _encode_apperr(exc) from exc
++
++
+ # --------------------------------------------------------------------------
+ # 커머스 도구 5 (DB 필요 — get_exchange_rate만 예외)
+ # --------------------------------------------------------------------------
+@@ -89,26 +127,32 @@ def get_exchange_rate(currency: str) -> dict[str, Any]:
+ 
+     환율표는 상수라 DB 세션을 만들지 않는다(계획 합의).
+     """
+-    return commerce_tools.get_exchange_rate(None, currency)  # db 미사용
++    return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 미사용
+ 
+ 
+ # --------------------------------------------------------------------------
+ # RAG 도구 2 (vector_search=검색, rag_qa=근거기반 답변)
+ # --------------------------------------------------------------------------
+ @mcp.tool()
+-def vector_search(query: str, top_k: int = 3, source: str | None = None) -> dict[str, Any]:
+-    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k, source(선택)."""
+-    results = rag_service.search(query, k=top_k, source=source)
+-    return {"ok": True, "count": len(results), "results": results}
++def vector_search(
++    query: str, top_k: TopK | None = None, source: str | None = None
++) -> dict[str, Any]:
++    """정책·매뉴얼 등 지식 문서를 벡터 검색한다. 인자: query, top_k(1~10, 미지정=기본), source(선택)."""
++
++    def _run() -> dict[str, Any]:
++        results = rag_service.search(query, k=top_k, source=source)  # None→RAG_TOP_K
++        return {"ok": True, "count": len(results), "results": results}
++
++    return _guard(_run)
+ 
+ 
+ @mcp.tool()
+-def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+-    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k.
++def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k(1~10, 미지정=기본).
+ 
+     LLM 호출이 포함된다(설정된 provider 사용). 키/서버 없으면 예외 전파.
+     """
+-    return rag_qa_mod.answer(question, k=top_k)
++    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None→RAG_TOP_K
+ 
+ 
+ # --------------------------------------------------------------------------
+@@ -117,19 +161,21 @@ def rag_qa(question: str, top_k: int = 3) -> dict[str, Any]:
+ @mcp.tool()
+ def analyze_sentiment(text: str) -> dict[str, Any]:
+     """리뷰/문의 텍스트의 감성(긍정/부정)을 분석한다(KoELECTRA). 인자: text."""
+-    return ml_sentiment.analyze_sentiment(text)
++    return _guard(lambda: ml_sentiment.analyze_sentiment(text))
+ 
+ 
+ @mcp.tool()
+ def classify_intent(text: str) -> dict[str, Any]:
+     """고객 문의의 의도를 규칙 기반으로 분류한다. 인자: text."""
+-    return ml_intent.classify_intent(text)
++    return _guard(lambda: ml_intent.classify_intent(text))
+ 
+ 
+ @mcp.tool()
+-def recommend_products(query: str, top_k: int = 3) -> dict[str, Any]:
+-    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k."""
+-    return with_db(lambda db: ml_recommend.recommend_products(db, query, top_k=top_k))
++def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
++    """질의와 임베딩 유사도로 상품을 추천한다. 인자: query, top_k(1~10, 미지정=기본)."""
++    # None이면 recommend_products의 자체 기본값에 위임(여기서 3을 재하드코딩하지 않음).
++    kwargs = {} if top_k is None else {"top_k": top_k}
++    return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
+ 
+ 
+ # --------------------------------------------------------------------------
+diff --git a/_unified_mall_agent_project/tests/test_mcp.py b/_unified_mall_agent_project/tests/test_mcp.py
+index a944ae51..9b8e6f0a 100644
+--- a/_unified_mall_agent_project/tests/test_mcp.py
++++ b/_unified_mall_agent_project/tests/test_mcp.py
+@@ -14,7 +14,9 @@ import json
+ 
+ import pytest
+ 
++from app.core.errors import ConfigError, InfraError, ValidationErr
+ from app.mcp import server as mcp_server
++from app.mcp.client import _APPERR_NONCE, _tool_error
+ from app.mcp.server import mcp
+ 
+ 
+@@ -160,3 +162,125 @@ def test_get_exchange_rate_never_opens_session(monkeypatch):
+     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+     assert structured["ok"] is True
+     assert structured["rate"] > 0
++
++
++# --- 얇은 래핑 계약: 인자 전달 + top_k None 위임(하드코딩 3 없음) --------------
++def test_vector_search_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured.update(query=query, k=k, source=source)
++        return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _b, s = _run(
++        mcp.call_tool("vector_search", {"query": "환불규정", "top_k": 5, "source": "policy"})
++    )
++    assert captured == {"query": "환불규정", "k": 5, "source": "policy"}
++    assert s["ok"] is True and s["count"] == 1
++
++
++def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_search(query, k=None, source=None):
++        captured["k"] = k
++        return []
++
++    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
++    _run(mcp.call_tool("vector_search", {"query": "q"}))
++    # top_k 미지정 → None을 그대로 위임(service가 RAG_TOP_K로 결정). 3을 재하드코딩하지 않음.
++    assert captured["k"] is None
++
++
++def test_rag_qa_passes_args_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured.update(question=question, k=k)
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
++    assert captured == {"question": "교환?", "k": 2}
++    assert s["answer"] == "a"
++
++
++def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
++    captured: dict = {}
++
++    def _fake_answer(question, k=None):
++        captured["k"] = k
++        return {"answer": "a", "sources": []}
++
++    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
++    _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
++    # top_k 미지정 → None 위임(qa.answer가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
++    assert captured["k"] is None
++
++
++def test_recommend_top_k_none_uses_function_default(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured.update(query=query, top_k=top_k)
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠"}))
++    # None이면 recommend_products의 자체 기본값(3) 사용 — MCP가 top_k를 안 넘김
++    assert captured["top_k"] == 3
++
++
++def test_recommend_top_k_passed_through(monkeypatch):
++    captured: dict = {}
++
++    def _fake_reco(db, query, top_k=3):
++        captured["top_k"] = top_k
++        return {"ok": True, "items": []}
++
++    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
++    _run(mcp.call_tool("recommend_products", {"query": "셔츠", "top_k": 7}))
++    assert captured["top_k"] == 7
++
++
++def _marker(code: str, msg: str, tool: str = "x") -> str:
++    """서버가 실제로 생성하는 형태의 신뢰 가능한 오류 문자열(정확한 nonce 포함)."""
++    return f"Error executing tool {tool}: [APPERR:{_APPERR_NONCE}:{code}] {msg}"
++
++
++# --- 오류 taxonomy 복원 + 주입 방지 (_tool_error 단위) ----------------------
++def test_tool_error_restores_apperr_code():
++    # 서버가 (정확한 nonce로) 실은 마커 → 원래 타입 복원
++    assert isinstance(_tool_error("rag_qa", _marker("validation_error", "빈 질문", "rag_qa")), ValidationErr)
++    assert isinstance(_tool_error("x", _marker("config_error", "정책 불일치")), ConfigError)
++    # 미등록 code는 안전하게 InfraError
++    assert isinstance(_tool_error("x", _marker("weird_code", "?")), InfraError)
++
++
++def test_tool_error_framework_errors():
++    # 존재하지 않는 도구·pydantic 인자 검증 → ValidationErr(422)
++    assert isinstance(_tool_error("t", "Unknown tool: t"), ValidationErr)
++    assert isinstance(
++        _tool_error("get_price", "Error executing tool get_price: 1 validation error ... Field required"),
++        ValidationErr,
++    )
++    # 그 밖의 실행 실패 → InfraError(503)
++    assert isinstance(_tool_error("x", "Error executing tool x: some sqlalchemy error"), InfraError)
++
++
++def test_tool_error_marker_injection_is_ignored():
++    # 호출자가 도구명/인자에 마커를 심어도 taxonomy를 조작할 수 없다(nonce 없음 → 불신).
++    # 1) unknown-tool 이름에 마커 주입 → unknown-tool 경로로 ValidationErr(ConfigError 아님)
++    assert isinstance(
++        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected"), ValidationErr
++    )
++    # 2) 도구 실행 위치에 nonce 없는 위조 마커 → 신뢰 안 함 → InfraError(ConfigError 조작 실패)
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected"), InfraError
++    )
++    # 3) 틀린 nonce도 불신
++    assert isinstance(
++        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected"),
++        InfraError,
++    )
+tests\test_mcp_stdio.py:40:    result = _run(mcp_client.call_tool("get_price", {"product_code": "P0001"}))
+tests\test_mcp_stdio.py:46:    result = _run(mcp_client.call_tool("get_exchange_rate", {"currency": "USD"}))
+tests\test_mcp_stdio.py:52:    result = _run(mcp_client.call_tool("get_price", {"product_code": "NOPE"}))
+tests\test_mcp_stdio.py:60:        _run(mcp_client.call_tool("nonexistent_tool", {}))
+tests\test_mcp_stdio.py:66:        _run(mcp_client.call_tool("get_price", {}))
+tests\test_mcp_stdio.py:72:        _run(mcp_client.call_tool("vector_search", {"query": "환불", "top_k": 0}))
+tests\test_mcp_stdio.py:79:        _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+tests\test_mcp.py:3:FastMCP 인스턴스를 **인프로세스**로 호출한다(`mcp.call_tool`은 (blocks, structured)
+tests\test_mcp.py:19:from app.mcp.client import _APPERR_NONCE, _tool_error
+tests\test_mcp.py:58:    _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+tests\test_mcp.py:64:    _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "NOPE"}))
+tests\test_mcp.py:70:    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "usd"}))
+tests\test_mcp.py:77:    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "XXX"}))
+tests\test_mcp.py:84:    _blocks, structured = _run(mcp.call_tool("classify_intent", {"text": "환불하고 싶어요"}))
+tests\test_mcp.py:150:        _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+tests\test_mcp.py:162:    _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+tests\test_mcp.py:177:        mcp.call_tool("vector_search", {"query": "환불규정", "top_k": 5, "source": "policy"})
+tests\test_mcp.py:191:    _run(mcp.call_tool("vector_search", {"query": "q"}))
+tests\test_mcp.py:204:    _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
+tests\test_mcp.py:217:    _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
+tests\test_mcp.py:230:    _run(mcp.call_tool("recommend_products", {"query": "셔츠"}))
+tests\test_mcp.py:243:    _run(mcp.call_tool("recommend_products", {"query": "셔츠", "top_k": 7}))
+tests\test_mcp.py:249:    return f"Error executing tool {tool}: [APPERR:{_APPERR_NONCE}:{code}] {msg}"
+tests\test_mcp.py:265:        _tool_error("get_price", "Error executing tool get_price: 1 validation error ... Field required"),
+tests\test_mcp.py:269:    assert isinstance(_tool_error("x", "Error executing tool x: some sqlalchemy error"), InfraError)
+tests\test_mcp.py:276:        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected"), ValidationErr
+tests\test_mcp.py:280:        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected"), InfraError
+tests\test_mcp.py:284:        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected"),
+app\mcp\server.py:58:_APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
+app\mcp\server.py:61:def _encode_apperr(exc: AppError) -> BaseException:
+app\mcp\server.py:65:    복원할 수 있도록 '[APPERR:<nonce>:<code>]' 마커를 실어 재발생시킨다. nonce는 클라이언트가
+app\mcp\server.py:69:    if _APPERR_NONCE:
+app\mcp\server.py:70:        return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
+app\mcp\server.py:84:        raise _encode_apperr(exc) from exc
+app\mcp\server.py:94:        raise _encode_apperr(exc) from exc
+app\mcp\client.py:31:# 서버가 '[APPERR:<nonce>:<code>]'로 실어 보낸 도구 내부 AppError의 error_code → 타입 복원표.
+app\mcp\client.py:32:_APPERR_BY_CODE: dict[str, type[AppError]] = {
+app\mcp\client.py:39:# 호출자 입력은 이 nonce를 알 수 없으므로 도구명/인자에 '[APPERR:..]'를 심어도 위조 불가.
+app\mcp\client.py:40:_APPERR_NONCE = secrets.token_hex(16)
+app\mcp\client.py:42:_APPERR_RE = re.compile(
+app\mcp\client.py:43:    rf"^Error executing tool \S+: \[APPERR:{re.escape(_APPERR_NONCE)}:(\w+)\]\s*(.*)", re.S
+app\mcp\client.py:73:    1. 서버가 **정확한 nonce로** 실은 '[APPERR:<nonce>:<code>]' 마커 → 원래 AppError 타입
+app\mcp\client.py:79:    m = _APPERR_RE.search(detail)
+app\mcp\client.py:82:        cls = _APPERR_BY_CODE.get(code, InfraError)
+app\mcp\client.py:96:def _server_params() -> StdioServerParameters:
+app\mcp\client.py:108:    env["MCP_APPERR_NONCE"] = _APPERR_NONCE
+app\mcp\client.py:120:        async with stdio_client(_server_params()) as (read, write):
+app\mcp\client.py:136:async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+app\mcp\client.py:148:        async with stdio_client(_server_params()) as (read, write):
+app\mcp\client.py:151:                result = await session.call_tool(name, arguments or {})
+app\routers\mcp.py:36:    return await mcp_client.call_tool(body.name, body.arguments)
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/client.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/app/mcp/server.py', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of '_unified_mall_agent_project/tests/test_mcp.py', LF will be replaced by CRLF the next time Git touches it
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$files = @('"'app/mcp/client.py','app/mcp/server.py','app/core/errors.py','app/main.py','app/routers/mcp.py','tests/test_mcp_stdio.py','tests/test_mcp.py'); foreach ("'$f in $files) { Write-Output "FILE $f"; $n=1; Get-Content -LiteralPath $f | ForEach-Object { '"'{0,4}: {1}' -f "'$n++, $_ } }' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1398ms:
+FILE app/mcp/client.py
+   1: """MCP ?대씪?댁뼵???쒕퉬????stdio濡??곕━ MCP ?쒕쾭???곌껐??紐⑸줉/?몄텧???쒖뿰.
+   2: 
+   3: ??FastAPI)??MCP ?대씪?댁뼵?멸? ?섏뼱, 蹂꾨룄 ?꾨줈?몄뒪濡?`python -m app.mcp.server`瑜??꾩슦怨?stdio濡??듭떊?쒕떎. "?붿껌留덈떎 ?쒕쾭 subprocess 湲곕룞"? **?숈뒿???쒖뿰**?대ŉ ?댁쁺
+   4: 援ъ“媛 ?꾨땲???댁쁺? ?μ닔紐??쒕쾭쨌? ??蹂꾨룄 ?ㅺ퀎).
+   5: 
+   6: ?대갚 ?놁쓬: ?쒕쾭 湲곕룞/?듭떊 ?ㅽ뙣???덉쇅濡??꾪뙆?쒕떎.
+   7: """
+   8: 
+   9: from __future__ import annotations
+  10: 
+  11: import os
+  12: import sys
+  13: from pathlib import Path
+  14: from typing import Any
+  15: 
+  16: from mcp import ClientSession, StdioServerParameters
+  17: from mcp.client.stdio import stdio_client
+  18: 
+  19: import re
+  20: import secrets
+  21: 
+  22: from app.core.errors import (
+  23:     AppError,
+  24:     ConfigError,
+  25:     InfraError,
+  26:     LLMOutputError,
+  27:     ValidationErr,
+  28: )
+  29: 
+  30: # ?쒕쾭媛 '[APPERR:<nonce>:<code>]'濡??ㅼ뼱 蹂대궦 ?꾧뎄 ?대? AppError??error_code ?????蹂듭썝??
+  31: _APPERR_BY_CODE: dict[str, type[AppError]] = {
+  32:     ValidationErr.error_code: ValidationErr,
+  33:     ConfigError.error_code: ConfigError,
+  34:     InfraError.error_code: InfraError,
+  35:     LLMOutputError.error_code: LLMOutputError,
+  36: }
+  37: # 1?뚯슜 鍮꾨? nonce. ?쒕쾭 ?쒕툕?꾨줈?몄뒪???섍꼍蹂?섎줈 ?섍꺼, ?쒕쾭媛 留덉빱???ㅼ뼱 蹂대궦??
+  38: # ?몄텧???낅젰? ??nonce瑜??????놁쑝誘濡??꾧뎄紐??몄옄??'[APPERR:..]'瑜??ъ뼱???꾩“ 遺덇?.
+  39: _APPERR_NONCE = secrets.token_hex(16)
+  40: # 留덉빱??(1) FastMCP ?꾧뎄 ?ㅽ뻾 ?ㅻ쪟 ?묐몢???ㅼ뿉??(2) ?뺥솗??nonce瑜?媛吏?寃껊쭔 ?좊ː?쒕떎.
+  41: _APPERR_RE = re.compile(
+  42:     rf"^Error executing tool \S+: \[APPERR:{re.escape(_APPERR_NONCE)}:(\w+)\]\s*(.*)", re.S
+  43: )
+  44: 
+  45: # app/mcp/client.py ??parents[2] = ?꾨줈?앺듃 猷⑦듃(= app ?⑦궎吏??遺紐?
+  46: _PROJECT_ROOT = Path(__file__).resolve().parents[2]
+  47: 
+  48: 
+  49: def _unwrap(exc: BaseException) -> BaseException:
+  50:     """anyio TaskGroup???덉쇅瑜?(Base)ExceptionGroup?쇰줈 媛먯? ???덉뼱 理쒕궡遺 ?덉쇅瑜?爰쇰궦??"""
+  51:     while isinstance(exc, BaseExceptionGroup) and exc.exceptions:
+  52:         exc = exc.exceptions[0]
+  53:     return exc
+  54: 
+  55: 
+  56: def _normalize(exc: BaseException, name: str) -> BaseException:
+  57:     """?꾩넚/?꾨줈?좎퐳 ?덉쇅瑜?????덈뒗 AppError濡??밴꺽?쒕떎(?대갚 ?꾨떂, 紐낆떆???ㅽ뙣).
+  58: 
+  59:     - ?대??먯꽌 ?대? ?щ┛ AppError(isError?믩텇瑜섎맂 ?ㅻ쪟 ????洹몃?濡??듦낵.
+  60:     - 洹?諛뽰쓽 ?꾩넚/?곌껐 ?ㅻ쪟??InfraError(503)濡??밴꺽 ???ㅽ뙣瑜?200 ?깃났?쇰줈 媛먯텛吏 ?딅뒗??
+  61:     """
+  62:     leaf = _unwrap(exc)
+  63:     if isinstance(leaf, AppError):
+  64:         return leaf
+  65:     return InfraError(f"MCP ?듭떊/?꾧뎄 ?ㅻ쪟: {name}: {type(leaf).__name__}: {leaf}")
+  66: 
+  67: 
+  68: def _tool_error(name: str, detail: str) -> AppError:
+  69:     """FastMCP媛 isError=True濡??뚮젮以 ?꾧뎄 ?ㅻ쪟瑜??먯씤蹂???낆쑝濡?蹂듭썝?쒕떎.
+  70: 
+  71:     ?곗꽑?쒖쐞:
+  72:     1. ?쒕쾭媛 **?뺥솗??nonce濡?* ?ㅼ? '[APPERR:<nonce>:<code>]' 留덉빱 ???먮옒 AppError ???       蹂듭썝(ValidationErr/ConfigError/InfraError ??. nonce ?녾굅???由щ㈃ ?좊ː?섏? ?딆쓬(二쇱엯 諛⑹?).
+  73:     2. FastMCP ?꾨젅?꾩썙???ㅻ쪟: 議댁옱?섏? ?딅뒗 ?꾧뎄쨌pydantic ?몄옄 寃利??ㅽ뙣 ??ValidationErr(422).
+  74:     3. 洹?諛뽰쓽 ?ㅽ뻾 ?ㅽ뙣(SQLAlchemy ??鍮?AppError, ?꾩“ 留덉빱 ?ы븿) ??InfraError(503).
+  75:     ?꾨줈?좎퐳 寃쎄퀎瑜??섏쑝硫??덉쇅 ??낆씠 ?щ씪吏誘濡?硫붿떆吏濡?蹂듭썝?쒕떎.
+  76:     """
+  77:     m = _APPERR_RE.search(detail)
+  78:     if m:
+  79:         code, message = m.group(1), m.group(2).strip()
+  80:         cls = _APPERR_BY_CODE.get(code, InfraError)
+  81:         return cls(f"MCP ?꾧뎄 '{name}': {message}")
+  82: 
+  83:     low = detail.lower()
+  84:     is_user_error = (
+  85:         detail.startswith("Unknown tool")  # 議댁옱?섏? ?딅뒗 ?꾧뎄
+  86:         or "validation error" in low  # pydantic ?몄옄 寃利??ㅽ뙣(?꾩닔 ?꾨씫쨌踰붿쐞 諛???
+  87:         or "field required" in low
+  88:     )
+  89:     if is_user_error:
+  90:         return ValidationErr(f"MCP ?꾧뎄 ?몄텧 ?ㅻ쪟(?대쫫/?몄옄): {name}: {detail}")
+  91:     return InfraError(f"MCP ?꾧뎄 ?ㅽ뻾 ?ㅽ뙣: {name}: {detail}")
+  92: 
+  93: 
+  94: def _server_params() -> StdioServerParameters:
+  95:     """?곕━ MCP ?쒕쾭瑜?stdio ?쒕툕?꾨줈?몄뒪濡??꾩슦湲??꾪븳 ?뚮씪誘명꽣.
+  96: 
+  97:     - command: ?꾩옱 ?뚯씠???명꽣?꾨━???숈씪 venv 蹂댁옣)
+  98:     - args: `-m app.mcp.server`
+  99:     - cwd/env: ?꾨줈?앺듃 猷⑦듃?먯꽌 ?ㅽ뻾 + PYTHONPATH濡?app ?⑦궎吏 ?꾪룷??蹂댁옣
+ 100:     """
+ 101:     env = dict(os.environ)
+ 102:     existing = env.get("PYTHONPATH", "")
+ 103:     root = str(_PROJECT_ROOT)
+ 104:     env["PYTHONPATH"] = root + (os.pathsep + existing if existing else "")
+ 105:     # ?꾧뎄 ?대? AppError??taxonomy瑜??꾩“ 遺덇??섍쾶 蹂댁〈?섍린 ?꾪븳 鍮꾨? nonce.
+ 106:     env["MCP_APPERR_NONCE"] = _APPERR_NONCE
+ 107:     return StdioServerParameters(
+ 108:         command=sys.executable,
+ 109:         args=["-m", "app.mcp.server"],
+ 110:         cwd=root,
+ 111:         env=env,
+ 112:     )
+ 113: 
+ 114: 
+ 115: async def list_tools() -> list[dict[str, Any]]:
+ 116:     """?쒕쾭媛 ?몄텧???꾧뎄 紐⑸줉(name/description/input schema)??諛섑솚?쒕떎."""
+ 117:     try:
+ 118:         async with stdio_client(_server_params()) as (read, write):
+ 119:             async with ClientSession(read, write) as session:
+ 120:                 await session.initialize()
+ 121:                 resp = await session.list_tools()
+ 122:                 return [
+ 123:                     {
+ 124:                         "name": t.name,
+ 125:                         "description": t.description,
+ 126:                         "input_schema": t.inputSchema,
+ 127:                     }
+ 128:                     for t in resp.tools
+ 129:                 ]
+ 130:     except Exception as e:  # ?꾩넚/?꾨줈?좎퐳 ?ㅽ뙣 ??????덈뒗 ?ㅻ쪟濡??밴꺽(?대갚 ?꾨떂)
+ 131:         raise _normalize(e, "list_tools") from e
+ 132: 
+ 133: 
+ 134: async def call_tool(name: str, arguments: dict[str, Any] | None = None) -> dict[str, Any]:
+ 135:     """?꾧뎄瑜??몄텧?섍퀬 援ъ“??寃곌낵(structuredContent ?곗꽑)瑜?諛섑솚?쒕떎.
+ 136: 
+ 137:     援щ텇(?대갚 湲덉?, RULE 3.2):
+ 138:     - **鍮꾩쫰?덉뒪 ?ㅽ뙣**(?녿뒗 ?곹뭹/二쇰Ц ?????꾧뎄媛 {"ok": false, ...} 援ъ“??寃곌낵濡?      諛섑솚?섎ŉ `isError=False`?????뺤긽 寃곌낵濡?洹몃?濡??뚮젮以??HTTP 200).
+ 139:     - **?꾧뎄 ?ㅻ쪟**(`isError=True`)??200 ?깃났 遊됲닾濡?媛먯떥吏 ?딄퀬 ?먯씤蹂꾨줈 ?밴꺽?쒕떎:
+ 140:       議댁옱?섏? ?딅뒗 ?꾧뎄쨌?몄옄 寃利??ㅽ뙣 ??`ValidationErr`(422), ?ㅼ젣 ?ㅽ뻾 ?ㅽ뙣(DB 誘몄?鍮?      ?? ??`InfraError`(503). (`_tool_error` 李멸퀬)
+ 141:     - **?꾩넚/?곌껐 ?ㅻ쪟**??`InfraError`(503). anyio媛 ExceptionGroup?쇰줈 媛먯떥硫??몃옪?쒕떎.
+ 142:     """
+ 143:     try:
+ 144:         async with stdio_client(_server_params()) as (read, write):
+ 145:             async with ClientSession(read, write) as session:
+ 146:                 await session.initialize()
+ 147:                 result = await session.call_tool(name, arguments or {})
+ 148:                 text_blocks = [
+ 149:                     getattr(block, "text", None)
+ 150:                     for block in getattr(result, "content", [])
+ 151:                     if getattr(block, "type", None) == "text"
+ 152:                 ]
+ 153:                 text = [t for t in text_blocks if t is not None]
+ 154:                 if getattr(result, "isError", False):
+ 155:                     detail = " ".join(text) or "?????녿뒗 MCP ?꾧뎄 ?ㅻ쪟"
+ 156:                     raise _tool_error(name, detail)
+ 157:                 # FastMCP??dict 諛섑솚 ?꾧뎄瑜?structuredContent濡??④퍡 ?ㅼ뼱以??
+ 158:                 return {
+ 159:                     "structured": getattr(result, "structuredContent", None),
+ 160:                     "text": text,
+ 161:                 }
+ 162:     except Exception as e:
+ 163:         raise _normalize(e, name) from e
+FILE app/mcp/server.py
+   1: """MCP ?쒕쾭 ???듯빀 湲곕뒫??MCP ?쒖? ?꾧뎄/由ъ냼???꾨＼?꾪듃濡??몄텧.
+   2: 
+   3: ?ㅺ퀎 ?먯튃(RULE쨌怨꾪쉷 ?⑹쓽):
+   4: - 湲곗〈 `app.tools.commerce_tools` / `app.rag` / `app.ml` ?⑥닔瑜?**?뉕쾶 ?섑븨**留??쒕떎(以묐났 湲덉?).
+   5: - ???쒕쾭??**蹂꾨룄 ?꾨줈?몄뒪**濡?stdio ?꾩넚?쒕떎(`python -m app.mcp.server`).
+   6:   FastAPI lifespan???놁쑝誘濡?**?뚯씠釉??앹꽦쨌seed瑜??섏? ?딅뒗??** DB媛 以鍮꾨뤌 ?덉?
+   7:   ?딆쑝硫?SQLAlchemy ?덉쇅媛 洹몃?濡?MCP ?ㅻ쪟濡??꾪뙆?쒕떎(?대갚쨌?먮룞?쒕뵫 湲덉?).
+   8: - DB媛 ?꾩슂???꾧뎄??`with_db`濡??ㅽ뻾留덈떎 ?몄뀡 open/close. `get_exchange_rate`??  DB瑜??곗? ?딆쑝誘濡??몄뀡??留뚮뱾吏 ?딅뒗??
+   9: - ?몄텧 ?꾧뎄??**10媛?怨좎젙**: 而ㅻ㉧?? + RAG2(vector_search/rag_qa) + ML3.
+  10:   `search_knowledge_base`??`vector_search`? 以묐났?대씪 **?쒖쇅**.
+  11: 
+  12: 二쇱쓽: "?꾧뎄 ?ㅽ뻾留덈떎 subprocess媛 ?몄뀡???щ뒗 援ъ“"??**?숈뒿???쒖뿰**?대ŉ ?댁쁺 援ъ“媛
+  13: ?꾨땲???댁쁺? 而ㅻ꽖???쨌?μ닔紐??몄뀡 ?깆쓣 蹂꾨룄 ?ㅺ퀎).
+  14: """
+  15: 
+  16: from __future__ import annotations
+  17: 
+  18: import json
+  19: import os
+  20: import sys
+  21: from collections.abc import Callable
+  22: from typing import Annotated, Any, TypeVar
+  23: 
+  24: from pydantic import Field
+  25: 
+  26: # Windows 肄섏넄 stdio瑜?UTF-8濡?(?쒓? ?꾧뎄 ?ㅻ챸쨌?몄옄 ?덉쟾)
+  27: if sys.platform == "win32":  # pragma: no cover - ?뚮옯??遺꾧린
+  28:     for _stream in (sys.stdin, sys.stdout, sys.stderr):
+  29:         reconfigure = getattr(_stream, "reconfigure", None)
+  30:         if reconfigure is not None:
+  31:             reconfigure(encoding="utf-8")
+  32: 
+  33: from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 ?ъ꽕?????꾪룷??
+  34: 
+  35: from app.core.errors import AppError  # noqa: E402
+  36: from app.db.database import SessionLocal  # noqa: E402
+  37: from app.db.models import Product  # noqa: E402
+  38: from app.ml import intent as ml_intent  # noqa: E402
+  39: from app.ml import recommend as ml_recommend  # noqa: E402
+  40: from app.ml import sentiment as ml_sentiment  # noqa: E402
+  41: from app.rag import qa as rag_qa_mod  # noqa: E402
+  42: from app.rag import service as rag_service  # noqa: E402
+  43: from app.tools import commerce_tools  # noqa: E402
+  44: 
+  45: _T = TypeVar("_T")
+  46: 
+  47: # top_k???ㅽ궎留??섏??먯꽌 1~10 踰붿쐞 寃利?踰붿쐞 諛??몄옄 寃利??ㅻ쪟). None?대㈃ 媛??⑥닔??# 湲곕낯媛?RAG_TOP_K ??config)?쇰줈 ?꾩엫 ??留ㅼ쭅媛?3???ш린??以묐났 ?섎뱶肄붾뵫?섏? ?딅뒗??
+  48: TopK = Annotated[int, Field(ge=1, le=10)]
+  49: 
+  50: mcp = FastMCP("seungmall")
+  51: 
+  52: 
+  53: # ?대씪?댁뼵?멸? ?쒕툕?꾨줈?몄뒪瑜??꾩슦硫??섍꺼以 1?뚯슜 nonce. ?닿쾶 ?덉뼱?쇰쭔 留덉빱瑜??좊ː諛쏅뒗??
+  54: # (?놁쑝硫??몃? ?대씪?댁뼵??吏곸젒 ?ㅽ뻾 ??留덉빱瑜??ㅼ? ?딅뒗?? ?꾩“ 遺덇?: ?몄텧???낅젰??nonce瑜?#  ?ы쁽?????놁쑝誘濡??몄옄??留덉빱瑜??ъ뼱??taxonomy瑜?議곗옉?섏? 紐삵븳??)
+  55: _APPERR_NONCE = os.environ.get("MCP_APPERR_NONCE")
+  56: 
+  57: 
+  58: def _encode_apperr(exc: AppError) -> BaseException:
+  59:     """?꾧뎄 ?대? AppError??error_code瑜??꾨줈?좎퐳 寃쎄퀎 ?덈㉧濡?蹂댁〈?쒕떎.
+  60: 
+  61:     FastMCP媛 ?덉쇅瑜?臾몄옄?댄솕?섎㈃ ??낆씠 ?щ씪吏꾨떎. ?대씪?댁뼵?멸? ?먮옒 ???422/503 ????    蹂듭썝?????덈룄濡?'[APPERR:<nonce>:<code>]' 留덉빱瑜??ㅼ뼱 ?щ컻?앹떆?⑤떎. nonce???대씪?댁뼵?멸?
+  62:     ?섍릿 鍮꾨?媛믪씠???몄텧???낅젰?쇰줈 ?꾩“?????녿떎(二쇱엯 諛⑹?). nonce媛 ?놁쑝硫??먮낯??洹몃?濡?    ?꾪뙆?쒕떎(?몃? ?대씪?댁뼵?몃뒗 ?곕━ taxonomy 蹂듭썝???곗? ?딆쓬).
+  63:     """
+  64:     if _APPERR_NONCE:
+  65:         return RuntimeError(f"[APPERR:{_APPERR_NONCE}:{exc.error_code}] {exc.message}")
+  66:     return exc
+  67: 
+  68: 
+  69: def with_db(op: Callable[[Any], _T]) -> _T:
+  70:     """?꾧뎄 ?ㅽ뻾留덈떎 ?몄뀡??open/close ?섍퀬 寃곌낵瑜?諛섑솚?쒕떎.
+  71: 
+  72:     DB 誘몄?鍮??깆쓽 ?덉쇅???쇳궎吏 ?딄퀬 ?꾪뙆?쒕떎(?대갚 湲덉?). ?꾧뎄媛 ??AppError??    error_code瑜?蹂댁〈???щ컻?앹떆?⑤떎.
+  73:     """
+  74:     db = SessionLocal()
+  75:     try:
+  76:         return op(db)
+  77:     except AppError as exc:
+  78:         raise _encode_apperr(exc) from exc
+  79:     finally:
+  80:         db.close()
+  81: 
+  82: 
+  83: def _guard(op: Callable[[], _T]) -> _T:
+  84:     """?몄뀡???꾩슂 ?녿뒗 ?꾧뎄????AppError??error_code瑜?蹂댁〈???щ컻?앹떆?⑤떎."""
+  85:     try:
+  86:         return op()
+  87:     except AppError as exc:
+  88:         raise _encode_apperr(exc) from exc
+  89: 
+  90: 
+  91: # --------------------------------------------------------------------------
+  92: # 而ㅻ㉧???꾧뎄 5 (DB ?꾩슂 ??get_exchange_rate留??덉쇅)
+  93: # --------------------------------------------------------------------------
+  94: @mcp.tool()
+  95: def get_price(product_code: str) -> dict[str, Any]:
+  96:     """?곹뭹 肄붾뱶濡??먮ℓ媛瑜?議고쉶?쒕떎. ?몄옄: product_code(?? 'P0001')."""
+  97:     return with_db(lambda db: commerce_tools.get_price(db, product_code))
+  98: 
+  99: 
+ 100: @mcp.tool()
+ 101: def get_stock(product_code: str) -> dict[str, Any]:
+ 102:     """?곹뭹 肄붾뱶濡??ш퀬 ?섎웾??議고쉶?쒕떎. ?몄옄: product_code(?? 'P0001')."""
+ 103:     return with_db(lambda db: commerce_tools.get_stock(db, product_code))
+ 104: 
+ 105: 
+ 106: @mcp.tool()
+ 107: def get_order_status(order_no: str) -> dict[str, Any]:
+ 108:     """二쇰Ц踰덊샇濡?二쇰Ц ?곹깭瑜?議고쉶?쒕떎. ?몄옄: order_no."""
+ 109:     return with_db(lambda db: commerce_tools.get_order_status(db, order_no))
+ 110: 
+ 111: 
+ 112: @mcp.tool()
+ 113: def search_product(keyword: str) -> dict[str, Any]:
+ 114:     """?곹뭹紐??ㅼ썙?쒕줈 ?곹뭹??寃?됲븳?? ?몄옄: keyword."""
+ 115:     return with_db(lambda db: commerce_tools.search_product(db, keyword))
+ 116: 
+ 117: 
+ 118: @mcp.tool()
+ 119: def get_exchange_rate(currency: str) -> dict[str, Any]:
+ 120:     """?듯솕 肄붾뱶???먰솕 ?섏쑉??議고쉶?쒕떎. ?몄옄: currency('USD'/'EUR'/'JPY').
+ 121: 
+ 122:     ?섏쑉?쒕뒗 ?곸닔??DB ?몄뀡??留뚮뱾吏 ?딅뒗??怨꾪쉷 ?⑹쓽).
+ 123:     """
+ 124:     return _guard(lambda: commerce_tools.get_exchange_rate(None, currency))  # db 誘몄궗??
+ 125: 
+ 126: # --------------------------------------------------------------------------
+ 127: # RAG ?꾧뎄 2 (vector_search=寃?? rag_qa=洹쇨굅湲곕컲 ?듬?)
+ 128: # --------------------------------------------------------------------------
+ 129: @mcp.tool()
+ 130: def vector_search(
+ 131:     query: str, top_k: TopK | None = None, source: str | None = None
+ 132: ) -> dict[str, Any]:
+ 133:     """?뺤콉쨌留ㅻ돱????吏??臾몄꽌瑜?踰≫꽣 寃?됲븳?? ?몄옄: query, top_k(1~10, 誘몄???湲곕낯), source(?좏깮)."""
+ 134: 
+ 135:     def _run() -> dict[str, Any]:
+ 136:         results = rag_service.search(query, k=top_k, source=source)  # None?뭃AG_TOP_K
+ 137:         return {"ok": True, "count": len(results), "results": results}
+ 138: 
+ 139:     return _guard(_run)
+ 140: 
+ 141: 
+ 142: @mcp.tool()
+ 143: def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
+ 144:     """吏??臾몄꽌 洹쇨굅濡?吏덈Ц???듯븳???섍컖 ?듭젣쨌異쒖쿂 ?몄슜). ?몄옄: question, top_k(1~10, 誘몄???湲곕낯).
+ 145: 
+ 146:     LLM ?몄텧???ы븿?쒕떎(?ㅼ젙??provider ?ъ슜). ???쒕쾭 ?놁쑝硫??덉쇅 ?꾪뙆.
+ 147:     """
+ 148:     return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None?뭃AG_TOP_K
+ 149: 
+ 150: 
+ 151: # --------------------------------------------------------------------------
+ 152: # ML ?꾧뎄 3 (媛먯꽦/?섎룄/異붿쿇)
+ 153: # --------------------------------------------------------------------------
+ 154: @mcp.tool()
+ 155: def analyze_sentiment(text: str) -> dict[str, Any]:
+ 156:     """由щ럭/臾몄쓽 ?띿뒪?몄쓽 媛먯꽦(湲띿젙/遺????遺꾩꽍?쒕떎(KoELECTRA). ?몄옄: text."""
+ 157:     return _guard(lambda: ml_sentiment.analyze_sentiment(text))
+ 158: 
+ 159: 
+ 160: @mcp.tool()
+ 161: def classify_intent(text: str) -> dict[str, Any]:
+ 162:     """怨좉컼 臾몄쓽???섎룄瑜?洹쒖튃 湲곕컲?쇰줈 遺꾨쪟?쒕떎. ?몄옄: text."""
+ 163:     return _guard(lambda: ml_intent.classify_intent(text))
+ 164: 
+ 165: 
+ 166: @mcp.tool()
+ 167: def recommend_products(query: str, top_k: TopK | None = None) -> dict[str, Any]:
+ 168:     """吏덉쓽? ?꾨쿋???좎궗?꾨줈 ?곹뭹??異붿쿇?쒕떎. ?몄옄: query, top_k(1~10, 誘몄???湲곕낯)."""
+ 169:     # None?대㈃ recommend_products???먯껜 湲곕낯媛믪뿉 ?꾩엫(?ш린??3???ы븯?쒖퐫?⑺븯吏 ?딆쓬).
+ 170:     kwargs = {} if top_k is None else {"top_k": top_k}
+ 171:     return with_db(lambda db: ml_recommend.recommend_products(db, query, **kwargs))
+ 172: 
+ 173: 
+ 174: # --------------------------------------------------------------------------
+ 175: # 由ъ냼??2
+ 176: # --------------------------------------------------------------------------
+ 177: @mcp.resource("config://runtime", mime_type="application/json")
+ 178: def runtime_config() -> str:
+ 179:     """?고????ㅼ젙(鍮꾨? ?쒖쇅)??JSON?쇰줈 ?몄텧?쒕떎."""
+ 180:     from app.core.config import get_settings
+ 181: 
+ 182:     s = get_settings()
+ 183:     payload = {
+ 184:         "llm_provider": s.LLM_PROVIDER,
+ 185:         "local_model": s.LOCAL_MODEL,
+ 186:         "openai_model": s.OPENAI_MODEL,
+ 187:         "gemini_model": s.GEMINI_MODEL,
+ 188:         "embedding_model": s.ST_EMBEDDING_MODEL,
+ 189:         "rag_top_k": s.RAG_TOP_K,
+ 190:         "sentiment_model": s.SENTIMENT_MODEL,
+ 191:     }
+ 192:     return json.dumps(payload, ensure_ascii=False, indent=2)
+ 193: 
+ 194: 
+ 195: @mcp.resource("catalog://products", mime_type="application/json")
+ 196: def product_catalog() -> str:
+ 197:     """?곹뭹 移댄깉濡쒓렇瑜?JSON?쇰줈 ?몄텧?쒕떎(?먯껜 ?몄뀡 open/close)."""
+ 198: 
+ 199:     def _load(db: Any) -> list[dict[str, Any]]:
+ 200:         rows = db.query(Product).order_by(Product.product_code).all()
+ 201:         return [
+ 202:             {
+ 203:                 "product_code": p.product_code,
+ 204:                 "name": p.name,
+ 205:                 "category": p.category,
+ 206:                 "price": p.price,
+ 207:             }
+ 208:             for p in rows
+ 209:         ]
+ 210: 
+ 211:     items = with_db(_load)
+ 212:     return json.dumps({"count": len(items), "products": items}, ensure_ascii=False, indent=2)
+ 213: 
+ 214: 
+ 215: # --------------------------------------------------------------------------
+ 216: # ?꾨＼?꾪듃 1
+ 217: # --------------------------------------------------------------------------
+ 218: @mcp.prompt()
+ 219: def grounded_rag_prompt(question: str) -> str:
+ 220:     """寃??癒쇱?쨌洹쇨굅留??ъ슜?섎뒗 RAG 吏移??꾨＼?꾪듃瑜??앹꽦?쒕떎."""
+ 221:     return (
+ 222:         "?덈뒗 ?뱀듅?κ뎄紐?怨좉컼吏??AI?? 諛섎뱶???꾨옒 ?덉감瑜?吏耳쒕씪.\n"
+ 223:         "1) 癒쇱? vector_search ?꾧뎄濡?愿??洹쇨굅瑜?寃?됲븳??\n"
+ 224:         "2) 寃?됰맂 洹쇨굅???덈뒗 ?댁슜留??ъ슜???듯븳??紐⑤Ⅴ硫?紐⑤Ⅸ?ㅺ퀬 ?듯븳??.\n"
+ 225:         "3) ?듬? ?앹뿉 ?ъ슜??異쒖쿂瑜?紐낆떆?쒕떎.\n\n"
+ 226:         f"吏덈Ц: {question}"
+ 227:     )
+ 228: 
+ 229: 
+ 230: if __name__ == "__main__":  # pragma: no cover - stdio 吏꾩엯??    mcp.run(transport="stdio")
+FILE app/core/errors.py
+   1: """?덉쇅 taxonomy 諛?FastAPI ?덉쇅 ?몃뱾??
+   2: 
+   3: RULE.md 3.2(?대갚 湲덉?)? ?듯빀 怨꾪쉷??짠6??援ы쁽?쒕떎. ?ㅻ쪟瑜??쇱폒 洹몃윺??븳 媛吏?寃곌낵濡??泥댄븯吏 ?딄퀬, ?뺤쓽??HTTP ?곹깭 + 援ъ“?붾맂 蹂몃Ц {ok, error_code, message}濡?紐낇솗???ㅽ뙣?쒗궓??
+   4: """
+   5: 
+   6: from __future__ import annotations
+   7: 
+   8: from fastapi import FastAPI, Request
+   9: from fastapi.responses import JSONResponse
+  10: 
+  11: 
+  12: class AppError(Exception):
+  13:     """?좏뵆由ъ??댁뀡 怨듯넻 ?덉쇅 踰좎씠??"""
+  14: 
+  15:     http_status: int = 500
+  16:     error_code: str = "app_error"
+  17: 
+  18:     def __init__(self, message: str):
+  19:         super().__init__(message)
+  20:         self.message = message
+  21: 
+  22: 
+  23: class ConfigError(AppError):
+  24:     """?ㅼ젙/??遺?????쒕퉬???섏〈??誘몄?鍮?(?대갚 ???紐낆떆???ㅽ뙣)."""
+  25: 
+  26:     http_status = 503
+  27:     error_code = "config_error"
+  28: 
+  29: 
+  30: class InfraError(AppError):
+  31:     """DB/?몃? ?명봽???곌껐 ?ㅽ뙣."""
+  32: 
+  33:     http_status = 503
+  34:     error_code = "infra_error"
+  35: 
+  36: 
+  37: class LLMOutputError(AppError):
+  38:     """LLM 異쒕젰???ㅽ궎留?寃利앹쓣 ?듦낵?섏? 紐삵븿 (?ъ떆????理쒖쥌 ?ㅽ뙣)."""
+  39: 
+  40:     http_status = 502
+  41:     error_code = "llm_output_error"
+  42: 
+  43: 
+  44: class ValidationErr(AppError):
+  45:     """?ъ슜???낅젰 寃利??ㅽ뙣."""
+  46: 
+  47:     http_status = 422
+  48:     error_code = "validation_error"
+  49: 
+  50: 
+  51: class AuthErr(AppError):
+  52:     """?몄쬆 ?ㅽ뙣 (?좏겙 ?놁쓬/臾댄슚/留뚮즺)."""
+  53: 
+  54:     http_status = 401
+  55:     error_code = "auth_error"
+  56: 
+  57: 
+  58: class ForbiddenErr(AppError):
+  59:     """沅뚰븳 ?놁쓬 (???由ъ냼???묎렐 ??."""
+  60: 
+  61:     http_status = 403
+  62:     error_code = "forbidden"
+  63: 
+  64: 
+  65: class NotFoundErr(AppError):
+  66:     """由ъ냼???놁쓬."""
+  67: 
+  68:     http_status = 404
+  69:     error_code = "not_found"
+  70: 
+  71: 
+  72: def register_exception_handlers(app: FastAPI) -> None:
+  73:     """AppError 怨꾩뿴???뺤쓽??HTTP ?곹깭 + 援ъ“??蹂몃Ц?쇰줈 留ㅽ븨?쒕떎."""
+  74: 
+  75:     @app.exception_handler(AppError)
+  76:     async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+  77:         return JSONResponse(
+  78:             status_code=exc.http_status,
+  79:             content={"ok": False, "error_code": exc.error_code, "message": exc.message},
+  80:         )
+FILE app/main.py
+   1: """FastAPI 吏꾩엯??
+   2: 
+   3: ??議곕┰: ?덉쇅 ?몃뱾??+ ???쇱슦??health/auth/products/orders/payments/agent/rag/nlp/
+   4: lab/mcp/workflow) + ?뺤쟻 UI. lifespan?먯꽌 DB ?뚯씠釉??앹꽦쨌?쒕뵫怨?RAG ?몃뜳??鍮뚮뱶(硫깅벑)瑜??섑뻾.
+   5: Phase 0~10 ?듯빀(而ㅻ㉧?ㅒ룹뿉?댁쟾?맞톀AG쨌ML쨌MCP쨌LangGraph).
+   6: """
+   7: 
+   8: from __future__ import annotations
+   9: 
+  10: from contextlib import asynccontextmanager
+  11: from pathlib import Path
+  12: 
+  13: from fastapi import FastAPI
+  14: from fastapi.responses import FileResponse
+  15: from fastapi.staticfiles import StaticFiles
+  16: 
+  17: from app.core.errors import register_exception_handlers
+  18: from app.db.database import Base, SessionLocal, engine
+  19: from app.db.seed import seed_products
+  20: from app.routers import (
+  21:     agent,
+  22:     auth,
+  23:     health,
+  24:     lab,
+  25:     mcp,
+  26:     nlp,
+  27:     orders,
+  28:     payments,
+  29:     products,
+  30:     rag,
+  31:     workflow,
+  32: )
+  33: 
+  34: _STATIC_DIR = Path(__file__).resolve().parent / "static"
+  35: 
+  36: 
+  37: @asynccontextmanager
+  38: async def lifespan(_app: FastAPI):
+  39:     # ?뚯씠釉??앹꽦 + ?쒕뵫 (硫깅벑)
+  40:     Base.metadata.create_all(bind=engine)
+  41:     db = SessionLocal()
+  42:     try:
+  43:         seed_products(db)
+  44:     finally:
+  45:         db.close()
+  46:     # RAG ?몃뜳?ㅺ? ?녾굅???꾨쿋??紐⑤뜽??諛붾뚯뿀?쇰㈃ ?щ퉴??(stale ?몃뜳??諛⑹? ???몃뜳???쒕퉬??遺꾨━)
+  47:     from app.rag.build_index import build_index, index_is_current
+  48: 
+  49:     if not index_is_current():
+  50:         build_index()
+  51:     yield
+  52: 
+  53: 
+  54: def create_app() -> FastAPI:
+  55:     app = FastAPI(
+  56:         title="?뱀듅?κ뎄紐?AI 而ㅻ㉧???먯씠?꾪듃",
+  57:         version="0.3.0",
+  58:         lifespan=lifespan,
+  59:     )
+  60:     register_exception_handlers(app)
+  61:     app.include_router(health.router)
+  62:     app.include_router(auth.router)
+  63:     app.include_router(products.router)
+  64:     app.include_router(orders.router)
+  65:     app.include_router(payments.router)
+  66:     app.include_router(agent.router)
+  67:     app.include_router(rag.router)
+  68:     app.include_router(nlp.router)
+  69:     app.include_router(lab.router)
+  70:     app.include_router(mcp.router)
+  71:     app.include_router(workflow.router)
+  72: 
+  73:     # ?뺤쟻 UI
+  74:     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+  75: 
+  76:     @app.get("/", include_in_schema=False)
+  77:     def index() -> FileResponse:
+  78:         return FileResponse(str(_STATIC_DIR / "index.html"))
+  79: 
+  80:     return app
+  81: 
+  82: 
+  83: app = create_app()
+FILE app/routers/mcp.py
+   1: """MCP ?쇱슦?????깆씠 MCP ?대씪?댁뼵?몃줈???곕━ MCP ?쒕쾭瑜??ъ슜?섎뒗 ?쒖뿰.
+   2: 
+   3: - POST /api/mcp/tools : ?쒕쾭媛 ?몄텧???꾧뎄 紐⑸줉
+   4: - POST /api/mcp/call  : ?꾧뎄 1嫄??몄텧
+   5: 
+   6: ?숈뒿???쒖뿰?대씪 留??붿껌留덈떎 ?쒕쾭 subprocess瑜?stdio濡?湲곕룞?쒕떎(?댁쁺 援ъ“ ?꾨떂).
+   7: """
+   8: 
+   9: from __future__ import annotations
+  10: 
+  11: from typing import Any
+  12: 
+  13: from fastapi import APIRouter
+  14: from pydantic import BaseModel, Field
+  15: 
+  16: from app.mcp import client as mcp_client
+  17: 
+  18: router = APIRouter(prefix="/api/mcp", tags=["mcp"])
+  19: 
+  20: 
+  21: class CallRequest(BaseModel):
+  22:     name: str = Field(min_length=1, description="?몄텧??MCP ?꾧뎄 ?대쫫")
+  23:     arguments: dict[str, Any] = Field(default_factory=dict)
+  24: 
+  25: 
+  26: @router.post("/tools")
+  27: async def list_mcp_tools() -> dict:
+  28:     """MCP ?쒕쾭媛 ?몄텧???꾧뎄 紐⑸줉??諛섑솚?쒕떎."""
+  29:     tools = await mcp_client.list_tools()
+  30:     return {"count": len(tools), "tools": tools}
+  31: 
+  32: 
+  33: @router.post("/call")
+  34: async def call_mcp_tool(body: CallRequest) -> dict:
+  35:     """MCP ?꾧뎄瑜??몄텧?섍퀬 寃곌낵瑜?諛섑솚?쒕떎."""
+  36:     return await mcp_client.call_tool(body.name, body.arguments)
+FILE tests/test_mcp_stdio.py
+   1: """MCP stdio ?뺣났 ?ㅻえ?????ㅼ젣 ?쒕툕?꾨줈?몄뒪 ?쒕쾭瑜?stdio濡?湲곕룞???듭떊.
+   2: 
+   3: `@pytest.mark.mcp`: ?쒕툕?꾨줈?몄뒪(?뚯씠???ш린?? 鍮꾩슜???덉뼱 湲곕낯 CI?먯꽌 ?쒖쇅?쒕떎
+   4: (CI = "not llm and not ml and not mcp"). LLM/紐⑤뜽???꾩슂???꾧뎄(rag_qa/analyze_sentiment/
+   5: recommend_products)???ш린???몄텧?섏? ?딅뒗????寃곗젙濡좎쟻 鍮?LLM ?꾧뎄留??뺣났 寃利앺븳??
+   6: 
+   7: ?쒕툕?꾨줈?몄뒪 ?쒕쾭??conftest媛 留뚮뱺 ?꾩떆 DB(DATABASE_URL ?섍꼍蹂??瑜??대씪?댁뼵?멸?
+   8: env濡?臾쇰젮二쇰?濡??숈씪 ?뚯씪??蹂몃떎. ?쒕쾭???ㅼ뒪濡??뚯씠釉??앹꽦/seed ?섏? ?딅뒗??怨꾪쉷 ?⑹쓽).
+   9: """
+  10: 
+  11: from __future__ import annotations
+  12: 
+  13: import asyncio
+  14: 
+  15: import pytest
+  16: 
+  17: from app.core.errors import ValidationErr
+  18: from app.mcp import client as mcp_client
+  19: from tests.test_mcp import EXPECTED_TOOLS  # ?꾧뎄 ?대쫫 吏묓빀 ?⑥씪 異쒖쿂(以묐났 諛⑹?)
+  20: 
+  21: pytestmark = pytest.mark.mcp
+  22: 
+  23: 
+  24: def _run(coro):
+  25:     return asyncio.run(coro)
+  26: 
+  27: 
+  28: def test_stdio_list_tools_exact_set():
+  29:     tools = _run(mcp_client.list_tools())
+  30:     names = {t["name"] for t in tools}
+  31:     # ?뺥솗???대쫫 吏묓빀 鍮꾧탳 ???섎せ???꾧뎄媛 ?욎씠硫??ㅽ뙣?댁빞 ?쒕떎
+  32:     assert names == EXPECTED_TOOLS
+  33:     # 媛??꾧뎄媛 ?낅젰 ?ㅽ궎留덈? ?몄텧?섎뒗吏(怨꾩빟)
+  34:     by_name = {t["name"]: t for t in tools}
+  35:     assert "product_code" in by_name["get_price"]["input_schema"]["properties"]
+  36:     assert "currency" in by_name["get_exchange_rate"]["input_schema"]["properties"]
+  37: 
+  38: 
+  39: def test_stdio_call_get_price():
+  40:     result = _run(mcp_client.call_tool("get_price", {"product_code": "P0001"}))
+  41:     assert result["structured"]["ok"] is True
+  42:     assert result["structured"]["price"] > 0
+  43: 
+  44: 
+  45: def test_stdio_call_get_exchange_rate():
+  46:     result = _run(mcp_client.call_tool("get_exchange_rate", {"currency": "USD"}))
+  47:     assert result["structured"]["rate"] > 0
+  48: 
+  49: 
+  50: def test_stdio_business_failure_is_not_error():
+  51:     # ?녿뒗 ?곹뭹 = 鍮꾩쫰?덉뒪 ?ㅽ뙣 ??isError ?꾨떂(援ъ“??ok:False), ?덉쇅濡??밴꺽?섏? ?딅뒗??    result = _run(mcp_client.call_tool("get_price", {"product_code": "NOPE"}))
+  52:     assert result["structured"]["ok"] is False
+  53:     assert result["structured"]["error_code"] == "product_not_found"
+  54: 
+  55: 
+  56: def test_stdio_unknown_tool_raises_validation_error():
+  57:     # ?????녿뒗 ?꾧뎄 = ?ъ슜???낅젰 ?ㅻ쪟 ??200 ?깃났?쇰줈 媛먯텛吏 ?딄퀬 ValidationErr(422)濡??꾪뙆
+  58:     with pytest.raises(ValidationErr):
+  59:         _run(mcp_client.call_tool("nonexistent_tool", {}))
+  60: 
+  61: 
+  62: def test_stdio_missing_required_arg_raises_validation_error():
+  63:     # ?꾩닔 ?몄옄 ?꾨씫 = ?몄옄 寃利??ㅽ뙣 ??ValidationErr(422)
+  64:     with pytest.raises(ValidationErr):
+  65:         _run(mcp_client.call_tool("get_price", {}))
+  66: 
+  67: 
+  68: def test_stdio_top_k_out_of_range_raises_validation_error():
+  69:     # top_k 踰붿쐞 諛?0) ???ㅽ궎留?寃利??ㅽ뙣 ??ValidationErr(422). 議곗슜??湲곕낯媛??대갚 ?꾨떂.
+  70:     with pytest.raises(ValidationErr):
+  71:         _run(mcp_client.call_tool("vector_search", {"query": "?섎텋", "top_k": 0}))
+  72: 
+  73: 
+  74: def test_stdio_tool_internal_validation_error_maps_422():
+  75:     # ?꾧뎄 ?대??먯꽌 ??ValidationErr(鍮?吏덈Ц)???꾨줈?좎퐳 寃쎄퀎瑜??섏뼱??503???꾨땶
+  76:     # 422濡?蹂듭썝?쇱빞 ?쒕떎(?쒕쾭媛 error_code瑜??ㅼ뼱 蹂대궡怨??대씪?댁뼵?멸? 蹂듭썝).
+  77:     with pytest.raises(ValidationErr):
+  78:         _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+FILE tests/test_mcp.py
+   1: """MCP ?쒕쾭 寃곗젙濡??뚯뒪?????깅줉 + ?꾧뎄 濡쒖쭅(LLM/subprocess 遺덊븘??.
+   2: 
+   3: FastMCP ?몄뒪?댁뒪瑜?**?명봽濡쒖꽭??*濡??몄텧?쒕떎(`mcp.call_tool`? (blocks, structured)
+   4: ?쒗뵆 諛섑솚). 而ㅻ㉧??ML(洹쒖튃) ?꾧뎄????DB濡?寃곗젙濡좎쟻. LLM/紐⑤뜽 濡쒕뱶 ?꾧뎄???ш린??寃利앺븯吏 ?딅뒗??媛곴컖 @llm/@ml, ?ㅻえ?щ뒗 test_mcp_stdio).
+   5: 
+   6: ?꾨줈?앺듃??async ?뚯뒪???뚮윭洹몄씤???놁쑝誘濡?肄붾（?댁? asyncio.run?쇰줈 援щ룞?쒕떎.
+   7: """
+   8: 
+   9: from __future__ import annotations
+  10: 
+  11: import asyncio
+  12: import json
+  13: 
+  14: import pytest
+  15: 
+  16: from app.core.errors import ConfigError, InfraError, ValidationErr
+  17: from app.mcp import server as mcp_server
+  18: from app.mcp.client import _APPERR_NONCE, _tool_error
+  19: from app.mcp.server import mcp
+  20: 
+  21: 
+  22: def _run(coro):
+  23:     return asyncio.run(coro)
+  24: 
+  25: 
+  26: # 怨꾪쉷 ?⑹쓽: ?꾧뎄???뺥솗??10媛?而ㅻ㉧?? + RAG2 + ML3), search_knowledge_base ?쒖쇅
+  27: EXPECTED_TOOLS = {
+  28:     "get_price",
+  29:     "get_stock",
+  30:     "get_order_status",
+  31:     "search_product",
+  32:     "get_exchange_rate",
+  33:     "vector_search",
+  34:     "rag_qa",
+  35:     "analyze_sentiment",
+  36:     "classify_intent",
+  37:     "recommend_products",
+  38: }
+  39: 
+  40: 
+  41: def test_registered_tools_exact_set():
+  42:     tools = _run(mcp.list_tools())
+  43:     names = {t.name for t in tools}
+  44:     assert names == EXPECTED_TOOLS
+  45:     assert "search_knowledge_base" not in names  # vector_search? 以묐났?대씪 ?쒖쇅
+  46: 
+  47: 
+  48: def test_registered_resources_and_prompt():
+  49:     resources = _run(mcp.list_resources())
+  50:     uris = {str(r.uri) for r in resources}
+  51:     assert uris == {"config://runtime", "catalog://products"}
+  52:     prompts = _run(mcp.list_prompts())
+  53:     assert {p.name for p in prompts} == {"grounded_rag_prompt"}
+  54: 
+  55: 
+  56: def test_get_price_tool_via_mcp():
+  57:     _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+  58:     assert structured["ok"] is True
+  59:     assert structured["price"] > 0
+  60: 
+  61: 
+  62: def test_get_price_not_found_is_structured_fail():
+  63:     _blocks, structured = _run(mcp.call_tool("get_price", {"product_code": "NOPE"}))
+  64:     assert structured["ok"] is False
+  65:     assert structured["error_code"] == "product_not_found"
+  66: 
+  67: 
+  68: def test_get_exchange_rate_no_session_needed():
+  69:     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "usd"}))
+  70:     assert structured["ok"] is True
+  71:     assert structured["currency"] == "USD"
+  72:     assert structured["rate"] > 0
+  73: 
+  74: 
+  75: def test_get_exchange_rate_unsupported():
+  76:     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "XXX"}))
+  77:     assert structured["ok"] is False
+  78:     assert structured["error_code"] == "currency_not_supported"
+  79: 
+  80: 
+  81: def test_classify_intent_tool_via_mcp():
+  82:     # 洹쒖튃 湲곕컲 ??紐⑤뜽 濡쒕뱶 遺덊븘????寃곗젙濡?    _blocks, structured = _run(mcp.call_tool("classify_intent", {"text": "?섎텋?섍퀬 ?띠뼱??}))
+  83:     assert "intent" in structured
+  84: 
+  85: 
+  86: def test_runtime_config_resource():
+  87:     content = _run(mcp.read_resource("config://runtime"))
+  88:     items = list(content)
+  89:     payload = json.loads(items[0].content)
+  90:     assert payload["llm_provider"] in {"local", "openai", "gemini"}
+  91:     serialized = json.dumps(payload)
+  92:     # ?ㅼ젣 鍮꾨? 媛믪씠 ?덉? ?딆븘???쒕떎: conftest媛 ?ㅼ젙??SECRET_KEY ?쇳떚?먯씠 ?놁뼱???쒕떎
+  93:     assert "test-secret-key-do-not-use-in-prod" not in serialized
+  94:     # 鍮꾨? ?깃꺽 ?꾨뱶紐낅룄 ?놁뼱???쒕떎
+  95:     low = serialized.lower()
+  96:     assert "api_key" not in low
+  97:     assert "secret" not in low
+  98: 
+  99: 
+ 100: def test_catalog_resource_lists_products():
+ 101:     content = _run(mcp.read_resource("catalog://products"))
+ 102:     items = list(content)
+ 103:     payload = json.loads(items[0].content)
+ 104:     assert payload["count"] > 0
+ 105:     assert payload["products"][0]["product_code"].startswith("P")
+ 106: 
+ 107: 
+ 108: # --- FastMCP 怨꾩빟(硫뷀??곗씠?? 寃利?---------------------------------------
+ 109: def test_resource_metadata_uri_and_mime():
+ 110:     resources = _run(mcp.list_resources())
+ 111:     by_uri = {str(r.uri): r for r in resources}
+ 112:     assert by_uri["config://runtime"].mimeType == "application/json"
+ 113:     assert by_uri["catalog://products"].mimeType == "application/json"
+ 114: 
+ 115: 
+ 116: def test_prompt_renders_question_and_guidance():
+ 117:     res = _run(mcp.get_prompt("grounded_rag_prompt", {"question": "援먰솚?뺤콉 ?뚮젮以?}))
+ 118:     assert res.messages
+ 119:     text = res.messages[0].content.text
+ 120:     assert "援먰솚?뺤콉" in text  # ?몄옄媛 ?ㅼ젣濡??뚮뜑留곷맖
+ 121:     assert "vector_search" in text  # 寃??癒쇱? 吏移??ы븿
+ 122: 
+ 123: 
+ 124: # --- 臾댄뤃諛?怨꾩빟: ?ㅼ젣 ?꾧뎄 ?ㅻ쪟???쇳궎吏 留먭퀬 ?꾪뙆 + ?몄뀡? ?ロ엺??---------
+ 125: def test_db_error_propagates_and_session_closed(monkeypatch):
+ 126:     """DB ?ㅽ뙣 ???꾧뎄媛 ?ㅻ쪟瑜??꾪뙆?섍퀬(?대갚 湲덉?), with_db媛 ?몄뀡???ル뒗吏 ?뺤씤."""
+ 127: 
+ 128:     class _FakeSession:
+ 129:         def __init__(self):
+ 130:             self.closed = False
+ 131: 
+ 132:         def query(self, *a, **k):
+ 133:             raise RuntimeError("DB DOWN")
+ 134: 
+ 135:         def close(self):
+ 136:             self.closed = True
+ 137: 
+ 138:     created: list[_FakeSession] = []
+ 139: 
+ 140:     def _factory():
+ 141:         s = _FakeSession()
+ 142:         created.append(s)
+ 143:         return s
+ 144: 
+ 145:     monkeypatch.setattr(mcp_server, "SessionLocal", _factory)
+ 146:     # get_price??with_db ??SessionLocal() ??query()?먯꽌 ?덉쇅 ???꾪뙆?쇱빞 ?쒕떎
+ 147:     with pytest.raises(Exception, match="DB DOWN"):
+ 148:         _run(mcp.call_tool("get_price", {"product_code": "P0001"}))
+ 149:     # finally 釉붾줉???몄뀡???レ븯?붽?
+ 150:     assert created and created[0].closed is True
+ 151: 
+ 152: 
+ 153: def test_get_exchange_rate_never_opens_session(monkeypatch):
+ 154:     """get_exchange_rate???몄뀡??留뚮뱾吏 ?딅뒗????SessionLocal ?몄텧 ???ㅽ뙣?쒖폒 利앸챸."""
+ 155: 
+ 156:     def _boom():
+ 157:         raise AssertionError("get_exchange_rate媛 ?몄뀡??留뚮뱾硫????쒕떎")
+ 158: 
+ 159:     monkeypatch.setattr(mcp_server, "SessionLocal", _boom)
+ 160:     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
+ 161:     assert structured["ok"] is True
+ 162:     assert structured["rate"] > 0
+ 163: 
+ 164: 
+ 165: # --- ?뉗? ?섑븨 怨꾩빟: ?몄옄 ?꾨떖 + top_k None ?꾩엫(?섎뱶肄붾뵫 3 ?놁쓬) --------------
+ 166: def test_vector_search_passes_args_through(monkeypatch):
+ 167:     captured: dict = {}
+ 168: 
+ 169:     def _fake_search(query, k=None, source=None):
+ 170:         captured.update(query=query, k=k, source=source)
+ 171:         return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
+ 172: 
+ 173:     monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+ 174:     _b, s = _run(
+ 175:         mcp.call_tool("vector_search", {"query": "?섎텋洹쒖젙", "top_k": 5, "source": "policy"})
+ 176:     )
+ 177:     assert captured == {"query": "?섎텋洹쒖젙", "k": 5, "source": "policy"}
+ 178:     assert s["ok"] is True and s["count"] == 1
+ 179: 
+ 180: 
+ 181: def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
+ 182:     captured: dict = {}
+ 183: 
+ 184:     def _fake_search(query, k=None, source=None):
+ 185:         captured["k"] = k
+ 186:         return []
+ 187: 
+ 188:     monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+ 189:     _run(mcp.call_tool("vector_search", {"query": "q"}))
+ 190:     # top_k 誘몄?????None??洹몃?濡??꾩엫(service媛 RAG_TOP_K濡?寃곗젙). 3???ы븯?쒖퐫?⑺븯吏 ?딆쓬.
+ 191:     assert captured["k"] is None
+ 192: 
+ 193: 
+ 194: def test_rag_qa_passes_args_through(monkeypatch):
+ 195:     captured: dict = {}
+ 196: 
+ 197:     def _fake_answer(question, k=None):
+ 198:         captured.update(question=question, k=k)
+ 199:         return {"answer": "a", "sources": []}
+ 200: 
+ 201:     monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+ 202:     _b, s = _run(mcp.call_tool("rag_qa", {"question": "援먰솚?", "top_k": 2}))
+ 203:     assert captured == {"question": "援먰솚?", "k": 2}
+ 204:     assert s["answer"] == "a"
+ 205: 
+ 206: 
+ 207: def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
+ 208:     captured: dict = {}
+ 209: 
+ 210:     def _fake_answer(question, k=None):
+ 211:         captured["k"] = k
+ 212:         return {"answer": "a", "sources": []}
+ 213: 
+ 214:     monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+ 215:     _run(mcp.call_tool("rag_qa", {"question": "援먰솚?"}))
+ 216:     # top_k 誘몄?????None ?꾩엫(qa.answer媛 RAG_TOP_K濡?寃곗젙). 3 ?ы븯?쒖퐫???꾨떂.
+ 217:     assert captured["k"] is None
+ 218: 
+ 219: 
+ 220: def test_recommend_top_k_none_uses_function_default(monkeypatch):
+ 221:     captured: dict = {}
+ 222: 
+ 223:     def _fake_reco(db, query, top_k=3):
+ 224:         captured.update(query=query, top_k=top_k)
+ 225:         return {"ok": True, "items": []}
+ 226: 
+ 227:     monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+ 228:     _run(mcp.call_tool("recommend_products", {"query": "?붿툩"}))
+ 229:     # None?대㈃ recommend_products???먯껜 湲곕낯媛?3) ?ъ슜 ??MCP媛 top_k瑜????섍?
+ 230:     assert captured["top_k"] == 3
+ 231: 
+ 232: 
+ 233: def test_recommend_top_k_passed_through(monkeypatch):
+ 234:     captured: dict = {}
+ 235: 
+ 236:     def _fake_reco(db, query, top_k=3):
+ 237:         captured["top_k"] = top_k
+ 238:         return {"ok": True, "items": []}
+ 239: 
+ 240:     monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+ 241:     _run(mcp.call_tool("recommend_products", {"query": "?붿툩", "top_k": 7}))
+ 242:     assert captured["top_k"] == 7
+ 243: 
+ 244: 
+ 245: def _marker(code: str, msg: str, tool: str = "x") -> str:
+ 246:     """?쒕쾭媛 ?ㅼ젣濡??앹꽦?섎뒗 ?뺥깭???좊ː 媛?ν븳 ?ㅻ쪟 臾몄옄???뺥솗??nonce ?ы븿)."""
+ 247:     return f"Error executing tool {tool}: [APPERR:{_APPERR_NONCE}:{code}] {msg}"
+ 248: 
+ 249: 
+ 250: # --- ?ㅻ쪟 taxonomy 蹂듭썝 + 二쇱엯 諛⑹? (_tool_error ?⑥쐞) ----------------------
+ 251: def test_tool_error_restores_apperr_code():
+ 252:     # ?쒕쾭媛 (?뺥솗??nonce濡? ?ㅼ? 留덉빱 ???먮옒 ???蹂듭썝
+ 253:     assert isinstance(_tool_error("rag_qa", _marker("validation_error", "鍮?吏덈Ц", "rag_qa")), ValidationErr)
+ 254:     assert isinstance(_tool_error("x", _marker("config_error", "?뺤콉 遺덉씪移?)), ConfigError)
+ 255:     # 誘몃벑濡?code???덉쟾?섍쾶 InfraError
+ 256:     assert isinstance(_tool_error("x", _marker("weird_code", "?")), InfraError)
+ 257: 
+ 258: 
+ 259: def test_tool_error_framework_errors():
+ 260:     # 議댁옱?섏? ?딅뒗 ?꾧뎄쨌pydantic ?몄옄 寃利???ValidationErr(422)
+ 261:     assert isinstance(_tool_error("t", "Unknown tool: t"), ValidationErr)
+ 262:     assert isinstance(
+ 263:         _tool_error("get_price", "Error executing tool get_price: 1 validation error ... Field required"),
+ 264:         ValidationErr,
+ 265:     )
+ 266:     # 洹?諛뽰쓽 ?ㅽ뻾 ?ㅽ뙣 ??InfraError(503)
+ 267:     assert isinstance(_tool_error("x", "Error executing tool x: some sqlalchemy error"), InfraError)
+ 268: 
+ 269: 
+ 270: def test_tool_error_marker_injection_is_ignored():
+ 271:     # ?몄텧?먭? ?꾧뎄紐??몄옄??留덉빱瑜??ъ뼱??taxonomy瑜?議곗옉?????녿떎(nonce ?놁쓬 ??遺덉떊).
+ 272:     # 1) unknown-tool ?대쫫??留덉빱 二쇱엯 ??unknown-tool 寃쎈줈濡?ValidationErr(ConfigError ?꾨떂)
+ 273:     assert isinstance(
+ 274:         _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected"), ValidationErr
+ 275:     )
+ 276:     # 2) ?꾧뎄 ?ㅽ뻾 ?꾩튂??nonce ?녿뒗 ?꾩“ 留덉빱 ???좊ː ??????InfraError(ConfigError 議곗옉 ?ㅽ뙣)
+ 277:     assert isinstance(
+ 278:         _tool_error("x", "Error executing tool x: [APPERR:config_error] injected"), InfraError
+ 279:     )
+ 280:     # 3) ?由?nonce??遺덉떊
+ 281:     assert isinstance(
+ 282:         _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected"),
+ 283:         InfraError,
+ 284:     )
+
+codex
+현재 nonce 마커 자체는 정확 nonce와 오류 프레임 선두를 함께 요구합니다. 다만 B의 “비-AppError→503”가 마커 외 휴리스틱에서도 깨질 수 있는지, 그리고 실제 stdio 왕복에서 nonce 미노출·복원이 성립하는지를 추가 확인 중입니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'rg -n "raise (RuntimeError|ValueError|Exception|ValidationErr|ConfigError|InfraError|LLMOutputError)|except .*Error|validation error|field required" app/tools app/rag app/ml app/core app/mcp; pytest -q tests/test_mcp.py tests/test_mcp_stdio.py -m "not llm and not ml"' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+2026-07-19T03:20:27.013563Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.5 seconds
+Output:
+app/core\llm_clients.py:28:            raise ConfigError("LOCAL_BASE_URL이 비어 있습니다. 로컬 Gemma 서버 주소를 설정하세요.")
+app/core\llm_clients.py:30:            raise ConfigError("LOCAL_MODEL이 비어 있습니다.")
+app/core\llm_clients.py:35:            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다. .env에 키를 넣으세요.")
+app/core\llm_clients.py:39:        raise ConfigError("gemini 프로바이더는 Phase 3.5(LangChain)에서 지원 예정입니다.")
+app/core\llm_clients.py:41:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/core\llm_clients.py:55:            raise ConfigError(f"{name}이(가) 비어 있습니다.")
+app/core\llm_clients.py:69:            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다.")
+app/core\llm_clients.py:78:            raise ConfigError("GOOGLE_API_KEY가 설정되지 않았습니다.")
+app/core\llm_clients.py:87:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/core\llm_clients.py:100:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/rag\summarize.py:32:    except APIConnectionError as exc:
+app/rag\summarize.py:33:        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+app/ml\sentiment.py:27:        raise ConfigError("SENTIMENT_MODEL이 비어 있습니다.")
+app/ml\sentiment.py:31:        raise ConfigError(f"감성 모델 로드 실패: {exc}") from exc
+app/ml\sentiment.py:35:        raise ConfigError(f"예상치 못한 감성 라벨: {labels}")
+app/ml\sentiment.py:51:        except (ValueError, KeyError, IndexError) as exc:
+app/ml\sentiment.py:52:            raise ConfigError(f"감성 라벨 인덱스를 해석할 수 없습니다: {raw_label}") from exc
+app/ml\sentiment.py:54:            raise ConfigError(f"예상치 못한 감성 라벨: {resolved}")
+app/ml\sentiment.py:56:    raise ConfigError(f"알 수 없는 감성 라벨: {raw_label}")
+app/ml\sentiment.py:61:        raise ValidationErr("감성을 분석할 텍스트가 비어 있습니다.")
+app/rag\service.py:33:        raise InfraError(
+app/rag\service.py:71:        raise InfraError("texts와 sources 길이가 다릅니다.")
+app/mcp\server.py:83:    except AppError as exc:
+app/mcp\server.py:93:    except AppError as exc:
+app/mcp\client.py:88:        or "validation error" in low  # pydantic 인자 검증 실패(필수 누락·범위 밖 등)
+app/mcp\client.py:89:        or "field required" in low
+app/ml\recommend.py:21:        raise ValidationErr("추천 질의가 비어 있습니다.")
+app/ml\recommend.py:23:        raise ValidationErr("top_k는 1 이상이어야 합니다.")
+app/ml\recommend.py:35:        raise ConfigError("상품 임베딩 개수가 상품 수와 일치하지 않습니다.")
+app/rag\qa.py:42:    except (APIConnectionError, APITimeoutError) as exc:
+app/rag\qa.py:43:        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+app/rag\qa.py:44:    except APIError as exc:  # HTTP 4xx/5xx, rate limit 등
+app/rag\qa.py:45:        raise InfraError(f"LLM 호출 오류: {exc}") from exc
+app/rag\qa.py:49:        raise LLMOutputError("LLM이 빈 응답을 반환했습니다.")
+app/rag\qa.py:86:        raise ValidationErr("질문이 비어 있습니다.")
+app/ml\intent.py:26:        raise ValidationErr("의도를 분류할 텍스트가 비어 있습니다.")
+app/rag\build_index.py:27:        raise InfraError(f"문서 폴더가 없습니다: {docs_dir}")
+app/rag\build_index.py:41:            raise InfraError(f"PDF 로딩 실패: {path.name} ({exc})") from exc
+app/rag\build_index.py:53:        raise InfraError(f"인덱싱할 문서(txt/pdf)가 없습니다: {docs_dir}")
+app/core\config.py:83:            raise ConfigError("SECRET_KEY가 설정되지 않았습니다. .env에 SECRET_KEY를 넣으세요.")
+app/rag\embeddings.py:24:            raise ConfigError("ST_EMBEDDING_MODEL이 비어 있습니다.")
+app/rag\embeddings.py:29:    raise ConfigError(f"지원하지 않는 EMBEDDING_PROVIDER: {settings.EMBEDDING_PROVIDER}")
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+ exited 1 in 2500ms:
+app/core\llm_clients.py:28:            raise ConfigError("LOCAL_BASE_URL이 비어 있습니다. 로컬 Gemma 서버 주소를 설정하세요.")
+app/core\llm_clients.py:30:            raise ConfigError("LOCAL_MODEL이 비어 있습니다.")
+app/core\llm_clients.py:35:            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다. .env에 키를 넣으세요.")
+app/core\llm_clients.py:39:        raise ConfigError("gemini 프로바이더는 Phase 3.5(LangChain)에서 지원 예정입니다.")
+app/core\llm_clients.py:41:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/core\llm_clients.py:55:            raise ConfigError(f"{name}이(가) 비어 있습니다.")
+app/core\llm_clients.py:69:            raise ConfigError("OPENAI_API_KEY가 설정되지 않았습니다.")
+app/core\llm_clients.py:78:            raise ConfigError("GOOGLE_API_KEY가 설정되지 않았습니다.")
+app/core\llm_clients.py:87:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/core\llm_clients.py:100:    raise ConfigError(f"알 수 없는 LLM_PROVIDER: {provider}")
+app/rag\summarize.py:32:    except APIConnectionError as exc:
+app/rag\summarize.py:33:        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+app/ml\sentiment.py:27:        raise ConfigError("SENTIMENT_MODEL이 비어 있습니다.")
+app/ml\sentiment.py:31:        raise ConfigError(f"감성 모델 로드 실패: {exc}") from exc
+app/ml\sentiment.py:35:        raise ConfigError(f"예상치 못한 감성 라벨: {labels}")
+app/ml\sentiment.py:51:        except (ValueError, KeyError, IndexError) as exc:
+app/ml\sentiment.py:52:            raise ConfigError(f"감성 라벨 인덱스를 해석할 수 없습니다: {raw_label}") from exc
+app/ml\sentiment.py:54:            raise ConfigError(f"예상치 못한 감성 라벨: {resolved}")
+app/ml\sentiment.py:56:    raise ConfigError(f"알 수 없는 감성 라벨: {raw_label}")
+app/ml\sentiment.py:61:        raise ValidationErr("감성을 분석할 텍스트가 비어 있습니다.")
+app/rag\service.py:33:        raise InfraError(
+app/rag\service.py:71:        raise InfraError("texts와 sources 길이가 다릅니다.")
+app/mcp\server.py:83:    except AppError as exc:
+app/mcp\server.py:93:    except AppError as exc:
+app/mcp\client.py:88:        or "validation error" in low  # pydantic 인자 검증 실패(필수 누락·범위 밖 등)
+app/mcp\client.py:89:        or "field required" in low
+app/ml\recommend.py:21:        raise ValidationErr("추천 질의가 비어 있습니다.")
+app/ml\recommend.py:23:        raise ValidationErr("top_k는 1 이상이어야 합니다.")
+app/ml\recommend.py:35:        raise ConfigError("상품 임베딩 개수가 상품 수와 일치하지 않습니다.")
+app/rag\qa.py:42:    except (APIConnectionError, APITimeoutError) as exc:
+app/rag\qa.py:43:        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+app/rag\qa.py:44:    except APIError as exc:  # HTTP 4xx/5xx, rate limit 등
+app/rag\qa.py:45:        raise InfraError(f"LLM 호출 오류: {exc}") from exc
+app/rag\qa.py:49:        raise LLMOutputError("LLM이 빈 응답을 반환했습니다.")
+app/rag\qa.py:86:        raise ValidationErr("질문이 비어 있습니다.")
+app/ml\intent.py:26:        raise ValidationErr("의도를 분류할 텍스트가 비어 있습니다.")
+app/rag\build_index.py:27:        raise InfraError(f"문서 폴더가 없습니다: {docs_dir}")
+app/rag\build_index.py:41:            raise InfraError(f"PDF 로딩 실패: {path.name} ({exc})") from exc
+app/rag\build_index.py:53:        raise InfraError(f"인덱싱할 문서(txt/pdf)가 없습니다: {docs_dir}")
+app/core\config.py:83:            raise ConfigError("SECRET_KEY가 설정되지 않았습니다. .env에 SECRET_KEY를 넣으세요.")
+app/rag\embeddings.py:24:            raise ConfigError("ST_EMBEDDING_MODEL이 비어 있습니다.")
+app/rag\embeddings.py:29:    raise ConfigError(f"지원하지 않는 EMBEDDING_PROVIDER: {settings.EMBEDDING_PROVIDER}")
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$env:PYTHONDONTWRITEBYTECODE='"'1'; pytest -q -s tests/test_mcp.py tests/test_mcp_stdio.py -m \"not llm and not ml\"" in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+2026-07-19T03:21:01.264959Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 2.5 seconds
+Output:
+ImportError while loading conftest 'C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project\tests\conftest.py'.
+tests\conftest.py:14: in <module>
+    _TMP_DB = os.path.join(tempfile.gettempdir(), f"mall_test_{uuid.uuid4().hex}.db")
+..\..\..\anaconda3\Lib\tempfile.py:315: in gettempdir
+    return _os.fsdecode(_gettempdir())
+..\..\..\anaconda3\Lib\tempfile.py:308: in _gettempdir
+    tempdir = _get_default_tempdir()
+..\..\..\anaconda3\Lib\tempfile.py:223: in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+E   FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+ exited 1 in 2522ms:
+ImportError while loading conftest 'C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project\tests\conftest.py'.
+tests\conftest.py:14: in <module>
+    _TMP_DB = os.path.join(tempfile.gettempdir(), f"mall_test_{uuid.uuid4().hex}.db")
+..\..\..\anaconda3\Lib\tempfile.py:315: in gettempdir
+    return _os.fsdecode(_gettempdir())
+..\..\..\anaconda3\Lib\tempfile.py:308: in _gettempdir
+    tempdir = _get_default_tempdir()
+..\..\..\anaconda3\Lib\tempfile.py:223: in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+E   FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+codex
+- 높음 — nonce가 장기 재사용되고 오류 응답에 평문으로 포함됩니다. [client.py:39](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/client.py:39)의 프로세스 전역 nonce가 모든 서브프로세스에 재사용되며, [server.py:65](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/server.py:65)에서 정확 nonce가 stdout 응답에 실립니다. 따라서 정상 AppError 한 건의 원시 stdio를 관찰하면 nonce를 회수하여 이후 요청에서 재사용할 수 있습니다. “stdout 관찰에도 위조 불가” 요구를 충족하지 못합니다.
+
+- 중간 — 비-AppError→503 계약이 유지되지 않습니다. [client.py:83](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/client.py:83)의 문자열 휴리스틱 때문에 일반 실행 예외 메시지에 `validation error` 또는 `field required`가 포함되면 ValidationErr(422)로 오분류됩니다. 현재 테스트는 SQLAlchemy 예시만 확인하여 이 경계를 검증하지 않습니다.
+
+인수 보류: 관찰 가능한 전역 nonce의 재사용 및 비-AppError 422 오분류 가능성
+tokens used
+41,545
+- 높음 — nonce가 장기 재사용되고 오류 응답에 평문으로 포함됩니다. [client.py:39](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/client.py:39)의 프로세스 전역 nonce가 모든 서브프로세스에 재사용되며, [server.py:65](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/server.py:65)에서 정확 nonce가 stdout 응답에 실립니다. 따라서 정상 AppError 한 건의 원시 stdio를 관찰하면 nonce를 회수하여 이후 요청에서 재사용할 수 있습니다. “stdout 관찰에도 위조 불가” 요구를 충족하지 못합니다.
+
+- 중간 — 비-AppError→503 계약이 유지되지 않습니다. [client.py:83](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/mcp/client.py:83)의 문자열 휴리스틱 때문에 일반 실행 예외 메시지에 `validation error` 또는 `field required`가 포함되면 ValidationErr(422)로 오분류됩니다. 현재 테스트는 SQLAlchemy 예시만 확인하여 이 경계를 검증하지 않습니다.
+
+인수 보류: 관찰 가능한 전역 nonce의 재사용 및 비-AppError 422 오분류 가능성

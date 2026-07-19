@@ -14,8 +14,13 @@ import json
 
 import pytest
 
+from app.core.errors import ConfigError, InfraError, ValidationErr
 from app.mcp import server as mcp_server
+from app.mcp.client import _tool_error
 from app.mcp.server import mcp
+
+# 테스트용 고정 nonce(호출 코드가 발급하는 것과 동일 역할)
+_TEST_NONCE = "test0nonce0abcdef"
 
 
 def _run(coro):
@@ -160,3 +165,150 @@ def test_get_exchange_rate_never_opens_session(monkeypatch):
     _blocks, structured = _run(mcp.call_tool("get_exchange_rate", {"currency": "USD"}))
     assert structured["ok"] is True
     assert structured["rate"] > 0
+
+
+# --- 얇은 래핑 계약: 인자 전달 + top_k None 위임(하드코딩 3 없음) --------------
+def test_vector_search_passes_args_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_search(query, k=None, source=None):
+        captured.update(query=query, k=k, source=source)
+        return [{"text": "x", "source": "policy", "page": None, "distance": 0.1}]
+
+    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+    _b, s = _run(
+        mcp.call_tool("vector_search", {"query": "환불규정", "top_k": 5, "source": "policy"})
+    )
+    assert captured == {"query": "환불규정", "k": 5, "source": "policy"}
+    assert s["ok"] is True and s["count"] == 1
+
+
+def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
+    captured: dict = {}
+
+    def _fake_search(query, k=None, source=None):
+        captured["k"] = k
+        return []
+
+    monkeypatch.setattr(mcp_server.rag_service, "search", _fake_search)
+    _run(mcp.call_tool("vector_search", {"query": "q"}))
+    # top_k 미지정 → None을 그대로 위임(service가 RAG_TOP_K로 결정). 3을 재하드코딩하지 않음.
+    assert captured["k"] is None
+
+
+def test_rag_qa_passes_args_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_answer(question, k=None):
+        captured.update(question=question, k=k)
+        return {"answer": "a", "sources": []}
+
+    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+    _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
+    assert captured == {"question": "교환?", "k": 2}
+    assert s["answer"] == "a"
+
+
+def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
+    captured: dict = {}
+
+    def _fake_answer(question, k=None):
+        captured["k"] = k
+        return {"answer": "a", "sources": []}
+
+    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+    _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
+    # top_k 미지정 → None 위임(qa.answer가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
+    assert captured["k"] is None
+
+
+def test_recommend_top_k_none_uses_function_default(monkeypatch):
+    captured: dict = {}
+
+    def _fake_reco(db, query, top_k=3):
+        captured.update(query=query, top_k=top_k)
+        return {"ok": True, "items": []}
+
+    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+    _run(mcp.call_tool("recommend_products", {"query": "셔츠"}))
+    # None이면 recommend_products의 자체 기본값(3) 사용 — MCP가 top_k를 안 넘김
+    assert captured["top_k"] == 3
+
+
+def test_recommend_top_k_passed_through(monkeypatch):
+    captured: dict = {}
+
+    def _fake_reco(db, query, top_k=3):
+        captured["top_k"] = top_k
+        return {"ok": True, "items": []}
+
+    monkeypatch.setattr(mcp_server.ml_recommend, "recommend_products", _fake_reco)
+    _run(mcp.call_tool("recommend_products", {"query": "셔츠", "top_k": 7}))
+    assert captured["top_k"] == 7
+
+
+def _marker(code: str, msg: str, tool: str = "x", nonce: str = _TEST_NONCE) -> str:
+    """서버가 실제로 생성하는 형태의 신뢰 가능한 오류 문자열(정확한 nonce 포함)."""
+    return f"Error executing tool {tool}: [APPERR:{nonce}:{code}] {msg}"
+
+
+# --- 오류 taxonomy 복원 + 주입 방지 (_tool_error 단위) ----------------------
+def test_tool_error_restores_apperr_code():
+    # 서버가 (이번 호출의 정확한 nonce로) 실은 마커 → 원래 타입 복원
+    assert isinstance(
+        _tool_error("rag_qa", _marker("validation_error", "빈 질문", "rag_qa"), _TEST_NONCE),
+        ValidationErr,
+    )
+    assert isinstance(_tool_error("x", _marker("config_error", "정책 불일치"), _TEST_NONCE), ConfigError)
+    # 미등록 code는 안전하게 InfraError
+    assert isinstance(_tool_error("x", _marker("weird_code", "?"), _TEST_NONCE), InfraError)
+
+
+def test_tool_error_framework_errors():
+    # 존재하지 않는 도구 → ValidationErr(422)
+    assert isinstance(_tool_error("t", "Unknown tool: t", _TEST_NONCE), ValidationErr)
+    # pydantic 인자 검증 고유 시그니처(N validation error for <Tool>Arguments) → ValidationErr(422)
+    assert isinstance(
+        _tool_error(
+            "get_price",
+            "Error executing tool get_price: 1 validation error for get_priceArguments\nproduct_code\n  Field required",
+            _TEST_NONCE,
+        ),
+        ValidationErr,
+    )
+    # 그 밖의 실행 실패 → InfraError(503)
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: some sqlalchemy error", _TEST_NONCE), InfraError
+    )
+
+
+def test_tool_error_heuristic_is_precise():
+    # 비-AppError 메시지에 'validation error'/'field required'가 우연히 섞여도, Arguments
+    # 시그니처가 아니면 422로 오분류하지 않는다(503 유지).
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: upstream validation error from vendor", _TEST_NONCE),
+        InfraError,
+    )
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: field required by remote api", _TEST_NONCE),
+        InfraError,
+    )
+
+
+def test_tool_error_marker_injection_is_ignored():
+    # 호출자가 도구명/인자에 마커를 심어도 taxonomy를 조작할 수 없다.
+    # 1) unknown-tool 이름에 마커 주입 → unknown-tool 경로로 ValidationErr(ConfigError 아님)
+    assert isinstance(
+        _tool_error("t", "Unknown tool: nonexistent_[APPERR:config_error] injected", _TEST_NONCE),
+        ValidationErr,
+    )
+    # 2) 도구 실행 위치에 nonce 없는 위조 마커 → 신뢰 안 함 → InfraError
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: [APPERR:config_error] injected", _TEST_NONCE),
+        InfraError,
+    )
+    # 3) 틀린 nonce도 불신(지난 호출 nonce 재사용 포함)
+    assert isinstance(
+        _tool_error("x", "Error executing tool x: [APPERR:deadbeef:config_error] injected", _TEST_NONCE),
+        InfraError,
+    )

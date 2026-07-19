@@ -107,3 +107,36 @@ def test_llm_failure_propagates():
 
     with pytest.raises(InfraError):
         run_ticket("배송 문의", chat_complete=_boom)
+
+
+# --- HTTP 계약 (/api/workflow/ticket) ---------------------------------------
+def test_http_ticket_success(client, monkeypatch):
+    # 분류 LLM을 고정해 결정론적으로 HTTP 성공 경로 검증
+    from app.prompts import classifier
+
+    monkeypatch.setattr(classifier, "_default_chat_complete", lambda _p: "배송")
+    r = client.post("/api/workflow/ticket", json={"content": "언제 배송되나요?"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["category"] == "배송"
+    assert body["priority"] == "일반"
+    assert body["team"] == "물류팀"
+    assert body["action"] == "assign"
+
+
+def test_http_ticket_blank_content_returns_422(client):
+    # 빈/공백 입력 → 폴백 없이 422 (pydantic min_length / classify_one ValidationErr)
+    assert client.post("/api/workflow/ticket", json={"content": ""}).status_code == 422
+    assert client.post("/api/workflow/ticket", json={"content": "   "}).status_code == 422
+
+
+def test_http_ticket_llm_failure_maps_503(client, monkeypatch):
+    from app.prompts import classifier
+
+    def _boom(_p: str) -> str:
+        raise InfraError("LLM 서버에 연결할 수 없습니다.")
+
+    monkeypatch.setattr(classifier, "_default_chat_complete", _boom)
+    r = client.post("/api/workflow/ticket", json={"content": "배송 문의"})
+    assert r.status_code == 503
+    assert r.json()["error_code"] == "infra_error"

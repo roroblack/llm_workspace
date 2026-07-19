@@ -1,8 +1,8 @@
 """FastAPI 진입점.
 
-Phase 1: 예외 핸들러 + health.
-Phase 2: DB 테이블 생성 + 시딩 + auth/products/orders/payments 라우터.
-정적 UI/에이전트 라우터는 이후 Phase에서 붙인다.
+앱 조립: 예외 핸들러 + 전 라우터(health/auth/products/orders/payments/agent/rag/nlp/
+lab/mcp/workflow) + 정적 UI. lifespan에서 DB 테이블 생성·시딩과 RAG 인덱스 빌드(멱등)를 수행.
+Phase 0~10 통합(커머스·에이전트·RAG·ML·MCP·LangGraph).
 """
 
 from __future__ import annotations
@@ -43,10 +43,7 @@ async def lifespan(_app: FastAPI):
         seed_products(db)
     finally:
         db.close()
-    # RAG 인덱스가 없으면 1회 빌드 (있으면 그대로 사용 — 인덱싱/서비스 분리)
-    from app.core.config import get_settings
-
-    # RAG 인덱스가 없거나 임베딩 모델이 바뀌었으면 재빌드 (stale 인덱스 방지)
+    # RAG 인덱스가 없거나 임베딩 모델이 바뀌었으면 재빌드 (stale 인덱스 방지 — 인덱싱/서비스 분리)
     from app.rag.build_index import build_index, index_is_current
 
     if not index_is_current():
@@ -57,7 +54,7 @@ async def lifespan(_app: FastAPI):
 def create_app() -> FastAPI:
     app = FastAPI(
         title="승승장구몰 AI 커머스 에이전트",
-        version="0.2.0",
+        version="0.3.0",
         lifespan=lifespan,
     )
     register_exception_handlers(app)

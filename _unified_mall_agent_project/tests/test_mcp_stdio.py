@@ -14,7 +14,7 @@ import asyncio
 
 import pytest
 
-from app.core.errors import InfraError
+from app.core.errors import ValidationErr
 from app.mcp import client as mcp_client
 from tests.test_mcp import EXPECTED_TOOLS  # 도구 이름 집합 단일 출처(중복 방지)
 
@@ -54,13 +54,26 @@ def test_stdio_business_failure_is_not_error():
     assert result["structured"]["error_code"] == "product_not_found"
 
 
-def test_stdio_unknown_tool_raises_infra_error():
-    # 알 수 없는 도구(프로토콜 오류) → 200 성공으로 감추지 않고 InfraError로 전파(폴백 금지)
-    with pytest.raises(InfraError):
+def test_stdio_unknown_tool_raises_validation_error():
+    # 알 수 없는 도구 = 사용자 입력 오류 → 200 성공으로 감추지 않고 ValidationErr(422)로 전파
+    with pytest.raises(ValidationErr):
         _run(mcp_client.call_tool("nonexistent_tool", {}))
 
 
-def test_stdio_missing_required_arg_raises_infra_error():
-    # 필수 인자 누락(인자 검증 실패) → InfraError로 전파
-    with pytest.raises(InfraError):
+def test_stdio_missing_required_arg_raises_validation_error():
+    # 필수 인자 누락 = 인자 검증 실패 → ValidationErr(422)
+    with pytest.raises(ValidationErr):
         _run(mcp_client.call_tool("get_price", {}))
+
+
+def test_stdio_top_k_out_of_range_raises_validation_error():
+    # top_k 범위 밖(0) → 스키마 검증 실패 → ValidationErr(422). 조용히 기본값 폴백 아님.
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("vector_search", {"query": "환불", "top_k": 0}))
+
+
+def test_stdio_tool_internal_validation_error_maps_422():
+    # 도구 내부에서 낸 ValidationErr(빈 질문)이 프로토콜 경계를 넘어도 503이 아닌
+    # 422로 복원돼야 한다(서버가 error_code를 실어 보내고 클라이언트가 복원).
+    with pytest.raises(ValidationErr):
+        _run(mcp_client.call_tool("rag_qa", {"question": "   "}))

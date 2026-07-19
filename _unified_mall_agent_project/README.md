@@ -60,14 +60,18 @@ uvicorn app.main:app --reload
 ## 테스트
 
 ```bash
-pytest -m "not llm and not ml"   # CI 기본(빠름, 모델 로드 없음)
-pytest -m "not llm"              # 로컬 완료검증(실 임베딩/KoELECTRA 포함)
-pytest -m "llm"                  # 로컬 Gemma/실키 서버 기동 시 라이브
+pytest -m "not llm and not ml and not mcp"   # CI 기본(빠름, 모델·서브프로세스 없음)
+pytest -m "mcp"                              # MCP stdio 왕복(서브프로세스 기동)
+pytest -m "not llm"                          # 로컬 완료검증(실 임베딩/KoELECTRA 포함)
+pytest -m "llm"                              # 로컬 Gemma/실키 서버 기동 시 라이브
 ```
 
-## 주요 엔드포인트
-- `POST /api/agent/chat` (수동 ReAct) / `/api/agent/lc-chat` (LangChain)
-- `POST /auth/signup` `/auth/login`, `/api/products`, `/api/orders`, `/api/payments`
+## 주요 엔드포인트 (메서드 표기)
+- `POST /api/agent/chat` (수동 ReAct) / `POST /api/agent/lc-chat` (LangChain)
+- `POST /auth/signup` `POST /auth/login`
+- `GET /api/products` `GET /api/products/{product_code}`
+- `POST /api/orders` (주문 생성) / `GET /api/orders` `GET /api/orders/{order_no}` (조회)
+- `POST /api/payments` (결제) / `GET /api/payments/{order_no}` (조회)
 - `POST /api/rag/search` `/api/rag/summarize` `/api/rag/qa`(근거 기반 답변+출처 인용, TXT/PDF)
 - `POST /api/nlp/intent` `/sentiment` `/recommend`
 - `POST /api/lab/{basic,role,diversity,token-compare,estimate-cost,usecase}`
