@@ -5,7 +5,8 @@ from __future__ import annotations
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
-from app.rag.qa import answer as rag_answer
+from app.application.answer_question import AnswerResult
+from app.composition import build_answer_question
 from app.rag.service import search
 from app.rag.summarize import summarize_text
 
@@ -32,10 +33,25 @@ def rag_search(body: SearchRequest) -> dict:
     return {"results": search(body.query, k=body.top_k, source=body.source)}
 
 
+def _page(locator: str | None) -> int | None:
+    """Citation.locator(문자열) → 레거시 HTTP 응답의 page(int|None) 형태 유지."""
+    return int(locator) if locator and locator.isdigit() else None
+
+
+def _to_response(result: AnswerResult) -> dict:
+    return {
+        "answer": result.answer,
+        "sources": [
+            {"source": c.source, "page": _page(c.locator)} for c in result.sources
+        ],
+    }
+
+
 @router.post("/qa")
 def rag_qa(body: QARequest) -> dict:
-    """질문 → 근거 기반 답변 + 출처 인용 (환각 억제)."""
-    return rag_answer(body.question, k=body.top_k)
+    """질문 → 근거 기반 답변 + 출처 인용 (환각 억제). AnswerQuestion 유스케이스 경유."""
+    use_case = build_answer_question(top_k=body.top_k)
+    return _to_response(use_case(body.question))
 
 
 @router.post("/summarize")

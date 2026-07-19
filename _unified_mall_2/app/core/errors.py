@@ -1,14 +1,17 @@
-"""예외 taxonomy 및 FastAPI 예외 핸들러.
+"""예외 taxonomy 및 FastAPI 예외 핸들러 등록.
 
 RULE.md 3.2(폴백 금지)와 통합 계획서 §6을 구현한다. 오류를 삼켜 그럴듯한 가짜
 결과로 대체하지 않고, 정의된 HTTP 상태 + 구조화된 본문 {ok, error_code, message}로
 명확히 실패시킨다.
+
+이 모듈은 **모듈 레벨에서 프레임워크를 import하지 않는다**(Application 계층이 예외
+타입만 안전히 import할 수 있게 — Clean Architecture 경계). FastAPI 의존은
+register_exception_handlers 내부에서 지연 import한다.
 """
 
 from __future__ import annotations
 
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
+from typing import Any
 
 
 class AppError(Exception):
@@ -71,8 +74,13 @@ class NotFoundErr(AppError):
     error_code = "not_found"
 
 
-def register_exception_handlers(app: FastAPI) -> None:
-    """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다."""
+def register_exception_handlers(app: Any) -> None:
+    """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다.
+
+    FastAPI는 Interface 계층 관심사이므로 여기서 지연 import한다(모듈 레벨 순수 유지).
+    """
+    from fastapi import Request
+    from fastapi.responses import JSONResponse
 
     @app.exception_handler(AppError)
     async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:

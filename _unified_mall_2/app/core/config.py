@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     # --- LLM 프로바이더 선택 ---
     LLM_PROVIDER: Literal["local", "openai", "gemini"] = "local"
 
+    # --- 모델 레지스트리(Phase 1) ---
+    # 활성 모델 '프로필 선택자'(모델 ID 자체가 아니라 model_registry.yaml의 profile_id).
+    # 실제 모델 ID·revision·checksum은 model_registry.yaml에서 해석한다(RULE 3.1: 소스 모델ID 금지).
+    ACTIVE_MODEL_PROFILE: str = "local_gemma4_e4b"
+
     # --- 로컬(Gemma GGUF, OpenAI 호환 서버) ---
     LOCAL_BASE_URL: str = "http://127.0.0.1:8000/v1"
     LOCAL_MODEL: str = "gemma-4-e4b"
