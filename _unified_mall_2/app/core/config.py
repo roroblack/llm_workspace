@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     GOOGLE_API_KEY: str | None = None
     GEMINI_MODEL: str = "gemini-2.5-flash"
 
+    # --- pgvector (Phase 3, 학습 트랙) ---
+    # 접속 정보(모델ID 아님) — userspace PG(conda pgv env). 미기동이면 접속 실패→명시 오류(무폴백).
+    PGVECTOR_DSN: str = "host=127.0.0.1 port=5433 user=postgres dbname=mall_vec"
+
     # --- RAG / 임베딩 ---
     EMBEDDING_PROVIDER: Literal["local_st"] = "local_st"
     ST_EMBEDDING_MODEL: str = "jhgan/ko-sroberta-multitask"
