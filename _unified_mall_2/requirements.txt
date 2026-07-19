@@ -1,0 +1,37 @@
+# Phase 1 최소 의존성 (로컬 검증된 버전으로 고정 — RULE 재현성)
+fastapi==0.116.1
+uvicorn[standard]==0.35.0
+pydantic==2.13.4
+pydantic-settings==2.10.1
+openai==2.44.0
+python-dotenv==1.1.1
+pytest==7.4.4
+httpx==0.28.1
+# Phase 2 (DB·인증)
+sqlalchemy==2.0.41
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1
+python-jose[cryptography]==3.5.0
+python-multipart==0.0.20
+# Phase 3.5 (LangChain 자동화 계층)
+langchain==1.3.12
+langchain-core==1.4.9
+langchain-openai==1.3.4
+langchain-google-genai==4.2.7
+langgraph==1.2.8
+# Phase 5 (RAG) — 로컬 임베딩 + FAISS
+sentence-transformers==5.6.0
+faiss-cpu==1.14.3
+langchain-community==0.4.2
+langchain-huggingface==1.2.2
+langchain-text-splitters==1.1.2
+pypdf==6.14.2
+# reference/ 복습 레퍼런스(Gemini 날것 SDK) — 직접 사용하므로 명시 고정
+google-genai==2.10.0
+# Phase 9 (MCP 서버/클라이언트)
+mcp[cli]==1.28.1
+# Phase 6 (ML: 감성분석 KoELECTRA)
+transformers==5.13.0
+torch==2.12.0
+# Phase 7 (실험실: 토큰 카운트)
+tiktoken==0.13.0
