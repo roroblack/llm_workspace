@@ -27,3 +27,22 @@ def build_graph_answer_question(top_k: int | None = None) -> AnswerQuestion:
 
     fusion = FusionRetriever([PgVectorRetriever(), PgGraphRetriever()])
     return AnswerQuestion(retriever=fusion, model=LlmGateway(), top_k=top_k)
+
+
+def build_hybrid_answer_question(top_k: int | None = None, rerank: bool = False) -> AnswerQuestion:
+    """Hybrid RAG: dense(pgvector) + lexical(pg_trgm)을 RRF로 결합(Phase 4).
+
+    rerank=True면 결합 결과를 LLM-as-reranker로 재정렬(RerankedRetriever). 모두 같은
+    RetrieverPort라 AnswerQuestion을 수정 없이 재사용. 정렬 순서는 그대로 근거로 들어간다.
+    """
+    from app.adapters.hybrid_retriever import HybridRetriever
+    from app.adapters.pg_lexical_retriever import PgLexicalRetriever
+    from app.adapters.pgvector_retriever import PgVectorRetriever
+
+    model = LlmGateway()
+    retriever = HybridRetriever([PgVectorRetriever(), PgLexicalRetriever()])
+    if rerank:
+        from app.adapters.reranker import LlmReranker, RerankedRetriever
+
+        retriever = RerankedRetriever(retriever, LlmReranker(model))
+    return AnswerQuestion(retriever=retriever, model=model, top_k=top_k)

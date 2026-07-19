@@ -1,7 +1,8 @@
 """pgvector 스키마·적재 (Phase 3 학습 트랙).
 
-FAISS와 **동일한 청킹·임베딩**(공정 비교)으로 corpus를 pgvector에 적재한다. 임베딩은
-ko-sroberta(768, 정규화). 연결/DB 실패는 삼키지 않고 전파(무폴백).
+FAISS와 **동일한 청킹·임베딩**(공정 비교)으로 corpus를 pgvector에 적재한다. 임베딩
+모델은 app.rag.embeddings(레지스트리 기반)에서 받는다 — 여기서 모델ID를 명명하지 않음.
+차원은 768(정규화). 연결/DB 실패는 삼키지 않고 전파(무폴백).
 
 접속 정보는 config.PGVECTOR_DSN(모델ID 아님). userspace PG 기동은 scripts/pg.py 참조.
 """
@@ -12,7 +13,7 @@ from pathlib import Path
 
 from app.core.config import get_settings
 
-_EMBED_DIM = 768  # ko-sroberta-multitask
+_EMBED_DIM = 768  # 임베딩 차원(모델은 레지스트리 기반 embeddings에서 결정)
 
 
 def get_conn(dsn: str | None = None):
@@ -37,6 +38,7 @@ def ensure_schema(conn) -> None:
     """확장·테이블·인덱스를 생성한다(멱등). HNSW 인덱스로 근사 최근접 검색 학습."""
     with conn.cursor() as cur:
         cur.execute("CREATE EXTENSION IF NOT EXISTS vector")
+        cur.execute("CREATE EXTENSION IF NOT EXISTS pg_trgm")  # Phase 4: 키워드(trigram) 검색
         cur.execute(
             f"""
             CREATE TABLE IF NOT EXISTS rag_chunks (
@@ -52,6 +54,11 @@ def ensure_schema(conn) -> None:
         cur.execute(
             "CREATE INDEX IF NOT EXISTS rag_chunks_embedding_hnsw "
             "ON rag_chunks USING hnsw (embedding vector_l2_ops)"
+        )
+        # GIN trigram 인덱스 — pg_trgm 키워드 검색(word_similarity) 가속.
+        cur.execute(
+            "CREATE INDEX IF NOT EXISTS rag_chunks_content_trgm "
+            "ON rag_chunks USING gin (content gin_trgm_ops)"
         )
     conn.commit()
 

@@ -47,3 +47,13 @@ class ModelGateway(Protocol):
         self, prompt: str, *, max_tokens: int | None = None, temperature: float = 0.0
     ) -> str:
         ...
+
+
+@runtime_checkable
+class RerankerPort(Protocol):
+    """후보 Evidence를 질의 관련도로 재정렬(Phase 4). 구현: LlmReranker, FakeReranker(테스트)."""
+
+    def rerank(
+        self, query: str, evidence: list[Evidence], top_n: int | None = None
+    ) -> list[Evidence]:
+        ...
