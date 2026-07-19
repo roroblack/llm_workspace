@@ -53,16 +53,25 @@ def test_verified_flag():
         assert p.verified == bool(p.artifact_sha256 and p.verified_at)
 
 
-# 알려진 모델 ID 패턴(신 Clean Arch 코드에 소스 하드코딩 금지 — 레지스트리로 해석해야 함)
+# 알려진 모델 ID 패턴. 넓혔지만 **완전 보장은 아니다**(동적 문자열 조합·미등록 모델명은
+# 정적 스캔으로 못 잡음 — 일반적 한계, Codex 지적 반영). 이 테스트는 신 Clean Arch 코드가
+# 모델 ID를 소스에 리터럴로 박지 않았는지 확인하는 **휴리스틱 가드**다.
 _MODEL_ID_PATTERNS = [
     r"gpt-\d", r"gpt-4", r"gpt-5", r"gemini-\d", r"gemma-\d",
-    r"qwen[\d.]", r"claude-", r"\bo1-", r"\bo3-", r"koelectra",
+    r"qwen[\d.]", r"claude-", r"\bo1-", r"\bo3-", r"\bo4-", r"koelectra",
+    r"text-embedding", r"sroberta", r"electra", r"llama-\d", r"mistral",
 ]
-# 신 Clean Arch 계층만 검사(레거시 app/core/config.py 등은 이후 Phase에서 수렴)
+# 신 Clean Arch 계층만 검사(범위 의도적): 레거시 app/core/config.py·rag/qa.py의 모델ID는
+# Phase 8(MCP 수렴)에서 제거. 전 리포지토리 보장이 아니라 '신 코드 무하드코딩'만 강제한다.
 _NEW_CODE_DIRS = [_APP / "application", _APP / "adapters"]
 
 
 def test_llm_reg_002_no_hardcoded_model_ids_in_new_code():
+    """휴리스틱: 신 Clean Arch 코드(application/adapters)에 리터럴 모델ID 0.
+
+    한계(정직): 동적 조합·미등록 패턴·범위 밖 디렉터리는 못 잡는다. 전면 보장은 legacy 수렴
+    (Phase 8) + 이 스캔의 지속 보강으로 달성한다.
+    """
     offenders: list[str] = []
     for root in _NEW_CODE_DIRS:
         for py in root.rglob("*.py"):
