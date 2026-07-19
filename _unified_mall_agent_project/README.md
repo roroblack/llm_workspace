@@ -18,6 +18,7 @@ llm_workspace의 28개 LLM/NLP 실습 프로젝트를 **하나의 실행 가능�
 | `app/ml` | 의도분류, KoELECTRA 감성분석, 임베딩 추천 | coffee/survey, Bert_sentiment, music |
 | `app/lab` | 파라미터 실험, 토큰/비용, 유즈케이스 | llm_parameter, chatgpt, usage |
 | `app/mcp` | MCP(Model Context Protocol) 서버/클라이언트 — 기존 도구·RAG·ML을 MCP 표준으로 노출(도구 10·리소스 2·프롬프트 1, stdio) | _0714_MCP(simple/rag/enterprise) |
+| `app/workflow` | LangGraph StateGraph — CS 티켓 분류→우선순위→조건분기(escalate/assign/manual_review) | _0715_LangGraph(agent_workflow) |
 | `app/static` | 챗 UI(멀티턴 화면 누적, 에이전트 단계 표시) | chatgpt/survey UI |
 
 ## 실행
@@ -71,6 +72,7 @@ pytest -m "llm"                  # 로컬 Gemma/실키 서버 기동 시 라이�
 - `POST /api/nlp/intent` `/sentiment` `/recommend`
 - `POST /api/lab/{basic,role,diversity,token-compare,estimate-cost,usecase}`
 - `POST /api/mcp/tools` `/api/mcp/call` (앱이 MCP 클라이언트로 stdio 서버 호출 시연)
+- `POST /api/workflow/ticket` (LangGraph CS 티켓: 분류→우선순위→escalate/assign/manual_review)
 - `GET /api/health`
 
 ## 레거시 프로젝트

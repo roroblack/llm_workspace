@@ -1,0 +1,618 @@
+2026-07-19T02:25:44.920086Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f7831-9d4e-7da3-b5ac-1bd94b4486cf
+--------
+user
+역할: 시니어 파이썬 리뷰어(2차 확인). Phase 10에서 네가 낸 지적 5건을 반영했다.
+반영이 올바른지, 새 결함이 생기지 않았는지만 본다.
+
+1차 지적 → 반영:
+1)(높음) calculate_priority가 미지 카테고리를 조용히 '일반' → app/workflow/rules.py: category not in CATEGORIES면 ConfigError 발생.
+2)(중간) 팀 매핑 누락 taxonomy → assign_team KeyError→ConfigError(503), import 가드도 ConfigError.
+3)(중간) route_after_priority 리터럴 중복+else 폴백 → app/workflow/ticket_graph.py: PRIORITY_URGENT/NORMAL 상수 재사용,
+  긴급→escalate, 일반→assign, 그 외 → ConfigError.
+4)(중간) 테스트 → test_priority_unknown_category_raises(ConfigError, 미분류 포함) 추가, assign_team 미매핑 테스트 ConfigError로.
+5)(낮음) 매핑 불변식 <= → set(CATEGORIES)==set(TEAM_BY_CATEGORY) (가드+테스트 둘 다).
+
+검토 파일: app/workflow/rules.py, app/workflow/ticket_graph.py, tests/test_workflow.py.
+
+확인:
+A. 각 지적이 실제 해소됐는가(핵심을 덮는가)?
+B. calculate_priority/route_after_priority의 새 ConfigError 경로가 정상 흐름(유효 카테고리·긴급/일반)을
+   막지 않는가(과교정 아닌지)?
+C. ConfigError가 이 맥락(내부 정책 불일치/도달불가 불변식)에 맞는 taxonomy인가?
+D. import-time 가드가 == 로 바뀌며 정상 모듈 로드를 깨뜨리지 않는가(현재 7종 일치?).
+E. 남은 실제 결함.
+
+출력: 심각도별 유효 지적만. 해소 항목은 "해소" 짧게. 없으면 "잔여 결함 없음" 명시.
+
+codex
+요청하신 세 파일의 실제 변경과 테스트를 대조해, 기존 5건의 해소 여부와 과교정·회귀만 확인하겠습니다. 읽기 전용으로 코드와 관련 테스트 실행 결과를 점검합니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content app/workflow/rules.py; Get-Content app/workflow/ticket_graph.py; Get-Content tests/test_workflow.py' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1389ms:
+"""?곗폆 ?쇱슦??洹쒖튃 ???쒖닔 ?⑥닔(LLM 臾닿?, 寃곗젙濡?.
+
+?곗꽑?쒖쐞쨌?대떦?? **紐낅챸???꾨찓???뺤콉 ?곸닔**濡??좎뼵?쒕떎(留ㅼ쭅媛??섎뱶肄붾뵫 ?꾨떂).
+?꾨씫/紐⑥닚? ?대갚?섏? ?딄퀬 紐낆떆???ㅻ쪟濡??ㅽ뙣?쒕떎(RULE).
+"""
+
+from __future__ import annotations
+
+from app.core.errors import ConfigError
+from app.prompts.classifier import CATEGORIES
+
+# 利됱떆 ?먯뒪而щ젅?댁뀡 ????꾨찓???뺤콉). 洹??몃뒗 '?쇰컲'.
+URGENT_CATEGORIES: frozenset[str] = frozenset({"遺덈쭔", "?섎텋"})
+
+# 移댄뀒怨좊━ ???대떦? (?좏슚 移댄뀒怨좊━ 7醫??꾨? 紐낆떆, 湲곕낯? ?놁쓬).
+TEAM_BY_CATEGORY: dict[str, str] = {
+    "寃곗젣": "寃곗젣?",
+    "?섎텋": "寃곗젣?",
+    "諛곗넚": "臾쇰쪟?",
+    "援먰솚": "臾쇰쪟?",
+    "?곹뭹臾몄쓽": "?곹뭹?",
+    "移?갔": "CS?",
+    "遺덈쭔": "CS?",
+}
+
+PRIORITY_URGENT = "湲닿툒"
+PRIORITY_NORMAL = "?쇰컲"
+
+
+def calculate_priority(category: str) -> str:
+    """移댄뀒怨좊━濡??곗꽑?쒖쐞瑜??뺥븳?? 湲닿툒 ?뺤콉 ??곸씠硫?'湲닿툒', ?꾨땲硫?'?쇰컲'.
+
+    ?좏슚 移댄뀒怨좊━(CATEGORIES)留?諛쏅뒗?? 洹???媛?誘몃텇瑜샕룹삤? ????議곗슜??'?쇰컲'?쇰줈
+    ?⑥뼱?⑤━硫??대갚?대?濡? 紐낆떆???ㅻ쪟濡??ㅽ뙣?쒕떎(?뺤긽 寃쎈줈?먯꽌???꾨떖 遺덇?).
+    """
+    if category not in CATEGORIES:
+        raise ConfigError(f"?곗꽑?쒖쐞 ?먯젙 ??곸씠 ?꾨땶 移댄뀒怨좊━?낅땲?? {category}")
+    return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+
+
+def assign_team(category: str) -> str:
+    """移댄뀒怨좊━???대떦???諛섑솚?쒕떎. 留ㅽ븨???놁쑝硫??대갚 ???紐낆떆???ㅽ뙣.
+
+    留ㅽ븨 ?꾨씫? ?ъ슜???낅젰 ?ㅻ쪟媛 ?꾨땲??諛고룷???꾨찓???뺤콉??遺덉씪移섏씠誘濡?ConfigError(503).
+    """
+    try:
+        return TEAM_BY_CATEGORY[category]
+    except KeyError as exc:
+        # ?좏슚 移댄뀒怨좊━???꾨? 留ㅽ븨???덉뼱???쒕떎(?뺤긽 寃쎈줈?먯꽌???꾨떖 遺덇?).
+        raise ConfigError(f"?대떦? 留ㅽ븨???녿뒗 移댄뀒怨좊━?낅땲?? {category}") from exc
+
+
+# 遺덈??? 遺꾨쪟湲곗쓽 ?좏슚 移댄뀒怨좊━ 吏묓빀怨?? 留ㅽ븨 ??吏묓빀???뺥솗???쇱튂?댁빞 ?쒕떎.
+# (?쒕━?꾪듃/?ㅽ? ??import ?쒖젏??利됱떆 ?ㅽ뙣?쒖폒 議곗슜???대갚??留됰뒗??)
+if set(CATEGORIES) != set(TEAM_BY_CATEGORY):  # pragma: no cover - 媛쒕컻 以??ㅼ닔 諛⑹???媛??    _diff = set(CATEGORIES) ^ set(TEAM_BY_CATEGORY)
+    raise ConfigError(f"移댄뀒怨좊━?뷀? 留ㅽ븨 遺덉씪移? {sorted(_diff)}")
+"""CS ?곗폆 泥섎━ LangGraph StateGraph.
+
+洹몃옒??議곌굔遺꾧린):
+    START ??classify ????(?좏슚 移댄뀒怨좊━) ??priority ????(湲닿툒) ??escalate ??END
+                       ??                              ??(?쇰컲) ??assign   ??END
+                       ??(誘몃텇瑜?          ??manual_review ??END
+
+臾댄뤃諛?怨꾪쉷 Codex ?⑹쓽 #3):
+- 鍮??낅젰 ??ValidationErr(?꾪뙆), LLM ?곌껐 ?ㅽ뙣 ??InfraError(?꾪뙆). (classify_one???대? 洹몃젃寃?泥섎━)
+- LLM 異쒕젰???덉슜 移댄뀒怨좊━ ?꾨떂 ??'誘몃텇瑜? ??manual_review ??END.
+  priority濡?怨꾩냽 吏꾪뻾?섏? ?딅뒗??洹멸쾶 ???ㅻⅨ ?대갚).
+
+linear 洹몃옒?꾨뒗 留뚮뱾吏 ?딅뒗???붾뱶?ъ씤??誘몄궗??+ 誘몃텇瑜섎? 臾댁떆?섍퀬 吏꾪뻾 ??臾댄뤃諛??꾨컲, YAGNI).
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from app.core.errors import ConfigError
+from app.prompts.classifier import UNCLASSIFIED, ChatComplete, classify_one
+from app.workflow.rules import (
+    PRIORITY_NORMAL,
+    PRIORITY_URGENT,
+    assign_team,
+    calculate_priority,
+)
+
+
+class TicketState(TypedDict, total=False):
+    content: str
+    category: str
+    priority: str
+    team: str
+    action: str
+
+
+def build_ticket_graph(chat_complete: ChatComplete | None = None):
+    """CS ?곗폆 ?뚰겕?뚮줈 洹몃옒?꾨? 而댄뙆?쇳빐 諛섑솚?쒕떎.
+
+    chat_complete: 遺꾨쪟 LLM 二쇱엯(?뚯뒪??濡쒖뺄 寃곗젙濡?. 誘몄??????ㅼ젙??provider ?ъ슜.
+    """
+
+    def classify_node(state: TicketState) -> TicketState:
+        # 鍮??낅젰/LLM ?ㅽ뙣??classify_one??ValidationErr/InfraError濡??꾪뙆(?쇳궎吏 ?딆쓬).
+        return {"category": classify_one(state["content"], chat_complete)}
+
+    def route_after_classify(state: TicketState) -> str:
+        return "manual_review" if state["category"] == UNCLASSIFIED else "priority"
+
+    def priority_node(state: TicketState) -> TicketState:
+        return {"priority": calculate_priority(state["category"])}
+
+    def route_after_priority(state: TicketState) -> str:
+        # 洹쒖튃 ?곸닔 ?ъ궗??由ы꽣??以묐났 湲덉?). ?덉긽 諛?媛믪? 議곗슜???대갚 ???紐낆떆???ㅽ뙣.
+        priority = state["priority"]
+        if priority == PRIORITY_URGENT:
+            return "escalate"
+        if priority == PRIORITY_NORMAL:
+            return "assign"
+        raise ConfigError(f"?덉긽 諛??곗꽑?쒖쐞?낅땲?? {priority}")
+
+    def assign_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "assign"}
+
+    def escalate_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "escalate"}
+
+    def manual_review_node(state: TicketState) -> TicketState:
+        # 誘몃텇瑜섎뒗 ?뺤긽 ?섎룞寃???곹깭(?ㅻ쪟 ?꾨떂). ?대떦?/?곗꽑?쒖쐞??諛곗젙?섏? ?딅뒗??
+        return {"action": "manual_review"}
+
+    graph = StateGraph(TicketState)
+    graph.add_node("classify", classify_node)
+    graph.add_node("priority", priority_node)
+    graph.add_node("assign", assign_node)
+    graph.add_node("escalate", escalate_node)
+    graph.add_node("manual_review", manual_review_node)
+
+    graph.add_edge(START, "classify")
+    graph.add_conditional_edges(
+        "classify",
+        route_after_classify,
+        {"priority": "priority", "manual_review": "manual_review"},
+    )
+    graph.add_conditional_edges(
+        "priority",
+        route_after_priority,
+        {"escalate": "escalate", "assign": "assign"},
+    )
+    graph.add_edge("assign", END)
+    graph.add_edge("escalate", END)
+    graph.add_edge("manual_review", END)
+    return graph.compile()
+
+
+def run_ticket(content: str, chat_complete: ChatComplete | None = None) -> TicketState:
+    """?곗폆 ?댁슜???뚰겕?뚮줈???쒖썙 理쒖쥌 ?곹깭瑜?諛섑솚?쒕떎."""
+    graph = build_ticket_graph(chat_complete)
+    return graph.invoke({"content": content})
+"""LangGraph CS ?곗폆 ?뚰겕?뚮줈 ?뚯뒪??(寃곗젙濡???mock 遺꾨쪟, LLM 遺덊븘??.
+
+遺꾧린 ?꾨? 寃利? ?좏슚?믨릿湲됤넂escalate / ?좏슚?믪씪諛섃넂assign / 誘몃텇瑜섃넂manual_review.
+臾댄뤃諛?寃利? 鍮??낅젰?뭋alidationErr, LLM ?ㅽ뙣?묲nfraError ?꾪뙆.
+洹쒖튃(rules) ?⑥쐞 + 遺덈???紐⑤뱺 移댄뀒怨좊━ 留ㅽ븨).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from app.core.errors import ConfigError, InfraError, ValidationErr
+from app.prompts.classifier import CATEGORIES, UNCLASSIFIED
+from app.workflow import rules
+from app.workflow.ticket_graph import run_ticket
+
+
+def _fixed_chat(category: str):
+    """遺꾨쪟 LLM???뱀젙 移댄뀒怨좊━ 臾몄옄?대줈 怨좎젙?섎뒗 mock."""
+
+    def _chat(_prompt: str) -> str:
+        return category
+
+    return _chat
+
+
+# --- 洹쒖튃(rules) ?⑥쐞 -------------------------------------------------------
+def test_priority_urgent_categories():
+    assert rules.calculate_priority("遺덈쭔") == "湲닿툒"
+    assert rules.calculate_priority("?섎텋") == "湲닿툒"
+
+
+def test_priority_normal_categories():
+    for c in ["寃곗젣", "?곹뭹臾몄쓽", "援먰솚", "諛곗넚", "移?갔"]:
+        assert rules.calculate_priority(c) == "?쇰컲"
+
+
+def test_priority_unknown_category_raises():
+    # 臾댄뤃諛? ?좏슚 移댄뀒怨좊━媛 ?꾨땶 媛믪쓣 議곗슜??'?쇰컲'?쇰줈 ?④뎄吏 ?딅뒗??    with pytest.raises(ConfigError):
+        rules.calculate_priority("議댁옱?섏??딅뒗移댄뀒怨좊━")
+    with pytest.raises(ConfigError):
+        rules.calculate_priority(UNCLASSIFIED)
+
+
+def test_assign_team_mapping():
+    assert rules.assign_team("寃곗젣") == "寃곗젣?"
+    assert rules.assign_team("諛곗넚") == "臾쇰쪟?"
+    assert rules.assign_team("?곹뭹臾몄쓽") == "?곹뭹?"
+    assert rules.assign_team("移?갔") == "CS?"
+
+
+def test_category_and_team_mapping_are_exactly_equal():
+    # 遺덈??? ?좏슚 移댄뀒怨좊━ 吏묓빀 == ? 留ㅽ븨 ??吏묓빀(?꾨씫?? ?ㅽ? ?щ텇 ?ㅻ룄 遺덇?)
+    assert set(CATEGORIES) == set(rules.TEAM_BY_CATEGORY)
+
+
+def test_assign_team_unknown_category_raises():
+    # 留ㅽ븨 ?꾨씫? 諛고룷???뺤콉 遺덉씪移???ConfigError(503)
+    with pytest.raises(ConfigError):
+        rules.assign_team("議댁옱?섏??딅뒗移댄뀒怨좊━")
+
+
+# --- 洹몃옒??遺꾧린(mock 遺꾨쪟) -------------------------------------------------
+def test_urgent_category_routes_to_escalate():
+    state = run_ticket("?섎텋?댁＜?몄슂 ?뱀옣!", chat_complete=_fixed_chat("遺덈쭔"))
+    assert state["category"] == "遺덈쭔"
+    assert state["priority"] == "湲닿툒"
+    assert state["team"] == "CS?"
+    assert state["action"] == "escalate"
+
+
+def test_normal_category_routes_to_assign():
+    state = run_ticket("?몄젣 諛곗넚?섎굹??", chat_complete=_fixed_chat("諛곗넚"))
+    assert state["category"] == "諛곗넚"
+    assert state["priority"] == "?쇰컲"
+    assert state["team"] == "臾쇰쪟?"
+    assert state["action"] == "assign"
+
+
+def test_refund_is_urgent_and_payment_team():
+    state = run_ticket("?섎텋 ?붿껌?⑸땲??, chat_complete=_fixed_chat("?섎텋"))
+    assert state["priority"] == "湲닿툒"
+    assert state["team"] == "寃곗젣?"
+    assert state["action"] == "escalate"
+
+
+def test_unclassified_routes_to_manual_review_and_stops():
+    # ?덉슜 移댄뀒怨좊━媛 ?꾨땶 異쒕젰 ??誘몃텇瑜???manual_review ??END
+    state = run_ticket("?≪꽕?섏꽕", chat_complete=_fixed_chat("?쏆냼由щ텇瑜섎텋媛"))
+    assert state["category"] == UNCLASSIFIED
+    assert state["action"] == "manual_review"
+    # 臾댄뤃諛? priority/team?쇰줈 怨꾩냽 吏꾪뻾?섏? ?딆븯?뚯쓣 利앸챸
+    assert "priority" not in state
+    assert "team" not in state
+
+
+# --- 臾댄뤃諛? ?덉쇅 ?꾪뙆 ------------------------------------------------------
+def test_empty_content_raises_validation_error():
+    with pytest.raises(ValidationErr):
+        run_ticket("   ", chat_complete=_fixed_chat("諛곗넚"))
+
+
+def test_llm_failure_propagates():
+    def _boom(_prompt: str) -> str:
+        raise InfraError("LLM ?쒕쾭???곌껐?????놁뒿?덈떎.")
+
+    with pytest.raises(InfraError):
+        run_ticket("諛곗넚 臾몄쓽", chat_complete=_boom)
+
+codex
+정적 대조에서 import 가드의 본문 배치가 의심되는 지점이 보여, 실제 소스 줄 번호와 테스트 실행으로 확인하겠습니다. 특히 불일치 시 의도한 `ConfigError` 대신 다른 예외가 나는지까지 검증합니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$n=1; Get-Content -Encoding UTF8 app/workflow/rules.py | ForEach-Object { '"'{0,4}: {1}' -f "'$n, $_; $n++ }; python -m pytest tests/test_workflow.py -q' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+2026-07-19T02:26:07.446415Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 3.4 seconds
+Output:
+   1: """티켓 라우팅 규칙 — 순수 함수(LLM 무관, 결정론).
+   2: 
+   3: 우선순위·담당팀은 **명명된 도메인 정책 상수**로 선언한다(매직값 하드코딩 아님).
+   4: 누락/모순은 폴백하지 않고 명시적 오류로 실패한다(RULE).
+   5: """
+   6: 
+   7: from __future__ import annotations
+   8: 
+   9: from app.core.errors import ConfigError
+  10: from app.prompts.classifier import CATEGORIES
+  11: 
+  12: # 즉시 에스컬레이션 대상(도메인 정책). 그 외는 '일반'.
+  13: URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+  14: 
+  15: # 카테고리 → 담당팀 (유효 카테고리 7종 전부 명시, 기본팀 없음).
+  16: TEAM_BY_CATEGORY: dict[str, str] = {
+  17:     "결제": "결제팀",
+  18:     "환불": "결제팀",
+  19:     "배송": "물류팀",
+  20:     "교환": "물류팀",
+  21:     "상품문의": "상품팀",
+  22:     "칭찬": "CS팀",
+  23:     "불만": "CS팀",
+  24: }
+  25: 
+  26: PRIORITY_URGENT = "긴급"
+  27: PRIORITY_NORMAL = "일반"
+  28: 
+  29: 
+  30: def calculate_priority(category: str) -> str:
+  31:     """카테고리로 우선순위를 정한다. 긴급 정책 대상이면 '긴급', 아니면 '일반'.
+  32: 
+  33:     유효 카테고리(CATEGORIES)만 받는다. 그 외 값(미분류·오타 등)을 조용히 '일반'으로
+  34:     떨어뜨리면 폴백이므로, 명시적 오류로 실패한다(정상 경로에서는 도달 불가).
+  35:     """
+  36:     if category not in CATEGORIES:
+  37:         raise ConfigError(f"우선순위 판정 대상이 아닌 카테고리입니다: {category}")
+  38:     return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+  39: 
+  40: 
+  41: def assign_team(category: str) -> str:
+  42:     """카테고리의 담당팀을 반환한다. 매핑에 없으면 폴백 대신 명시적 실패.
+  43: 
+  44:     매핑 누락은 사용자 입력 오류가 아니라 배포된 도메인 정책의 불일치이므로 ConfigError(503).
+  45:     """
+  46:     try:
+  47:         return TEAM_BY_CATEGORY[category]
+  48:     except KeyError as exc:
+  49:         # 유효 카테고리는 전부 매핑돼 있어야 한다(정상 경로에서는 도달 불가).
+  50:         raise ConfigError(f"담당팀 매핑에 없는 카테고리입니다: {category}") from exc
+  51: 
+  52: 
+  53: # 불변식: 분류기의 유효 카테고리 집합과 팀 매핑 키 집합이 정확히 일치해야 한다.
+  54: # (드리프트/오타 시 import 시점에 즉시 실패시켜 조용한 폴백을 막는다.)
+  55: if set(CATEGORIES) != set(TEAM_BY_CATEGORY):  # pragma: no cover - 개발 중 실수 방지용 가드
+  56:     _diff = set(CATEGORIES) ^ set(TEAM_BY_CATEGORY)
+  57:     raise ConfigError(f"카테고리↔팀 매핑 불일치: {sorted(_diff)}")
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pytest\__main__.py", line 5, in <module>
+    raise SystemExit(pytest.console_main())
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+ exited 1 in 3360ms:
+   1: """티켓 라우팅 규칙 — 순수 함수(LLM 무관, 결정론).
+   2: 
+   3: 우선순위·담당팀은 **명명된 도메인 정책 상수**로 선언한다(매직값 하드코딩 아님).
+   4: 누락/모순은 폴백하지 않고 명시적 오류로 실패한다(RULE).
+   5: """
+   6: 
+   7: from __future__ import annotations
+   8: 
+   9: from app.core.errors import ConfigError
+  10: from app.prompts.classifier import CATEGORIES
+  11: 
+  12: # 즉시 에스컬레이션 대상(도메인 정책). 그 외는 '일반'.
+  13: URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+  14: 
+  15: # 카테고리 → 담당팀 (유효 카테고리 7종 전부 명시, 기본팀 없음).
+  16: TEAM_BY_CATEGORY: dict[str, str] = {
+  17:     "결제": "결제팀",
+  18:     "환불": "결제팀",
+  19:     "배송": "물류팀",
+  20:     "교환": "물류팀",
+  21:     "상품문의": "상품팀",
+  22:     "칭찬": "CS팀",
+  23:     "불만": "CS팀",
+  24: }
+  25: 
+  26: PRIORITY_URGENT = "긴급"
+  27: PRIORITY_NORMAL = "일반"
+  28: 
+  29: 
+  30: def calculate_priority(category: str) -> str:
+  31:     """카테고리로 우선순위를 정한다. 긴급 정책 대상이면 '긴급', 아니면 '일반'.
+  32: 
+  33:     유효 카테고리(CATEGORIES)만 받는다. 그 외 값(미분류·오타 등)을 조용히 '일반'으로
+  34:     떨어뜨리면 폴백이므로, 명시적 오류로 실패한다(정상 경로에서는 도달 불가).
+  35:     """
+  36:     if category not in CATEGORIES:
+  37:         raise ConfigError(f"우선순위 판정 대상이 아닌 카테고리입니다: {category}")
+  38:     return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+  39: 
+  40: 
+  41: def assign_team(category: str) -> str:
+  42:     """카테고리의 담당팀을 반환한다. 매핑에 없으면 폴백 대신 명시적 실패.
+  43: 
+  44:     매핑 누락은 사용자 입력 오류가 아니라 배포된 도메인 정책의 불일치이므로 ConfigError(503).
+  45:     """
+  46:     try:
+  47:         return TEAM_BY_CATEGORY[category]
+  48:     except KeyError as exc:
+  49:         # 유효 카테고리는 전부 매핑돼 있어야 한다(정상 경로에서는 도달 불가).
+  50:         raise ConfigError(f"담당팀 매핑에 없는 카테고리입니다: {category}") from exc
+  51: 
+  52: 
+  53: # 불변식: 분류기의 유효 카테고리 집합과 팀 매핑 키 집합이 정확히 일치해야 한다.
+  54: # (드리프트/오타 시 import 시점에 즉시 실패시켜 조용한 폴백을 막는다.)
+  55: if set(CATEGORIES) != set(TEAM_BY_CATEGORY):  # pragma: no cover - 개발 중 실수 방지용 가드
+  56:     _diff = set(CATEGORIES) ^ set(TEAM_BY_CATEGORY)
+  57:     raise ConfigError(f"카테고리↔팀 매핑 불일치: {sorted(_diff)}")
+Traceback (most recent call last):
+  File "<frozen runpy>", line 198, in _run_module_as_main
+  File "<frozen runpy>", line 88, in _run_code
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pytest\__main__.py", line 5, in <module>
+    raise SystemExit(pytest.console_main())
+                     ^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'python -c "from app.prompts.classifier import CATEGORIES; from app.workflow.rules import TEAM_BY_CATEGORY, calculate_priority, PRIORITY_URGENT, PRIORITY_NORMAL; print(CATEGORIES); print(set(CATEGORIES)==set(TEAM_BY_CATEGORY), len(CATEGORIES), len(TEAM_BY_CATEGORY)); print([(c, calculate_priority(c)) for c in CATEGORIES])"; git diff -- app/workflow/rules.py app/workflow/ticket_graph.py tests/test_workflow.py' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1887ms:
+['결제', '환불', '상품문의', '교환', '배송', '칭찬', '불만']
+True 7 7
+[('결제', '일반'), ('환불', '긴급'), ('상품문의', '일반'), ('교환', '일반'), ('배송', '일반'), ('칭찬', '일반'), ('불만', '긴급')]
+
+codex
+잔여 결함 없음.
+
+- 해소: 미지 카테고리와 `UNCLASSIFIED`은 `calculate_priority()`에서 `ConfigError`.
+- 해소: 팀 매핑 누락은 `KeyError`를 보존 연결한 `ConfigError`.
+- 해소: 우선순위 상수 재사용 및 예상 외 값의 명시적 `ConfigError`.
+- 해소: 관련 회귀 테스트 추가.
+- 해소: `CATEGORIES`와 `TEAM_BY_CATEGORY`의 완전 일치 불변식 적용.
+
+정상 경로도 확인했다. 현재 7종이 정확히 일치하며, `환불/불만 → 긴급`, 나머지 5종은 `일반`으로 계산된다. 따라서 새 검증이 유효 흐름을 막지 않는다. 세 `ConfigError` 경로 모두 정상 그래프에서는 도달 불가능한 내부 정책·상태 불일치를 나타내므로 taxonomy도 적절하다.
+
+참고로 pytest는 실행 환경에 사용 가능한 임시 디렉터리가 없어 시작되지 않았지만, 모듈 import와 7종 전체 우선순위 계산은 직접 정상 확인했다.
+tokens used
+22,712
+잔여 결함 없음.
+
+- 해소: 미지 카테고리와 `UNCLASSIFIED`은 `calculate_priority()`에서 `ConfigError`.
+- 해소: 팀 매핑 누락은 `KeyError`를 보존 연결한 `ConfigError`.
+- 해소: 우선순위 상수 재사용 및 예상 외 값의 명시적 `ConfigError`.
+- 해소: 관련 회귀 테스트 추가.
+- 해소: `CATEGORIES`와 `TEAM_BY_CATEGORY`의 완전 일치 불변식 적용.
+
+정상 경로도 확인했다. 현재 7종이 정확히 일치하며, `환불/불만 → 긴급`, 나머지 5종은 `일반`으로 계산된다. 따라서 새 검증이 유효 흐름을 막지 않는다. 세 `ConfigError` 경로 모두 정상 그래프에서는 도달 불가능한 내부 정책·상태 불일치를 나타내므로 taxonomy도 적절하다.
+
+참고로 pytest는 실행 환경에 사용 가능한 임시 디렉터리가 없어 시작되지 않았지만, 모듈 import와 7종 전체 우선순위 계산은 직접 정상 확인했다.

@@ -1,0 +1,61 @@
+2026-07-19T02:12:25.776973Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f7825-6b54-77c2-9127-473da5ebe42d
+--------
+user
+역할: 시니어 설계 리뷰어. Phase 10(LangGraph) 구현 직전 설계 의논 3건만. 짧게 결론+근거.
+RULE: 하드코딩·폴백·데모모드 금지(명시적 오류로 실패: ConfigError/InfraError/LLMOutputError/ValidationErr), YAGNI, 기존 함수 재사용(중복 금지).
+
+배경(계획: plans/2026-07-15_1120_Phase9_10_MCP_LangGraph_상세계획.md, 이미 조건부 GO):
+- 통합 앱에 CS 티켓 워크플로를 LangGraph StateGraph로 구현. 기존 app/prompts/classifier.py
+  재사용: classify_one(text, chat) → CATEGORIES(["결제","환불","상품문의","교환","배송","칭찬","불만"]) 중 하나 또는 "미분류"(UNCLASSIFIED).
+  빈 입력→ValidationErr, LLM 연결 실패→InfraError(이미 그렇게 구현됨).
+- 계획 Codex 합의 #3(무폴백): LLM출력이 허용 카테고리 아님 → "미분류" 기록 후
+  manual_review 노드 → END. priority로 계속 진행 금지(=또 다른 폴백). 유효 분류만 priority로.
+  그래프: START→classify→(유효→priority→긴급/일반분기 | 미분류→manual_review→END).
+
+의논 사항:
+1. 계획 '설계' 절에는 "linear + conditional 두 그래프 제공(강의 대응)"이라고 적혀 있다.
+   그런데 linear 그래프(classify→priority→assign, 분기 없음)는 미분류 입력에도 계속 진행하게 되어
+   합의 #3의 무폴백(미분류→manual_review→END)과 정면 충돌한다. 또 엔드포인트는 conditional만 쓴다.
+   → linear 그래프를 (a)빼고 conditional만 구현 (b)"기초 개념 시연"으로 분명히 라벨링하고
+   유효 카테고리 입력으로만 테스트(엔드포인트 미연결) 중 무엇이 RULE(YAGNI·무폴백)에 맞나?
+2. 규칙(rules.py, 순수함수) 구체값:
+   - 긴급 카테고리 = {"불만","환불"} (즉시 에스컬레이션), 그 외 "일반". 타당한가? 하드코딩 아닌
+     '명명된 규칙 상수'로 보는 게 맞나(도메인 규칙이므로)?
+   - 팀 매핑: 결제·환불→결제팀, 배송·교환→물류팀, 상품문의→상품팀, 칭찬·불만→CS팀. 누락 카테고리
+     발생 시 기본팀으로 떨구면 폴백인가? (미분류는 애초에 priority/assign에 도달 못 함) → 유효
+     카테고리는 7개 전부 매핑표에 있으니 기본팀 불필요, 매핑에 없으면 KeyError로 실패시키는 게 맞나?
+3. State(TypedDict): content, category, priority, team, action, error 필드. classify 노드가
+   미분류를 만들면 error 필드에 사유를 남기고 manual_review로 가는 게 맞나, 아니면 error는
+   실제 예외(전파)에만 쓰고 미분류는 정상 상태로 다루나?
+
+출력: 각 항목 결론(택1) + 1~2줄 근거. 계획과 다르게 가야 하면 그렇게 말하라.
+
+codex
+1. 결론: **(a) linear 그래프 제외, conditional만 구현.**  
+   엔드포인트에서 쓰이지 않고 무폴백 합의와 충돌하므로 YAGNI 위반이다. 강의 시연 목적만으로 잘못된 경로를 구현하지 말고, **계획의 해당 설계를 변경**한다.
+
+2. 결론: **긴급 집합과 전체 팀 매핑을 명명된 도메인 규칙 상수로 정의하고, 기본팀은 두지 않는다.**  
+   `{"불만", "환불"}`은 요구사항에서 확정된 정책이므로 금지된 임시 하드코딩과 다르다. 매핑 누락은 `KeyError` 그대로보다 의미가 명확한 **`ValidationErr`를 명시적으로 발생**시킨다.
+
+3. 결론: **“미분류”는 정상적인 수동 검토 상태로 다루고 `error`에 넣지 않는다.**  
+   `category="미분류"`와 `action="manual_review"`가 경로를 충분히 표현한다. 실제 예외는 상태에 저장해 계속 진행하지 말고 지정된 `InfraError`/`LLMOutputError`/`ValidationErr`로 전파하므로, 현재 용도라면 `error` 필드 자체를 제거하는 것이 YAGNI에 맞다.
+tokens used
+4,891
+1. 결론: **(a) linear 그래프 제외, conditional만 구현.**  
+   엔드포인트에서 쓰이지 않고 무폴백 합의와 충돌하므로 YAGNI 위반이다. 강의 시연 목적만으로 잘못된 경로를 구현하지 말고, **계획의 해당 설계를 변경**한다.
+
+2. 결론: **긴급 집합과 전체 팀 매핑을 명명된 도메인 규칙 상수로 정의하고, 기본팀은 두지 않는다.**  
+   `{"불만", "환불"}`은 요구사항에서 확정된 정책이므로 금지된 임시 하드코딩과 다르다. 매핑 누락은 `KeyError` 그대로보다 의미가 명확한 **`ValidationErr`를 명시적으로 발생**시킨다.
+
+3. 결론: **“미분류”는 정상적인 수동 검토 상태로 다루고 `error`에 넣지 않는다.**  
+   `category="미분류"`와 `action="manual_review"`가 경로를 충분히 표현한다. 실제 예외는 상태에 저장해 계속 진행하지 말고 지정된 `InfraError`/`LLMOutputError`/`ValidationErr`로 전파하므로, 현재 용도라면 `error` 필드 자체를 제거하는 것이 YAGNI에 맞다.

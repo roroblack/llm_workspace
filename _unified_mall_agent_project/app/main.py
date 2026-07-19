@@ -17,7 +17,19 @@ from fastapi.staticfiles import StaticFiles
 from app.core.errors import register_exception_handlers
 from app.db.database import Base, SessionLocal, engine
 from app.db.seed import seed_products
-from app.routers import agent, auth, health, lab, mcp, nlp, orders, payments, products, rag
+from app.routers import (
+    agent,
+    auth,
+    health,
+    lab,
+    mcp,
+    nlp,
+    orders,
+    payments,
+    products,
+    rag,
+    workflow,
+)
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -59,6 +71,7 @@ def create_app() -> FastAPI:
     app.include_router(nlp.router)
     app.include_router(lab.router)
     app.include_router(mcp.router)
+    app.include_router(workflow.router)
 
     # 정적 UI
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

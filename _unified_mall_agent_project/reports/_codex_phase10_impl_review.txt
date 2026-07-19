@@ -1,0 +1,1698 @@
+2026-07-19T02:19:30.907283Z ERROR codex_models_manager::cache: failed to load models cache: missing field `supports_reasoning_summaries` at line 88 column 5
+OpenAI Codex v0.144.1
+--------
+workdir: C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+model: gpt-5.6-sol
+provider: openai
+approval: never
+sandbox: read-only
+reasoning effort: low
+reasoning summaries: none
+session id: 019f782b-e937-7aa0-8fbd-3344b3489553
+--------
+user
+역할: 시니어 파이썬 리뷰어. Phase 10(LangGraph) 구현 점검. RULE: 하드코딩·폴백·데모모드 금지
+(명시적 오류로 실패: ConfigError/InfraError/LLMOutputError/ValidationErr), YAGNI, 기존 함수 재사용(중복 금지).
+
+배경(설계, 이미 Codex와 합의):
+- CS 티켓 워크플로를 LangGraph StateGraph로 구현. 기존 app/prompts/classifier.classify_one 재사용
+  (CATEGORIES 중 하나 또는 "미분류"; 빈입력→ValidationErr, LLM실패→InfraError는 이미 그렇게 구현됨).
+- 그래프: START→classify→(유효→priority→긴급/일반분기 | 미분류→manual_review→END).
+- 무폴백: 미분류는 priority로 진행하지 않고 manual_review→END. 실제 예외는 전파.
+- 규칙 상수: 긴급={"불만","환불"}, 팀 매핑 7종 전부, 기본팀 없음(누락→ValidationErr).
+- 설계변경(합의): linear 그래프는 만들지 않음(엔드포인트 미사용+무폴백 충돌+YAGNI).
+
+검토 파일:
+1) app/workflow/rules.py
+2) app/workflow/ticket_graph.py
+3) app/routers/workflow.py
+4) tests/test_workflow.py
+5) app/main.py (라우터 등록)
+
+중점 점검:
+A. RULE 위반(하드코딩/폴백/중복/YAGNI)? 특히 미분류가 조용히 priority로 새는 경로가 없는가.
+B. LangGraph 사용 정합: add_conditional_edges 매핑, 노드 반환(부분 상태 갱신), TypedDict total=False,
+   그래프 노드에서 발생한 ValidationErr/InfraError가 invoke() 밖으로 전파되는가.
+C. build_ticket_graph의 chat 주입 클로저 방식이 안전한가(상태 오염/재진입).
+D. rules import-time 불변식 가드가 적절한가(과함/부작용). assign_team 미매핑→ValidationErr가 맞나
+   (혹은 ConfigError가 더 맞나 — 이유와 함께).
+E. 테스트가 계약을 실제로 검증하는가(미분류시 priority/team 미설정 단언 포함). 느슨/누락?
+F. 그 밖의 실제 버그(경합/상태 병합/엣지 누락으로 도달 못 하는 노드 등).
+
+출력: 심각도(치명/높음/중간/낮음)별 '유효 지적'만. 각 지적 파일:근거:수정안 1–2줄. 오탐이면 그렇게.
+없으면 "잔여 결함 없음" 명시.
+
+codex
+요청하신 5개 파일과 관련 예외·분류기 계약을 함께 추적해서, 실제 실행 경로와 테스트가 맞물리는지 확인하겠습니다. 변경은 하지 않고 유효 결함만 보고하겠습니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content app/workflow/rules.py; Get-Content app/workflow/ticket_graph.py; Get-Content app/routers/workflow.py; Get-Content tests/test_workflow.py; Get-Content app/main.py; rg -n "class (ConfigError|InfraError|LLMOutputError|ValidationErr)|def classify_one|CATEGORIES" app tests' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 3558ms:
+"""?곗폆 ?쇱슦??洹쒖튃 ???쒖닔 ?⑥닔(LLM 臾닿?, 寃곗젙濡?.
+
+?곗꽑?쒖쐞쨌?대떦?? **紐낅챸???꾨찓???뺤콉 ?곸닔**濡??좎뼵?쒕떎(留ㅼ쭅媛??섎뱶肄붾뵫 ?꾨떂).
+?꾨씫/紐⑥닚? ?대갚?섏? ?딄퀬 紐낆떆???ㅻ쪟濡??ㅽ뙣?쒕떎(RULE).
+"""
+
+from __future__ import annotations
+
+from app.core.errors import ValidationErr
+from app.prompts.classifier import CATEGORIES
+
+# 利됱떆 ?먯뒪而щ젅?댁뀡 ????꾨찓???뺤콉). 洹??몃뒗 '?쇰컲'.
+URGENT_CATEGORIES: frozenset[str] = frozenset({"遺덈쭔", "?섎텋"})
+
+# 移댄뀒怨좊━ ???대떦? (?좏슚 移댄뀒怨좊━ 7醫??꾨? 紐낆떆, 湲곕낯? ?놁쓬).
+TEAM_BY_CATEGORY: dict[str, str] = {
+    "寃곗젣": "寃곗젣?",
+    "?섎텋": "寃곗젣?",
+    "諛곗넚": "臾쇰쪟?",
+    "援먰솚": "臾쇰쪟?",
+    "?곹뭹臾몄쓽": "?곹뭹?",
+    "移?갔": "CS?",
+    "遺덈쭔": "CS?",
+}
+
+PRIORITY_URGENT = "湲닿툒"
+PRIORITY_NORMAL = "?쇰컲"
+
+
+def calculate_priority(category: str) -> str:
+    """移댄뀒怨좊━濡??곗꽑?쒖쐞瑜??뺥븳?? 湲닿툒 ?뺤콉 ??곸씠硫?'湲닿툒', ?꾨땲硫?'?쇰컲'."""
+    return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+
+
+def assign_team(category: str) -> str:
+    """移댄뀒怨좊━???대떦???諛섑솚?쒕떎. 留ㅽ븨???놁쑝硫??대갚 ???紐낆떆???ㅽ뙣."""
+    try:
+        return TEAM_BY_CATEGORY[category]
+    except KeyError as exc:
+        # ?좏슚 移댄뀒怨좊━???꾨? 留ㅽ븨???덉뼱???쒕떎(?뺤긽 寃쎈줈?먯꽌???꾨떖 遺덇?).
+        raise ValidationErr(f"?대떦? 留ㅽ븨???녿뒗 移댄뀒怨좊━?낅땲?? {category}") from exc
+
+
+# 遺덈??? 遺꾨쪟湲곗쓽 紐⑤뱺 ?좏슚 移댄뀒怨좊━??? 留ㅽ븨??議댁옱?댁빞 ?쒕떎.
+# (?쒕━?꾪듃 ??import ?쒖젏??利됱떆 ?ㅽ뙣?쒖폒 議곗슜???대갚??留됰뒗??)
+_UNMAPPED = set(CATEGORIES) - set(TEAM_BY_CATEGORY)
+if _UNMAPPED:  # pragma: no cover - 媛쒕컻 以??ㅼ닔 諛⑹???媛??    raise ValidationErr(f"? 留ㅽ븨 ?꾨씫 移댄뀒怨좊━: {sorted(_UNMAPPED)}")
+"""CS ?곗폆 泥섎━ LangGraph StateGraph.
+
+洹몃옒??議곌굔遺꾧린):
+    START ??classify ????(?좏슚 移댄뀒怨좊━) ??priority ????(湲닿툒) ??escalate ??END
+                       ??                              ??(?쇰컲) ??assign   ??END
+                       ??(誘몃텇瑜?          ??manual_review ??END
+
+臾댄뤃諛?怨꾪쉷 Codex ?⑹쓽 #3):
+- 鍮??낅젰 ??ValidationErr(?꾪뙆), LLM ?곌껐 ?ㅽ뙣 ??InfraError(?꾪뙆). (classify_one???대? 洹몃젃寃?泥섎━)
+- LLM 異쒕젰???덉슜 移댄뀒怨좊━ ?꾨떂 ??'誘몃텇瑜? ??manual_review ??END.
+  priority濡?怨꾩냽 吏꾪뻾?섏? ?딅뒗??洹멸쾶 ???ㅻⅨ ?대갚).
+
+linear 洹몃옒?꾨뒗 留뚮뱾吏 ?딅뒗???붾뱶?ъ씤??誘몄궗??+ 誘몃텇瑜섎? 臾댁떆?섍퀬 吏꾪뻾 ??臾댄뤃諛??꾨컲, YAGNI).
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from app.prompts.classifier import UNCLASSIFIED, ChatComplete, classify_one
+from app.workflow.rules import assign_team, calculate_priority
+
+
+class TicketState(TypedDict, total=False):
+    content: str
+    category: str
+    priority: str
+    team: str
+    action: str
+
+
+def build_ticket_graph(chat_complete: ChatComplete | None = None):
+    """CS ?곗폆 ?뚰겕?뚮줈 洹몃옒?꾨? 而댄뙆?쇳빐 諛섑솚?쒕떎.
+
+    chat_complete: 遺꾨쪟 LLM 二쇱엯(?뚯뒪??濡쒖뺄 寃곗젙濡?. 誘몄??????ㅼ젙??provider ?ъ슜.
+    """
+
+    def classify_node(state: TicketState) -> TicketState:
+        # 鍮??낅젰/LLM ?ㅽ뙣??classify_one??ValidationErr/InfraError濡??꾪뙆(?쇳궎吏 ?딆쓬).
+        return {"category": classify_one(state["content"], chat_complete)}
+
+    def route_after_classify(state: TicketState) -> str:
+        return "manual_review" if state["category"] == UNCLASSIFIED else "priority"
+
+    def priority_node(state: TicketState) -> TicketState:
+        return {"priority": calculate_priority(state["category"])}
+
+    def route_after_priority(state: TicketState) -> str:
+        return "escalate" if state["priority"] == "湲닿툒" else "assign"
+
+    def assign_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "assign"}
+
+    def escalate_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "escalate"}
+
+    def manual_review_node(state: TicketState) -> TicketState:
+        # 誘몃텇瑜섎뒗 ?뺤긽 ?섎룞寃???곹깭(?ㅻ쪟 ?꾨떂). ?대떦?/?곗꽑?쒖쐞??諛곗젙?섏? ?딅뒗??
+        return {"action": "manual_review"}
+
+    graph = StateGraph(TicketState)
+    graph.add_node("classify", classify_node)
+    graph.add_node("priority", priority_node)
+    graph.add_node("assign", assign_node)
+    graph.add_node("escalate", escalate_node)
+    graph.add_node("manual_review", manual_review_node)
+
+    graph.add_edge(START, "classify")
+    graph.add_conditional_edges(
+        "classify",
+        route_after_classify,
+        {"priority": "priority", "manual_review": "manual_review"},
+    )
+    graph.add_conditional_edges(
+        "priority",
+        route_after_priority,
+        {"escalate": "escalate", "assign": "assign"},
+    )
+    graph.add_edge("assign", END)
+    graph.add_edge("escalate", END)
+    graph.add_edge("manual_review", END)
+    return graph.compile()
+
+
+def run_ticket(content: str, chat_complete: ChatComplete | None = None) -> TicketState:
+    """?곗폆 ?댁슜???뚰겕?뚮줈???쒖썙 理쒖쥌 ?곹깭瑜?諛섑솚?쒕떎."""
+    graph = build_ticket_graph(chat_complete)
+    return graph.invoke({"content": content})
+"""LangGraph ?뚰겕?뚮줈 ?쇱슦????CS ?곗폆 泥섎━.
+
+POST /api/workflow/ticket : 臾몄쓽 ?댁슜 ??理쒖쥌 ?곹깭(category/priority/team/action).
+鍮??낅젰/LLM ?ㅽ뙣???대갚 ?놁씠 ?ㅻ쪟濡??꾪뙆(洹몃옒???몃뱶媛 ValidationErr/InfraError 諛쒖깮).
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter
+from pydantic import BaseModel, Field
+
+from app.workflow.ticket_graph import run_ticket
+
+router = APIRouter(prefix="/api/workflow", tags=["workflow"])
+
+
+class TicketRequest(BaseModel):
+    content: str = Field(min_length=1, description="CS 臾몄쓽 ?댁슜")
+
+
+@router.post("/ticket")
+def handle_ticket(body: TicketRequest) -> dict:
+    """臾몄쓽瑜??뚰겕?뚮줈???쒖썙 遺꾨쪟?믪슦?좎닚?꾟넂諛곗젙/?먯뒪而щ젅?댁뀡/?섎룞寃??寃곌낵瑜?諛섑솚?쒕떎."""
+    return dict(run_ticket(body.content))
+"""LangGraph CS ?곗폆 ?뚰겕?뚮줈 ?뚯뒪??(寃곗젙濡???mock 遺꾨쪟, LLM 遺덊븘??.
+
+遺꾧린 ?꾨? 寃利? ?좏슚?믨릿湲됤넂escalate / ?좏슚?믪씪諛섃넂assign / 誘몃텇瑜섃넂manual_review.
+臾댄뤃諛?寃利? 鍮??낅젰?뭋alidationErr, LLM ?ㅽ뙣?묲nfraError ?꾪뙆.
+洹쒖튃(rules) ?⑥쐞 + 遺덈???紐⑤뱺 移댄뀒怨좊━ 留ㅽ븨).
+"""
+
+from __future__ import annotations
+
+import pytest
+
+from app.core.errors import InfraError, ValidationErr
+from app.prompts.classifier import CATEGORIES, UNCLASSIFIED
+from app.workflow import rules
+from app.workflow.ticket_graph import run_ticket
+
+
+def _fixed_chat(category: str):
+    """遺꾨쪟 LLM???뱀젙 移댄뀒怨좊━ 臾몄옄?대줈 怨좎젙?섎뒗 mock."""
+
+    def _chat(_prompt: str) -> str:
+        return category
+
+    return _chat
+
+
+# --- 洹쒖튃(rules) ?⑥쐞 -------------------------------------------------------
+def test_priority_urgent_categories():
+    assert rules.calculate_priority("遺덈쭔") == "湲닿툒"
+    assert rules.calculate_priority("?섎텋") == "湲닿툒"
+
+
+def test_priority_normal_categories():
+    for c in ["寃곗젣", "?곹뭹臾몄쓽", "援먰솚", "諛곗넚", "移?갔"]:
+        assert rules.calculate_priority(c) == "?쇰컲"
+
+
+def test_assign_team_mapping():
+    assert rules.assign_team("寃곗젣") == "寃곗젣?"
+    assert rules.assign_team("諛곗넚") == "臾쇰쪟?"
+    assert rules.assign_team("?곹뭹臾몄쓽") == "?곹뭹?"
+    assert rules.assign_team("移?갔") == "CS?"
+
+
+def test_every_category_is_mapped_to_a_team():
+    # 遺덈??? 遺꾨쪟湲곗쓽 紐⑤뱺 ?좏슚 移댄뀒怨좊━媛 ? 留ㅽ븨??議댁옱(議곗슜???대갚 諛⑹?)
+    assert set(CATEGORIES) <= set(rules.TEAM_BY_CATEGORY)
+
+
+def test_assign_team_unknown_category_raises():
+    with pytest.raises(ValidationErr):
+        rules.assign_team("議댁옱?섏??딅뒗移댄뀒怨좊━")
+
+
+# --- 洹몃옒??遺꾧린(mock 遺꾨쪟) -------------------------------------------------
+def test_urgent_category_routes_to_escalate():
+    state = run_ticket("?섎텋?댁＜?몄슂 ?뱀옣!", chat_complete=_fixed_chat("遺덈쭔"))
+    assert state["category"] == "遺덈쭔"
+    assert state["priority"] == "湲닿툒"
+    assert state["team"] == "CS?"
+    assert state["action"] == "escalate"
+
+
+def test_normal_category_routes_to_assign():
+    state = run_ticket("?몄젣 諛곗넚?섎굹??", chat_complete=_fixed_chat("諛곗넚"))
+    assert state["category"] == "諛곗넚"
+    assert state["priority"] == "?쇰컲"
+    assert state["team"] == "臾쇰쪟?"
+    assert state["action"] == "assign"
+
+
+def test_refund_is_urgent_and_payment_team():
+    state = run_ticket("?섎텋 ?붿껌?⑸땲??, chat_complete=_fixed_chat("?섎텋"))
+    assert state["priority"] == "湲닿툒"
+    assert state["team"] == "寃곗젣?"
+    assert state["action"] == "escalate"
+
+
+def test_unclassified_routes_to_manual_review_and_stops():
+    # ?덉슜 移댄뀒怨좊━媛 ?꾨땶 異쒕젰 ??誘몃텇瑜???manual_review ??END
+    state = run_ticket("?≪꽕?섏꽕", chat_complete=_fixed_chat("?쏆냼由щ텇瑜섎텋媛"))
+    assert state["category"] == UNCLASSIFIED
+    assert state["action"] == "manual_review"
+    # 臾댄뤃諛? priority/team?쇰줈 怨꾩냽 吏꾪뻾?섏? ?딆븯?뚯쓣 利앸챸
+    assert "priority" not in state
+    assert "team" not in state
+
+
+# --- 臾댄뤃諛? ?덉쇅 ?꾪뙆 ------------------------------------------------------
+def test_empty_content_raises_validation_error():
+    with pytest.raises(ValidationErr):
+        run_ticket("   ", chat_complete=_fixed_chat("諛곗넚"))
+
+
+def test_llm_failure_propagates():
+    def _boom(_prompt: str) -> str:
+        raise InfraError("LLM ?쒕쾭???곌껐?????놁뒿?덈떎.")
+
+    with pytest.raises(InfraError):
+        run_ticket("諛곗넚 臾몄쓽", chat_complete=_boom)
+"""FastAPI 吏꾩엯??
+
+Phase 1: ?덉쇅 ?몃뱾??+ health.
+Phase 2: DB ?뚯씠釉??앹꽦 + ?쒕뵫 + auth/products/orders/payments ?쇱슦??
+?뺤쟻 UI/?먯씠?꾪듃 ?쇱슦?곕뒗 ?댄썑 Phase?먯꽌 遺숈씤??
+"""
+
+from __future__ import annotations
+
+from contextlib import asynccontextmanager
+from pathlib import Path
+
+from fastapi import FastAPI
+from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.core.errors import register_exception_handlers
+from app.db.database import Base, SessionLocal, engine
+from app.db.seed import seed_products
+from app.routers import (
+    agent,
+    auth,
+    health,
+    lab,
+    mcp,
+    nlp,
+    orders,
+    payments,
+    products,
+    rag,
+    workflow,
+)
+
+_STATIC_DIR = Path(__file__).resolve().parent / "static"
+
+
+@asynccontextmanager
+async def lifespan(_app: FastAPI):
+    # ?뚯씠釉??앹꽦 + ?쒕뵫 (硫깅벑)
+    Base.metadata.create_all(bind=engine)
+    db = SessionLocal()
+    try:
+        seed_products(db)
+    finally:
+        db.close()
+    # RAG ?몃뜳?ㅺ? ?놁쑝硫?1??鍮뚮뱶 (?덉쑝硫?洹몃?濡??ъ슜 ???몃뜳???쒕퉬??遺꾨━)
+    from app.core.config import get_settings
+
+    # RAG ?몃뜳?ㅺ? ?녾굅???꾨쿋??紐⑤뜽??諛붾뚯뿀?쇰㈃ ?щ퉴??(stale ?몃뜳??諛⑹?)
+    from app.rag.build_index import build_index, index_is_current
+
+    if not index_is_current():
+        build_index()
+    yield
+
+
+def create_app() -> FastAPI:
+    app = FastAPI(
+        title="?뱀듅?κ뎄紐?AI 而ㅻ㉧???먯씠?꾪듃",
+        version="0.2.0",
+        lifespan=lifespan,
+    )
+    register_exception_handlers(app)
+    app.include_router(health.router)
+    app.include_router(auth.router)
+    app.include_router(products.router)
+    app.include_router(orders.router)
+    app.include_router(payments.router)
+    app.include_router(agent.router)
+    app.include_router(rag.router)
+    app.include_router(nlp.router)
+    app.include_router(lab.router)
+    app.include_router(mcp.router)
+    app.include_router(workflow.router)
+
+    # ?뺤쟻 UI
+    app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+    @app.get("/", include_in_schema=False)
+    def index() -> FileResponse:
+        return FileResponse(str(_STATIC_DIR / "index.html"))
+
+    return app
+
+
+app = create_app()
+app\workflow\rules.py:10:from app.prompts.classifier import CATEGORIES
+app\workflow\rules.py:13:URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+app\workflow\rules.py:32:    return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+app\workflow\rules.py:46:_UNMAPPED = set(CATEGORIES) - set(TEAM_BY_CATEGORY)
+app\prompts\templates.py:10:CATEGORIES = ["결제", "환불", "상품문의", "교환", "배송", "칭찬", "불만"]
+app\prompts\templates.py:50:    cats = " / ".join(CATEGORIES)
+app\prompts\classifier.py:17:from app.prompts.templates import CATEGORIES, build_classify_prompt
+app\prompts\classifier.py:19:UNCLASSIFIED = "미분류"  # CATEGORIES에 포함하지 않는 오답 sentinel
+app\prompts\classifier.py:46:    found = [c for c in CATEGORIES if c in output]
+app\prompts\classifier.py:52:def classify_one(text: str, chat_complete: ChatComplete | None = None) -> str:
+app\core\errors.py:25:class ConfigError(AppError):
+app\core\errors.py:32:class InfraError(AppError):
+app\core\errors.py:39:class LLMOutputError(AppError):
+app\core\errors.py:46:class ValidationErr(AppError):
+tests\test_prompts.py:4:    CATEGORIES,
+tests\test_prompts.py:21:    for c in CATEGORIES:
+tests\test_workflow.py:13:from app.prompts.classifier import CATEGORIES, UNCLASSIFIED
+tests\test_workflow.py:47:    assert set(CATEGORIES) <= set(rules.TEAM_BY_CATEGORY)
+
+codex
+현재 분기 구조 자체는 미분류를 `manual_review→END`로 차단하고 부분 상태 갱신도 올바릅니다. 다만 규칙 함수의 입력 계약과 import-time 가드의 오류 분류가 설계 원칙에 맞는지, 실제 테스트 실행까지 확인 중입니다.
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command 'Get-Content -Encoding utf8 app/workflow/rules.py; Get-Content -Encoding utf8 app/workflow/ticket_graph.py; Get-Content -Encoding utf8 app/prompts/classifier.py; Get-Content -Encoding utf8 app/core/errors.py; rg -n "langgraph|pydantic|fastapi" pyproject.toml requirements*.txt; pytest -q tests/test_workflow.py' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+2026-07-19T02:20:01.395153Z ERROR codex_core::tools::router: error=Exit code: 1
+Wall time: 3.3 seconds
+Output:
+"""티켓 라우팅 규칙 — 순수 함수(LLM 무관, 결정론).
+
+우선순위·담당팀은 **명명된 도메인 정책 상수**로 선언한다(매직값 하드코딩 아님).
+누락/모순은 폴백하지 않고 명시적 오류로 실패한다(RULE).
+"""
+
+from __future__ import annotations
+
+from app.core.errors import ValidationErr
+from app.prompts.classifier import CATEGORIES
+
+# 즉시 에스컬레이션 대상(도메인 정책). 그 외는 '일반'.
+URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+
+# 카테고리 → 담당팀 (유효 카테고리 7종 전부 명시, 기본팀 없음).
+TEAM_BY_CATEGORY: dict[str, str] = {
+    "결제": "결제팀",
+    "환불": "결제팀",
+    "배송": "물류팀",
+    "교환": "물류팀",
+    "상품문의": "상품팀",
+    "칭찬": "CS팀",
+    "불만": "CS팀",
+}
+
+PRIORITY_URGENT = "긴급"
+PRIORITY_NORMAL = "일반"
+
+
+def calculate_priority(category: str) -> str:
+    """카테고리로 우선순위를 정한다. 긴급 정책 대상이면 '긴급', 아니면 '일반'."""
+    return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+
+
+def assign_team(category: str) -> str:
+    """카테고리의 담당팀을 반환한다. 매핑에 없으면 폴백 대신 명시적 실패."""
+    try:
+        return TEAM_BY_CATEGORY[category]
+    except KeyError as exc:
+        # 유효 카테고리는 전부 매핑돼 있어야 한다(정상 경로에서는 도달 불가).
+        raise ValidationErr(f"담당팀 매핑에 없는 카테고리입니다: {category}") from exc
+
+
+# 불변식: 분류기의 모든 유효 카테고리는 팀 매핑에 존재해야 한다.
+# (드리프트 시 import 시점에 즉시 실패시켜 조용한 폴백을 막는다.)
+_UNMAPPED = set(CATEGORIES) - set(TEAM_BY_CATEGORY)
+if _UNMAPPED:  # pragma: no cover - 개발 중 실수 방지용 가드
+    raise ValidationErr(f"팀 매핑 누락 카테고리: {sorted(_UNMAPPED)}")
+"""CS 티켓 처리 LangGraph StateGraph.
+
+그래프(조건분기):
+    START → classify → ┬ (유효 카테고리) → priority → ┬ (긴급) → escalate → END
+                       │                               └ (일반) → assign   → END
+                       └ (미분류)          → manual_review → END
+
+무폴백(계획 Codex 합의 #3):
+- 빈 입력 → ValidationErr(전파), LLM 연결 실패 → InfraError(전파). (classify_one이 이미 그렇게 처리)
+- LLM 출력이 허용 카테고리 아님 → '미분류' → manual_review → END.
+  priority로 계속 진행하지 않는다(그게 또 다른 폴백).
+
+linear 그래프는 만들지 않는다(엔드포인트 미사용 + 미분류를 무시하고 진행 → 무폴백 위반, YAGNI).
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from app.prompts.classifier import UNCLASSIFIED, ChatComplete, classify_one
+from app.workflow.rules import assign_team, calculate_priority
+
+
+class TicketState(TypedDict, total=False):
+    content: str
+    category: str
+    priority: str
+    team: str
+    action: str
+
+
+def build_ticket_graph(chat_complete: ChatComplete | None = None):
+    """CS 티켓 워크플로 그래프를 컴파일해 반환한다.
+
+    chat_complete: 분류 LLM 주입(테스트/로컬 결정론). 미지정 시 설정된 provider 사용.
+    """
+
+    def classify_node(state: TicketState) -> TicketState:
+        # 빈 입력/LLM 실패는 classify_one이 ValidationErr/InfraError로 전파(삼키지 않음).
+        return {"category": classify_one(state["content"], chat_complete)}
+
+    def route_after_classify(state: TicketState) -> str:
+        return "manual_review" if state["category"] == UNCLASSIFIED else "priority"
+
+    def priority_node(state: TicketState) -> TicketState:
+        return {"priority": calculate_priority(state["category"])}
+
+    def route_after_priority(state: TicketState) -> str:
+        return "escalate" if state["priority"] == "긴급" else "assign"
+
+    def assign_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "assign"}
+
+    def escalate_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "escalate"}
+
+    def manual_review_node(state: TicketState) -> TicketState:
+        # 미분류는 정상 수동검토 상태(오류 아님). 담당팀/우선순위는 배정하지 않는다.
+        return {"action": "manual_review"}
+
+    graph = StateGraph(TicketState)
+    graph.add_node("classify", classify_node)
+    graph.add_node("priority", priority_node)
+    graph.add_node("assign", assign_node)
+    graph.add_node("escalate", escalate_node)
+    graph.add_node("manual_review", manual_review_node)
+
+    graph.add_edge(START, "classify")
+    graph.add_conditional_edges(
+        "classify",
+        route_after_classify,
+        {"priority": "priority", "manual_review": "manual_review"},
+    )
+    graph.add_conditional_edges(
+        "priority",
+        route_after_priority,
+        {"escalate": "escalate", "assign": "assign"},
+    )
+    graph.add_edge("assign", END)
+    graph.add_edge("escalate", END)
+    graph.add_edge("manual_review", END)
+    return graph.compile()
+
+
+def run_ticket(content: str, chat_complete: ChatComplete | None = None) -> TicketState:
+    """티켓 내용을 워크플로에 태워 최종 상태를 반환한다."""
+    graph = build_ticket_graph(chat_complete)
+    return graph.invoke({"content": content})
+"""CS 문의 분류 + 정확도 측정 + 혼동쌍 분석 (오분류 개선 루프, PDF5).
+
+측정→분석→처방(후보 산출)까지 결정론으로 구현한다. 프롬프트 자동 재작성/반복
+튜닝은 YAGNI로 두지 않는다 (Codex 합의).
+"""
+
+from __future__ import annotations
+
+import csv
+from collections import Counter
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from app.core.config import get_settings
+from app.core.errors import InfraError, ValidationErr
+from app.prompts.templates import CATEGORIES, build_classify_prompt
+
+UNCLASSIFIED = "미분류"  # CATEGORIES에 포함하지 않는 오답 sentinel
+
+# chat_complete(prompt) -> str
+ChatComplete = Callable[[str], str]
+
+
+def _default_chat_complete(prompt: str) -> str:
+    """로컬/실제 LLM 평문 completion. 연결 실패는 InfraError."""
+    from openai import APIConnectionError
+
+    from app.core.llm_clients import get_active_model, get_chat_client
+
+    client = get_chat_client()
+    try:
+        resp = client.chat.completions.create(
+            model=get_active_model(),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=16,
+        )
+    except APIConnectionError as exc:
+        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+    return resp.choices[0].message.content or ""
+
+
+def normalize_category(output: str) -> str:
+    """모델 출력에서 카테고리를 정규화한다. 정확히 1개면 반환, 0/2개 이상은 미분류."""
+    found = [c for c in CATEGORIES if c in output]
+    if len(found) == 1:
+        return found[0]
+    return UNCLASSIFIED
+
+
+def classify_one(text: str, chat_complete: ChatComplete | None = None) -> str:
+    if not text or not text.strip():
+        raise ValidationErr("분류할 텍스트가 비어 있습니다.")
+    chat_complete = chat_complete or _default_chat_complete
+    output = chat_complete(build_classify_prompt(text))
+    return normalize_category(output)
+
+
+def measure_accuracy(preds: list[str], labels: list[str]) -> dict[str, Any]:
+    if len(preds) != len(labels):
+        raise ValidationErr("preds와 labels 길이가 다릅니다.")
+    wrong = [(i, lab, pred) for i, (pred, lab) in enumerate(zip(preds, labels)) if pred != lab]
+    total = len(labels)
+    correct = total - len(wrong)
+    return {
+        "total": total,
+        "correct": correct,
+        "accuracy": round(correct / total, 4) if total else 0.0,
+        "wrong": wrong,
+    }
+
+
+def confusion_pairs(preds: list[str], labels: list[str]) -> dict[tuple[str, str], int]:
+    """오분류된 (정답, 예측) 쌍을 집계한다 (혼동쌍)."""
+    if len(preds) != len(labels):
+        raise ValidationErr("preds와 labels 길이가 다릅니다.")
+    counter: Counter[tuple[str, str]] = Counter()
+    for pred, lab in zip(preds, labels):
+        if pred != lab:
+            counter[(lab, pred)] += 1
+    return dict(counter)
+
+
+def suggest_fewshot_candidates(preds: list[str], labels: list[str], top_n: int = 3) -> list[dict]:
+    """가장 많이 혼동된 경계 쌍을 few-shot 보강 후보로 제안한다 (처방, 자동 재작성 아님)."""
+    pairs = confusion_pairs(preds, labels)
+    ranked = sorted(pairs.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
+    return [
+        {"true_label": lab, "predicted": pred, "count": n, "hint": f"'{lab}' vs '{pred}' 경계 예시 보강"}
+        for (lab, pred), n in ranked
+    ]
+
+
+def improvement_report(
+    texts: list[str],
+    labels: list[str],
+    base_fewshot: list[tuple[str, str]],
+    augmented_fewshot: list[tuple[str, str]],
+    chat_complete: ChatComplete | None = None,
+) -> dict[str, Any]:
+    """오분류 개선 루프 마무리: few-shot 보강 전/후 정확도를 비교한다.
+
+    측정(base) → 분석(confusion_pairs) → 처방(augmented few-shot) → 재측정 순환을
+    하나의 리포트로 닫는다.
+    """
+    def _run(fewshot: list[tuple[str, str]]) -> list[str]:
+        return [
+            normalize_category((chat_complete or _default_chat_complete)(build_classify_prompt(t, fewshot)))
+            for t in texts
+        ]
+
+    before_preds = _run(base_fewshot)
+    before = measure_accuracy(before_preds, labels)
+    pairs = confusion_pairs(before_preds, labels)
+
+    after_preds = _run(augmented_fewshot)
+    after = measure_accuracy(after_preds, labels)
+
+    return {
+        "before_accuracy": before["accuracy"],
+        "after_accuracy": after["accuracy"],
+        "delta": round(after["accuracy"] - before["accuracy"], 4),
+        "confusion_pairs_before": {f"{k[0]}->{k[1]}": v for k, v in pairs.items()},
+    }
+
+
+def load_cs_dataset(path: Path | None = None) -> tuple[list[str], list[str]]:
+    """cs_inquiries.csv에서 (content, category_hint) 로드. 라벨 컬럼=category_hint."""
+    path = path or (get_settings().DATA_DIR / "cs_inquiries.csv")
+    if not path.exists():
+        raise InfraError(f"CS 데이터가 없습니다: {path}")
+    texts, labels = [], []
+    with path.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            texts.append(row["content"])
+            labels.append(row["category_hint"])
+    return texts, labels
+
+
+def classify_dataset(
+    texts: list[str], chat_complete: ChatComplete | None = None
+) -> list[str]:
+    return [classify_one(t, chat_complete) for t in texts]
+"""예외 taxonomy 및 FastAPI 예외 핸들러.
+
+RULE.md 3.2(폴백 금지)와 통합 계획서 §6을 구현한다. 오류를 삼켜 그럴듯한 가짜
+결과로 대체하지 않고, 정의된 HTTP 상태 + 구조화된 본문 {ok, error_code, message}로
+명확히 실패시킨다.
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+
+class AppError(Exception):
+    """애플리케이션 공통 예외 베이스."""
+
+    http_status: int = 500
+    error_code: str = "app_error"
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ConfigError(AppError):
+    """설정/키 부재 등 서비스 의존성 미준비 (폴백 대신 명시적 실패)."""
+
+    http_status = 503
+    error_code = "config_error"
+
+
+class InfraError(AppError):
+    """DB/외부 인프라 연결 실패."""
+
+    http_status = 503
+    error_code = "infra_error"
+
+
+class LLMOutputError(AppError):
+    """LLM 출력이 스키마 검증을 통과하지 못함 (재시도 후 최종 실패)."""
+
+    http_status = 502
+    error_code = "llm_output_error"
+
+
+class ValidationErr(AppError):
+    """사용자 입력 검증 실패."""
+
+    http_status = 422
+    error_code = "validation_error"
+
+
+class AuthErr(AppError):
+    """인증 실패 (토큰 없음/무효/만료)."""
+
+    http_status = 401
+    error_code = "auth_error"
+
+
+class ForbiddenErr(AppError):
+    """권한 없음 (타인 리소스 접근 등)."""
+
+    http_status = 403
+    error_code = "forbidden"
+
+
+class NotFoundErr(AppError):
+    """리소스 없음."""
+
+    http_status = 404
+    error_code = "not_found"
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다."""
+
+    @app.exception_handler(AppError)
+    async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.http_status,
+            content={"ok": False, "error_code": exc.error_code, "message": exc.message},
+        )
+rg: requirements*.txt: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+ exited 1 in 3346ms:
+"""티켓 라우팅 규칙 — 순수 함수(LLM 무관, 결정론).
+
+우선순위·담당팀은 **명명된 도메인 정책 상수**로 선언한다(매직값 하드코딩 아님).
+누락/모순은 폴백하지 않고 명시적 오류로 실패한다(RULE).
+"""
+
+from __future__ import annotations
+
+from app.core.errors import ValidationErr
+from app.prompts.classifier import CATEGORIES
+
+# 즉시 에스컬레이션 대상(도메인 정책). 그 외는 '일반'.
+URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+
+# 카테고리 → 담당팀 (유효 카테고리 7종 전부 명시, 기본팀 없음).
+TEAM_BY_CATEGORY: dict[str, str] = {
+    "결제": "결제팀",
+    "환불": "결제팀",
+    "배송": "물류팀",
+    "교환": "물류팀",
+    "상품문의": "상품팀",
+    "칭찬": "CS팀",
+    "불만": "CS팀",
+}
+
+PRIORITY_URGENT = "긴급"
+PRIORITY_NORMAL = "일반"
+
+
+def calculate_priority(category: str) -> str:
+    """카테고리로 우선순위를 정한다. 긴급 정책 대상이면 '긴급', 아니면 '일반'."""
+    return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+
+
+def assign_team(category: str) -> str:
+    """카테고리의 담당팀을 반환한다. 매핑에 없으면 폴백 대신 명시적 실패."""
+    try:
+        return TEAM_BY_CATEGORY[category]
+    except KeyError as exc:
+        # 유효 카테고리는 전부 매핑돼 있어야 한다(정상 경로에서는 도달 불가).
+        raise ValidationErr(f"담당팀 매핑에 없는 카테고리입니다: {category}") from exc
+
+
+# 불변식: 분류기의 모든 유효 카테고리는 팀 매핑에 존재해야 한다.
+# (드리프트 시 import 시점에 즉시 실패시켜 조용한 폴백을 막는다.)
+_UNMAPPED = set(CATEGORIES) - set(TEAM_BY_CATEGORY)
+if _UNMAPPED:  # pragma: no cover - 개발 중 실수 방지용 가드
+    raise ValidationErr(f"팀 매핑 누락 카테고리: {sorted(_UNMAPPED)}")
+"""CS 티켓 처리 LangGraph StateGraph.
+
+그래프(조건분기):
+    START → classify → ┬ (유효 카테고리) → priority → ┬ (긴급) → escalate → END
+                       │                               └ (일반) → assign   → END
+                       └ (미분류)          → manual_review → END
+
+무폴백(계획 Codex 합의 #3):
+- 빈 입력 → ValidationErr(전파), LLM 연결 실패 → InfraError(전파). (classify_one이 이미 그렇게 처리)
+- LLM 출력이 허용 카테고리 아님 → '미분류' → manual_review → END.
+  priority로 계속 진행하지 않는다(그게 또 다른 폴백).
+
+linear 그래프는 만들지 않는다(엔드포인트 미사용 + 미분류를 무시하고 진행 → 무폴백 위반, YAGNI).
+"""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from langgraph.graph import END, START, StateGraph
+
+from app.prompts.classifier import UNCLASSIFIED, ChatComplete, classify_one
+from app.workflow.rules import assign_team, calculate_priority
+
+
+class TicketState(TypedDict, total=False):
+    content: str
+    category: str
+    priority: str
+    team: str
+    action: str
+
+
+def build_ticket_graph(chat_complete: ChatComplete | None = None):
+    """CS 티켓 워크플로 그래프를 컴파일해 반환한다.
+
+    chat_complete: 분류 LLM 주입(테스트/로컬 결정론). 미지정 시 설정된 provider 사용.
+    """
+
+    def classify_node(state: TicketState) -> TicketState:
+        # 빈 입력/LLM 실패는 classify_one이 ValidationErr/InfraError로 전파(삼키지 않음).
+        return {"category": classify_one(state["content"], chat_complete)}
+
+    def route_after_classify(state: TicketState) -> str:
+        return "manual_review" if state["category"] == UNCLASSIFIED else "priority"
+
+    def priority_node(state: TicketState) -> TicketState:
+        return {"priority": calculate_priority(state["category"])}
+
+    def route_after_priority(state: TicketState) -> str:
+        return "escalate" if state["priority"] == "긴급" else "assign"
+
+    def assign_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "assign"}
+
+    def escalate_node(state: TicketState) -> TicketState:
+        return {"team": assign_team(state["category"]), "action": "escalate"}
+
+    def manual_review_node(state: TicketState) -> TicketState:
+        # 미분류는 정상 수동검토 상태(오류 아님). 담당팀/우선순위는 배정하지 않는다.
+        return {"action": "manual_review"}
+
+    graph = StateGraph(TicketState)
+    graph.add_node("classify", classify_node)
+    graph.add_node("priority", priority_node)
+    graph.add_node("assign", assign_node)
+    graph.add_node("escalate", escalate_node)
+    graph.add_node("manual_review", manual_review_node)
+
+    graph.add_edge(START, "classify")
+    graph.add_conditional_edges(
+        "classify",
+        route_after_classify,
+        {"priority": "priority", "manual_review": "manual_review"},
+    )
+    graph.add_conditional_edges(
+        "priority",
+        route_after_priority,
+        {"escalate": "escalate", "assign": "assign"},
+    )
+    graph.add_edge("assign", END)
+    graph.add_edge("escalate", END)
+    graph.add_edge("manual_review", END)
+    return graph.compile()
+
+
+def run_ticket(content: str, chat_complete: ChatComplete | None = None) -> TicketState:
+    """티켓 내용을 워크플로에 태워 최종 상태를 반환한다."""
+    graph = build_ticket_graph(chat_complete)
+    return graph.invoke({"content": content})
+"""CS 문의 분류 + 정확도 측정 + 혼동쌍 분석 (오분류 개선 루프, PDF5).
+
+측정→분석→처방(후보 산출)까지 결정론으로 구현한다. 프롬프트 자동 재작성/반복
+튜닝은 YAGNI로 두지 않는다 (Codex 합의).
+"""
+
+from __future__ import annotations
+
+import csv
+from collections import Counter
+from collections.abc import Callable
+from pathlib import Path
+from typing import Any
+
+from app.core.config import get_settings
+from app.core.errors import InfraError, ValidationErr
+from app.prompts.templates import CATEGORIES, build_classify_prompt
+
+UNCLASSIFIED = "미분류"  # CATEGORIES에 포함하지 않는 오답 sentinel
+
+# chat_complete(prompt) -> str
+ChatComplete = Callable[[str], str]
+
+
+def _default_chat_complete(prompt: str) -> str:
+    """로컬/실제 LLM 평문 completion. 연결 실패는 InfraError."""
+    from openai import APIConnectionError
+
+    from app.core.llm_clients import get_active_model, get_chat_client
+
+    client = get_chat_client()
+    try:
+        resp = client.chat.completions.create(
+            model=get_active_model(),
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0,
+            max_tokens=16,
+        )
+    except APIConnectionError as exc:
+        raise InfraError("LLM 서버에 연결할 수 없습니다.") from exc
+    return resp.choices[0].message.content or ""
+
+
+def normalize_category(output: str) -> str:
+    """모델 출력에서 카테고리를 정규화한다. 정확히 1개면 반환, 0/2개 이상은 미분류."""
+    found = [c for c in CATEGORIES if c in output]
+    if len(found) == 1:
+        return found[0]
+    return UNCLASSIFIED
+
+
+def classify_one(text: str, chat_complete: ChatComplete | None = None) -> str:
+    if not text or not text.strip():
+        raise ValidationErr("분류할 텍스트가 비어 있습니다.")
+    chat_complete = chat_complete or _default_chat_complete
+    output = chat_complete(build_classify_prompt(text))
+    return normalize_category(output)
+
+
+def measure_accuracy(preds: list[str], labels: list[str]) -> dict[str, Any]:
+    if len(preds) != len(labels):
+        raise ValidationErr("preds와 labels 길이가 다릅니다.")
+    wrong = [(i, lab, pred) for i, (pred, lab) in enumerate(zip(preds, labels)) if pred != lab]
+    total = len(labels)
+    correct = total - len(wrong)
+    return {
+        "total": total,
+        "correct": correct,
+        "accuracy": round(correct / total, 4) if total else 0.0,
+        "wrong": wrong,
+    }
+
+
+def confusion_pairs(preds: list[str], labels: list[str]) -> dict[tuple[str, str], int]:
+    """오분류된 (정답, 예측) 쌍을 집계한다 (혼동쌍)."""
+    if len(preds) != len(labels):
+        raise ValidationErr("preds와 labels 길이가 다릅니다.")
+    counter: Counter[tuple[str, str]] = Counter()
+    for pred, lab in zip(preds, labels):
+        if pred != lab:
+            counter[(lab, pred)] += 1
+    return dict(counter)
+
+
+def suggest_fewshot_candidates(preds: list[str], labels: list[str], top_n: int = 3) -> list[dict]:
+    """가장 많이 혼동된 경계 쌍을 few-shot 보강 후보로 제안한다 (처방, 자동 재작성 아님)."""
+    pairs = confusion_pairs(preds, labels)
+    ranked = sorted(pairs.items(), key=lambda kv: kv[1], reverse=True)[:top_n]
+    return [
+        {"true_label": lab, "predicted": pred, "count": n, "hint": f"'{lab}' vs '{pred}' 경계 예시 보강"}
+        for (lab, pred), n in ranked
+    ]
+
+
+def improvement_report(
+    texts: list[str],
+    labels: list[str],
+    base_fewshot: list[tuple[str, str]],
+    augmented_fewshot: list[tuple[str, str]],
+    chat_complete: ChatComplete | None = None,
+) -> dict[str, Any]:
+    """오분류 개선 루프 마무리: few-shot 보강 전/후 정확도를 비교한다.
+
+    측정(base) → 분석(confusion_pairs) → 처방(augmented few-shot) → 재측정 순환을
+    하나의 리포트로 닫는다.
+    """
+    def _run(fewshot: list[tuple[str, str]]) -> list[str]:
+        return [
+            normalize_category((chat_complete or _default_chat_complete)(build_classify_prompt(t, fewshot)))
+            for t in texts
+        ]
+
+    before_preds = _run(base_fewshot)
+    before = measure_accuracy(before_preds, labels)
+    pairs = confusion_pairs(before_preds, labels)
+
+    after_preds = _run(augmented_fewshot)
+    after = measure_accuracy(after_preds, labels)
+
+    return {
+        "before_accuracy": before["accuracy"],
+        "after_accuracy": after["accuracy"],
+        "delta": round(after["accuracy"] - before["accuracy"], 4),
+        "confusion_pairs_before": {f"{k[0]}->{k[1]}": v for k, v in pairs.items()},
+    }
+
+
+def load_cs_dataset(path: Path | None = None) -> tuple[list[str], list[str]]:
+    """cs_inquiries.csv에서 (content, category_hint) 로드. 라벨 컬럼=category_hint."""
+    path = path or (get_settings().DATA_DIR / "cs_inquiries.csv")
+    if not path.exists():
+        raise InfraError(f"CS 데이터가 없습니다: {path}")
+    texts, labels = [], []
+    with path.open(encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            texts.append(row["content"])
+            labels.append(row["category_hint"])
+    return texts, labels
+
+
+def classify_dataset(
+    texts: list[str], chat_complete: ChatComplete | None = None
+) -> list[str]:
+    return [classify_one(t, chat_complete) for t in texts]
+"""예외 taxonomy 및 FastAPI 예외 핸들러.
+
+RULE.md 3.2(폴백 금지)와 통합 계획서 §6을 구현한다. 오류를 삼켜 그럴듯한 가짜
+결과로 대체하지 않고, 정의된 HTTP 상태 + 구조화된 본문 {ok, error_code, message}로
+명확히 실패시킨다.
+"""
+
+from __future__ import annotations
+
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
+
+class AppError(Exception):
+    """애플리케이션 공통 예외 베이스."""
+
+    http_status: int = 500
+    error_code: str = "app_error"
+
+    def __init__(self, message: str):
+        super().__init__(message)
+        self.message = message
+
+
+class ConfigError(AppError):
+    """설정/키 부재 등 서비스 의존성 미준비 (폴백 대신 명시적 실패)."""
+
+    http_status = 503
+    error_code = "config_error"
+
+
+class InfraError(AppError):
+    """DB/외부 인프라 연결 실패."""
+
+    http_status = 503
+    error_code = "infra_error"
+
+
+class LLMOutputError(AppError):
+    """LLM 출력이 스키마 검증을 통과하지 못함 (재시도 후 최종 실패)."""
+
+    http_status = 502
+    error_code = "llm_output_error"
+
+
+class ValidationErr(AppError):
+    """사용자 입력 검증 실패."""
+
+    http_status = 422
+    error_code = "validation_error"
+
+
+class AuthErr(AppError):
+    """인증 실패 (토큰 없음/무효/만료)."""
+
+    http_status = 401
+    error_code = "auth_error"
+
+
+class ForbiddenErr(AppError):
+    """권한 없음 (타인 리소스 접근 등)."""
+
+    http_status = 403
+    error_code = "forbidden"
+
+
+class NotFoundErr(AppError):
+    """리소스 없음."""
+
+    http_status = 404
+    error_code = "not_found"
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다."""
+
+    @app.exception_handler(AppError)
+    async def _handle_app_error(_request: Request, exc: AppError) -> JSONResponse:
+        return JSONResponse(
+            status_code=exc.http_status,
+            content={"ok": False, "error_code": exc.error_code, "message": exc.message},
+        )
+rg: requirements*.txt: 파일 이름, 디렉터리 이름 또는 볼륨 레이블 구문이 잘못되었습니다. (os error 123)
+Traceback (most recent call last):
+  File "C:\Users\playdata2\anaconda3\Scripts\pytest-script.py", line 10, in <module>
+    sys.exit(console_main())
+             ^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 192, in console_main
+    code = main()
+           ^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 150, in main
+    config = _prepareconfig(args, plugins)
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 331, in _prepareconfig
+    config = pluginmanager.hook.pytest_cmdline_parse(
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 55, in _multicall
+    gen.send(outcome)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\helpconfig.py", line 104, in pytest_cmdline_parse
+    config: Config = outcome.get_result()
+                     ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 39, in _multicall
+    res = hook_impl.function(*args)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1075, in pytest_cmdline_parse
+    self.parse(args)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1425, in parse
+    self._preparse(args, addopts=addopts)
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\config\__init__.py", line 1327, in _preparse
+    self.hook.pytest_load_initial_conftests(
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_hooks.py", line 265, in __call__
+    return self._hookexec(self.name, self.get_hookimpls(), kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_manager.py", line 80, in _hookexec
+    return self._inner_hookexec(hook_name, methods, kwargs, firstresult)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 60, in _multicall
+    return outcome.get_result()
+           ^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_result.py", line 60, in get_result
+    raise ex[1].with_traceback(ex[2])
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\pluggy\_callers.py", line 34, in _multicall
+    next(gen)  # first yield
+    ^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 149, in pytest_load_initial_conftests
+    capman.start_global_capturing()
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 750, in start_global_capturing
+    self._global_capturing = _get_multicapture(self._method)
+                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 692, in _get_multicapture
+    return MultiCapture(in_=FDCapture(0), out=FDCapture(1), err=FDCapture(2))
+                                              ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\site-packages\_pytest\capture.py", line 466, in __init__
+    TemporaryFile(buffering=0),
+    ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 564, in NamedTemporaryFile
+    prefix, suffix, dir, output_type = _sanitize_params(prefix, suffix, dir)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 126, in _sanitize_params
+    dir = gettempdir()
+          ^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 315, in gettempdir
+    return _os.fsdecode(_gettempdir())
+                        ^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 308, in _gettempdir
+    tempdir = _get_default_tempdir()
+              ^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\playdata2\anaconda3\Lib\tempfile.py", line 223, in _get_default_tempdir
+    raise FileNotFoundError(_errno.ENOENT,
+FileNotFoundError: [Errno 2] No usable temporary directory found in ['C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\PLAYDA~1\\AppData\\Local\\Temp', 'C:\\Users\\playdata2\\AppData\\Local\\Temp', 'C:\\WINDOWS\\Temp', 'c:\\temp', 'c:\\tmp', '\\temp', '\\tmp', 'C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_agent_project']
+
+exec
+"C:\\WINDOWS\\System32\\WindowsPowerShell\\v1.0\\powershell.exe" -Command '$files=@('"'app/workflow/rules.py','app/workflow/ticket_graph.py','tests/test_workflow.py','app/routers/workflow.py','app/main.py'); foreach("'$f in $files){$n=0; Get-Content -Encoding utf8 $f | ForEach-Object {$n++; '"'{0}:{1}: {2}' -f "'$f,$n,$_}}' in C:\Users\playdata2\Documents\llm_workspace\_unified_mall_agent_project
+ succeeded in 1388ms:
+app/workflow/rules.py:1: """티켓 라우팅 규칙 — 순수 함수(LLM 무관, 결정론).
+app/workflow/rules.py:2: 
+app/workflow/rules.py:3: 우선순위·담당팀은 **명명된 도메인 정책 상수**로 선언한다(매직값 하드코딩 아님).
+app/workflow/rules.py:4: 누락/모순은 폴백하지 않고 명시적 오류로 실패한다(RULE).
+app/workflow/rules.py:5: """
+app/workflow/rules.py:6: 
+app/workflow/rules.py:7: from __future__ import annotations
+app/workflow/rules.py:8: 
+app/workflow/rules.py:9: from app.core.errors import ValidationErr
+app/workflow/rules.py:10: from app.prompts.classifier import CATEGORIES
+app/workflow/rules.py:11: 
+app/workflow/rules.py:12: # 즉시 에스컬레이션 대상(도메인 정책). 그 외는 '일반'.
+app/workflow/rules.py:13: URGENT_CATEGORIES: frozenset[str] = frozenset({"불만", "환불"})
+app/workflow/rules.py:14: 
+app/workflow/rules.py:15: # 카테고리 → 담당팀 (유효 카테고리 7종 전부 명시, 기본팀 없음).
+app/workflow/rules.py:16: TEAM_BY_CATEGORY: dict[str, str] = {
+app/workflow/rules.py:17:     "결제": "결제팀",
+app/workflow/rules.py:18:     "환불": "결제팀",
+app/workflow/rules.py:19:     "배송": "물류팀",
+app/workflow/rules.py:20:     "교환": "물류팀",
+app/workflow/rules.py:21:     "상품문의": "상품팀",
+app/workflow/rules.py:22:     "칭찬": "CS팀",
+app/workflow/rules.py:23:     "불만": "CS팀",
+app/workflow/rules.py:24: }
+app/workflow/rules.py:25: 
+app/workflow/rules.py:26: PRIORITY_URGENT = "긴급"
+app/workflow/rules.py:27: PRIORITY_NORMAL = "일반"
+app/workflow/rules.py:28: 
+app/workflow/rules.py:29: 
+app/workflow/rules.py:30: def calculate_priority(category: str) -> str:
+app/workflow/rules.py:31:     """카테고리로 우선순위를 정한다. 긴급 정책 대상이면 '긴급', 아니면 '일반'."""
+app/workflow/rules.py:32:     return PRIORITY_URGENT if category in URGENT_CATEGORIES else PRIORITY_NORMAL
+app/workflow/rules.py:33: 
+app/workflow/rules.py:34: 
+app/workflow/rules.py:35: def assign_team(category: str) -> str:
+app/workflow/rules.py:36:     """카테고리의 담당팀을 반환한다. 매핑에 없으면 폴백 대신 명시적 실패."""
+app/workflow/rules.py:37:     try:
+app/workflow/rules.py:38:         return TEAM_BY_CATEGORY[category]
+app/workflow/rules.py:39:     except KeyError as exc:
+app/workflow/rules.py:40:         # 유효 카테고리는 전부 매핑돼 있어야 한다(정상 경로에서는 도달 불가).
+app/workflow/rules.py:41:         raise ValidationErr(f"담당팀 매핑에 없는 카테고리입니다: {category}") from exc
+app/workflow/rules.py:42: 
+app/workflow/rules.py:43: 
+app/workflow/rules.py:44: # 불변식: 분류기의 모든 유효 카테고리는 팀 매핑에 존재해야 한다.
+app/workflow/rules.py:45: # (드리프트 시 import 시점에 즉시 실패시켜 조용한 폴백을 막는다.)
+app/workflow/rules.py:46: _UNMAPPED = set(CATEGORIES) - set(TEAM_BY_CATEGORY)
+app/workflow/rules.py:47: if _UNMAPPED:  # pragma: no cover - 개발 중 실수 방지용 가드
+app/workflow/rules.py:48:     raise ValidationErr(f"팀 매핑 누락 카테고리: {sorted(_UNMAPPED)}")
+app/workflow/ticket_graph.py:1: """CS 티켓 처리 LangGraph StateGraph.
+app/workflow/ticket_graph.py:2: 
+app/workflow/ticket_graph.py:3: 그래프(조건분기):
+app/workflow/ticket_graph.py:4:     START → classify → ┬ (유효 카테고리) → priority → ┬ (긴급) → escalate → END
+app/workflow/ticket_graph.py:5:                        │                               └ (일반) → assign   → END
+app/workflow/ticket_graph.py:6:                        └ (미분류)          → manual_review → END
+app/workflow/ticket_graph.py:7: 
+app/workflow/ticket_graph.py:8: 무폴백(계획 Codex 합의 #3):
+app/workflow/ticket_graph.py:9: - 빈 입력 → ValidationErr(전파), LLM 연결 실패 → InfraError(전파). (classify_one이 이미 그렇게 처리)
+app/workflow/ticket_graph.py:10: - LLM 출력이 허용 카테고리 아님 → '미분류' → manual_review → END.
+app/workflow/ticket_graph.py:11:   priority로 계속 진행하지 않는다(그게 또 다른 폴백).
+app/workflow/ticket_graph.py:12: 
+app/workflow/ticket_graph.py:13: linear 그래프는 만들지 않는다(엔드포인트 미사용 + 미분류를 무시하고 진행 → 무폴백 위반, YAGNI).
+app/workflow/ticket_graph.py:14: """
+app/workflow/ticket_graph.py:15: 
+app/workflow/ticket_graph.py:16: from __future__ import annotations
+app/workflow/ticket_graph.py:17: 
+app/workflow/ticket_graph.py:18: from typing import TypedDict
+app/workflow/ticket_graph.py:19: 
+app/workflow/ticket_graph.py:20: from langgraph.graph import END, START, StateGraph
+app/workflow/ticket_graph.py:21: 
+app/workflow/ticket_graph.py:22: from app.prompts.classifier import UNCLASSIFIED, ChatComplete, classify_one
+app/workflow/ticket_graph.py:23: from app.workflow.rules import assign_team, calculate_priority
+app/workflow/ticket_graph.py:24: 
+app/workflow/ticket_graph.py:25: 
+app/workflow/ticket_graph.py:26: class TicketState(TypedDict, total=False):
+app/workflow/ticket_graph.py:27:     content: str
+app/workflow/ticket_graph.py:28:     category: str
+app/workflow/ticket_graph.py:29:     priority: str
+app/workflow/ticket_graph.py:30:     team: str
+app/workflow/ticket_graph.py:31:     action: str
+app/workflow/ticket_graph.py:32: 
+app/workflow/ticket_graph.py:33: 
+app/workflow/ticket_graph.py:34: def build_ticket_graph(chat_complete: ChatComplete | None = None):
+app/workflow/ticket_graph.py:35:     """CS 티켓 워크플로 그래프를 컴파일해 반환한다.
+app/workflow/ticket_graph.py:36: 
+app/workflow/ticket_graph.py:37:     chat_complete: 분류 LLM 주입(테스트/로컬 결정론). 미지정 시 설정된 provider 사용.
+app/workflow/ticket_graph.py:38:     """
+app/workflow/ticket_graph.py:39: 
+app/workflow/ticket_graph.py:40:     def classify_node(state: TicketState) -> TicketState:
+app/workflow/ticket_graph.py:41:         # 빈 입력/LLM 실패는 classify_one이 ValidationErr/InfraError로 전파(삼키지 않음).
+app/workflow/ticket_graph.py:42:         return {"category": classify_one(state["content"], chat_complete)}
+app/workflow/ticket_graph.py:43: 
+app/workflow/ticket_graph.py:44:     def route_after_classify(state: TicketState) -> str:
+app/workflow/ticket_graph.py:45:         return "manual_review" if state["category"] == UNCLASSIFIED else "priority"
+app/workflow/ticket_graph.py:46: 
+app/workflow/ticket_graph.py:47:     def priority_node(state: TicketState) -> TicketState:
+app/workflow/ticket_graph.py:48:         return {"priority": calculate_priority(state["category"])}
+app/workflow/ticket_graph.py:49: 
+app/workflow/ticket_graph.py:50:     def route_after_priority(state: TicketState) -> str:
+app/workflow/ticket_graph.py:51:         return "escalate" if state["priority"] == "긴급" else "assign"
+app/workflow/ticket_graph.py:52: 
+app/workflow/ticket_graph.py:53:     def assign_node(state: TicketState) -> TicketState:
+app/workflow/ticket_graph.py:54:         return {"team": assign_team(state["category"]), "action": "assign"}
+app/workflow/ticket_graph.py:55: 
+app/workflow/ticket_graph.py:56:     def escalate_node(state: TicketState) -> TicketState:
+app/workflow/ticket_graph.py:57:         return {"team": assign_team(state["category"]), "action": "escalate"}
+app/workflow/ticket_graph.py:58: 
+app/workflow/ticket_graph.py:59:     def manual_review_node(state: TicketState) -> TicketState:
+app/workflow/ticket_graph.py:60:         # 미분류는 정상 수동검토 상태(오류 아님). 담당팀/우선순위는 배정하지 않는다.
+app/workflow/ticket_graph.py:61:         return {"action": "manual_review"}
+app/workflow/ticket_graph.py:62: 
+app/workflow/ticket_graph.py:63:     graph = StateGraph(TicketState)
+app/workflow/ticket_graph.py:64:     graph.add_node("classify", classify_node)
+app/workflow/ticket_graph.py:65:     graph.add_node("priority", priority_node)
+app/workflow/ticket_graph.py:66:     graph.add_node("assign", assign_node)
+app/workflow/ticket_graph.py:67:     graph.add_node("escalate", escalate_node)
+app/workflow/ticket_graph.py:68:     graph.add_node("manual_review", manual_review_node)
+app/workflow/ticket_graph.py:69: 
+app/workflow/ticket_graph.py:70:     graph.add_edge(START, "classify")
+app/workflow/ticket_graph.py:71:     graph.add_conditional_edges(
+app/workflow/ticket_graph.py:72:         "classify",
+app/workflow/ticket_graph.py:73:         route_after_classify,
+app/workflow/ticket_graph.py:74:         {"priority": "priority", "manual_review": "manual_review"},
+app/workflow/ticket_graph.py:75:     )
+app/workflow/ticket_graph.py:76:     graph.add_conditional_edges(
+app/workflow/ticket_graph.py:77:         "priority",
+app/workflow/ticket_graph.py:78:         route_after_priority,
+app/workflow/ticket_graph.py:79:         {"escalate": "escalate", "assign": "assign"},
+app/workflow/ticket_graph.py:80:     )
+app/workflow/ticket_graph.py:81:     graph.add_edge("assign", END)
+app/workflow/ticket_graph.py:82:     graph.add_edge("escalate", END)
+app/workflow/ticket_graph.py:83:     graph.add_edge("manual_review", END)
+app/workflow/ticket_graph.py:84:     return graph.compile()
+app/workflow/ticket_graph.py:85: 
+app/workflow/ticket_graph.py:86: 
+app/workflow/ticket_graph.py:87: def run_ticket(content: str, chat_complete: ChatComplete | None = None) -> TicketState:
+app/workflow/ticket_graph.py:88:     """티켓 내용을 워크플로에 태워 최종 상태를 반환한다."""
+app/workflow/ticket_graph.py:89:     graph = build_ticket_graph(chat_complete)
+app/workflow/ticket_graph.py:90:     return graph.invoke({"content": content})
+tests/test_workflow.py:1: """LangGraph CS 티켓 워크플로 테스트 (결정론 — mock 분류, LLM 불필요).
+tests/test_workflow.py:2: 
+tests/test_workflow.py:3: 분기 전부 검증: 유효→긴급→escalate / 유효→일반→assign / 미분류→manual_review.
+tests/test_workflow.py:4: 무폴백 검증: 빈 입력→ValidationErr, LLM 실패→InfraError 전파.
+tests/test_workflow.py:5: 규칙(rules) 단위 + 불변식(모든 카테고리 매핑).
+tests/test_workflow.py:6: """
+tests/test_workflow.py:7: 
+tests/test_workflow.py:8: from __future__ import annotations
+tests/test_workflow.py:9: 
+tests/test_workflow.py:10: import pytest
+tests/test_workflow.py:11: 
+tests/test_workflow.py:12: from app.core.errors import InfraError, ValidationErr
+tests/test_workflow.py:13: from app.prompts.classifier import CATEGORIES, UNCLASSIFIED
+tests/test_workflow.py:14: from app.workflow import rules
+tests/test_workflow.py:15: from app.workflow.ticket_graph import run_ticket
+tests/test_workflow.py:16: 
+tests/test_workflow.py:17: 
+tests/test_workflow.py:18: def _fixed_chat(category: str):
+tests/test_workflow.py:19:     """분류 LLM을 특정 카테고리 문자열로 고정하는 mock."""
+tests/test_workflow.py:20: 
+tests/test_workflow.py:21:     def _chat(_prompt: str) -> str:
+tests/test_workflow.py:22:         return category
+tests/test_workflow.py:23: 
+tests/test_workflow.py:24:     return _chat
+tests/test_workflow.py:25: 
+tests/test_workflow.py:26: 
+tests/test_workflow.py:27: # --- 규칙(rules) 단위 -------------------------------------------------------
+tests/test_workflow.py:28: def test_priority_urgent_categories():
+tests/test_workflow.py:29:     assert rules.calculate_priority("불만") == "긴급"
+tests/test_workflow.py:30:     assert rules.calculate_priority("환불") == "긴급"
+tests/test_workflow.py:31: 
+tests/test_workflow.py:32: 
+tests/test_workflow.py:33: def test_priority_normal_categories():
+tests/test_workflow.py:34:     for c in ["결제", "상품문의", "교환", "배송", "칭찬"]:
+tests/test_workflow.py:35:         assert rules.calculate_priority(c) == "일반"
+tests/test_workflow.py:36: 
+tests/test_workflow.py:37: 
+tests/test_workflow.py:38: def test_assign_team_mapping():
+tests/test_workflow.py:39:     assert rules.assign_team("결제") == "결제팀"
+tests/test_workflow.py:40:     assert rules.assign_team("배송") == "물류팀"
+tests/test_workflow.py:41:     assert rules.assign_team("상품문의") == "상품팀"
+tests/test_workflow.py:42:     assert rules.assign_team("칭찬") == "CS팀"
+tests/test_workflow.py:43: 
+tests/test_workflow.py:44: 
+tests/test_workflow.py:45: def test_every_category_is_mapped_to_a_team():
+tests/test_workflow.py:46:     # 불변식: 분류기의 모든 유효 카테고리가 팀 매핑에 존재(조용한 폴백 방지)
+tests/test_workflow.py:47:     assert set(CATEGORIES) <= set(rules.TEAM_BY_CATEGORY)
+tests/test_workflow.py:48: 
+tests/test_workflow.py:49: 
+tests/test_workflow.py:50: def test_assign_team_unknown_category_raises():
+tests/test_workflow.py:51:     with pytest.raises(ValidationErr):
+tests/test_workflow.py:52:         rules.assign_team("존재하지않는카테고리")
+tests/test_workflow.py:53: 
+tests/test_workflow.py:54: 
+tests/test_workflow.py:55: # --- 그래프 분기(mock 분류) -------------------------------------------------
+tests/test_workflow.py:56: def test_urgent_category_routes_to_escalate():
+tests/test_workflow.py:57:     state = run_ticket("환불해주세요 당장!", chat_complete=_fixed_chat("불만"))
+tests/test_workflow.py:58:     assert state["category"] == "불만"
+tests/test_workflow.py:59:     assert state["priority"] == "긴급"
+tests/test_workflow.py:60:     assert state["team"] == "CS팀"
+tests/test_workflow.py:61:     assert state["action"] == "escalate"
+tests/test_workflow.py:62: 
+tests/test_workflow.py:63: 
+tests/test_workflow.py:64: def test_normal_category_routes_to_assign():
+tests/test_workflow.py:65:     state = run_ticket("언제 배송되나요?", chat_complete=_fixed_chat("배송"))
+tests/test_workflow.py:66:     assert state["category"] == "배송"
+tests/test_workflow.py:67:     assert state["priority"] == "일반"
+tests/test_workflow.py:68:     assert state["team"] == "물류팀"
+tests/test_workflow.py:69:     assert state["action"] == "assign"
+tests/test_workflow.py:70: 
+tests/test_workflow.py:71: 
+tests/test_workflow.py:72: def test_refund_is_urgent_and_payment_team():
+tests/test_workflow.py:73:     state = run_ticket("환불 요청합니다", chat_complete=_fixed_chat("환불"))
+tests/test_workflow.py:74:     assert state["priority"] == "긴급"
+tests/test_workflow.py:75:     assert state["team"] == "결제팀"
+tests/test_workflow.py:76:     assert state["action"] == "escalate"
+tests/test_workflow.py:77: 
+tests/test_workflow.py:78: 
+tests/test_workflow.py:79: def test_unclassified_routes_to_manual_review_and_stops():
+tests/test_workflow.py:80:     # 허용 카테고리가 아닌 출력 → 미분류 → manual_review → END
+tests/test_workflow.py:81:     state = run_ticket("횡설수설", chat_complete=_fixed_chat("헛소리분류불가"))
+tests/test_workflow.py:82:     assert state["category"] == UNCLASSIFIED
+tests/test_workflow.py:83:     assert state["action"] == "manual_review"
+tests/test_workflow.py:84:     # 무폴백: priority/team으로 계속 진행하지 않았음을 증명
+tests/test_workflow.py:85:     assert "priority" not in state
+tests/test_workflow.py:86:     assert "team" not in state
+tests/test_workflow.py:87: 
+tests/test_workflow.py:88: 
+tests/test_workflow.py:89: # --- 무폴백: 예외 전파 ------------------------------------------------------
+tests/test_workflow.py:90: def test_empty_content_raises_validation_error():
+tests/test_workflow.py:91:     with pytest.raises(ValidationErr):
+tests/test_workflow.py:92:         run_ticket("   ", chat_complete=_fixed_chat("배송"))
+tests/test_workflow.py:93: 
+tests/test_workflow.py:94: 
+tests/test_workflow.py:95: def test_llm_failure_propagates():
+tests/test_workflow.py:96:     def _boom(_prompt: str) -> str:
+tests/test_workflow.py:97:         raise InfraError("LLM 서버에 연결할 수 없습니다.")
+tests/test_workflow.py:98: 
+tests/test_workflow.py:99:     with pytest.raises(InfraError):
+tests/test_workflow.py:100:         run_ticket("배송 문의", chat_complete=_boom)
+app/routers/workflow.py:1: """LangGraph 워크플로 라우터 — CS 티켓 처리.
+app/routers/workflow.py:2: 
+app/routers/workflow.py:3: POST /api/workflow/ticket : 문의 내용 → 최종 상태(category/priority/team/action).
+app/routers/workflow.py:4: 빈 입력/LLM 실패는 폴백 없이 오류로 전파(그래프 노드가 ValidationErr/InfraError 발생).
+app/routers/workflow.py:5: """
+app/routers/workflow.py:6: 
+app/routers/workflow.py:7: from __future__ import annotations
+app/routers/workflow.py:8: 
+app/routers/workflow.py:9: from fastapi import APIRouter
+app/routers/workflow.py:10: from pydantic import BaseModel, Field
+app/routers/workflow.py:11: 
+app/routers/workflow.py:12: from app.workflow.ticket_graph import run_ticket
+app/routers/workflow.py:13: 
+app/routers/workflow.py:14: router = APIRouter(prefix="/api/workflow", tags=["workflow"])
+app/routers/workflow.py:15: 
+app/routers/workflow.py:16: 
+app/routers/workflow.py:17: class TicketRequest(BaseModel):
+app/routers/workflow.py:18:     content: str = Field(min_length=1, description="CS 문의 내용")
+app/routers/workflow.py:19: 
+app/routers/workflow.py:20: 
+app/routers/workflow.py:21: @router.post("/ticket")
+app/routers/workflow.py:22: def handle_ticket(body: TicketRequest) -> dict:
+app/routers/workflow.py:23:     """문의를 워크플로에 태워 분류→우선순위→배정/에스컬레이션/수동검토 결과를 반환한다."""
+app/routers/workflow.py:24:     return dict(run_ticket(body.content))
+app/main.py:1: """FastAPI 진입점.
+app/main.py:2: 
+app/main.py:3: Phase 1: 예외 핸들러 + health.
+app/main.py:4: Phase 2: DB 테이블 생성 + 시딩 + auth/products/orders/payments 라우터.
+app/main.py:5: 정적 UI/에이전트 라우터는 이후 Phase에서 붙인다.
+app/main.py:6: """
+app/main.py:7: 
+app/main.py:8: from __future__ import annotations
+app/main.py:9: 
+app/main.py:10: from contextlib import asynccontextmanager
+app/main.py:11: from pathlib import Path
+app/main.py:12: 
+app/main.py:13: from fastapi import FastAPI
+app/main.py:14: from fastapi.responses import FileResponse
+app/main.py:15: from fastapi.staticfiles import StaticFiles
+app/main.py:16: 
+app/main.py:17: from app.core.errors import register_exception_handlers
+app/main.py:18: from app.db.database import Base, SessionLocal, engine
+app/main.py:19: from app.db.seed import seed_products
+app/main.py:20: from app.routers import (
+app/main.py:21:     agent,
+app/main.py:22:     auth,
+app/main.py:23:     health,
+app/main.py:24:     lab,
+app/main.py:25:     mcp,
+app/main.py:26:     nlp,
+app/main.py:27:     orders,
+app/main.py:28:     payments,
+app/main.py:29:     products,
+app/main.py:30:     rag,
+app/main.py:31:     workflow,
+app/main.py:32: )
+app/main.py:33: 
+app/main.py:34: _STATIC_DIR = Path(__file__).resolve().parent / "static"
+app/main.py:35: 
+app/main.py:36: 
+app/main.py:37: @asynccontextmanager
+app/main.py:38: async def lifespan(_app: FastAPI):
+app/main.py:39:     # 테이블 생성 + 시딩 (멱등)
+app/main.py:40:     Base.metadata.create_all(bind=engine)
+app/main.py:41:     db = SessionLocal()
+app/main.py:42:     try:
+app/main.py:43:         seed_products(db)
+app/main.py:44:     finally:
+app/main.py:45:         db.close()
+app/main.py:46:     # RAG 인덱스가 없으면 1회 빌드 (있으면 그대로 사용 — 인덱싱/서비스 분리)
+app/main.py:47:     from app.core.config import get_settings
+app/main.py:48: 
+app/main.py:49:     # RAG 인덱스가 없거나 임베딩 모델이 바뀌었으면 재빌드 (stale 인덱스 방지)
+app/main.py:50:     from app.rag.build_index import build_index, index_is_current
+app/main.py:51: 
+app/main.py:52:     if not index_is_current():
+app/main.py:53:         build_index()
+app/main.py:54:     yield
+app/main.py:55: 
+app/main.py:56: 
+app/main.py:57: def create_app() -> FastAPI:
+app/main.py:58:     app = FastAPI(
+app/main.py:59:         title="승승장구몰 AI 커머스 에이전트",
+app/main.py:60:         version="0.2.0",
+app/main.py:61:         lifespan=lifespan,
+app/main.py:62:     )
+app/main.py:63:     register_exception_handlers(app)
+app/main.py:64:     app.include_router(health.router)
+app/main.py:65:     app.include_router(auth.router)
+app/main.py:66:     app.include_router(products.router)
+app/main.py:67:     app.include_router(orders.router)
+app/main.py:68:     app.include_router(payments.router)
+app/main.py:69:     app.include_router(agent.router)
+app/main.py:70:     app.include_router(rag.router)
+app/main.py:71:     app.include_router(nlp.router)
+app/main.py:72:     app.include_router(lab.router)
+app/main.py:73:     app.include_router(mcp.router)
+app/main.py:74:     app.include_router(workflow.router)
+app/main.py:75: 
+app/main.py:76:     # 정적 UI
+app/main.py:77:     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+app/main.py:78: 
+app/main.py:79:     @app.get("/", include_in_schema=False)
+app/main.py:80:     def index() -> FileResponse:
+app/main.py:81:         return FileResponse(str(_STATIC_DIR / "index.html"))
+app/main.py:82: 
+app/main.py:83:     return app
+app/main.py:84: 
+app/main.py:85: 
+app/main.py:86: app = create_app()
+
+codex
+## 높음
+
+- [rules.py:30](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:30): `calculate_priority()`가 미지의 카테고리를 조용히 `"일반"`으로 처리해 무폴백 계약을 위반한다. `CATEGORIES` 소속 여부를 검증하고 미지 값은 명시적 오류로 실패시켜야 한다.
+
+## 중간
+
+- [rules.py:41](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:41), [rules.py:48](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:48): 팀 매핑 누락은 사용자 입력 오류가 아니라 배포된 도메인 정책의 불일치이므로 `ValidationErr(422)`보다 `ConfigError(503)`가 맞다. import-time 가드는 빠른 실패라는 점에서는 적절하나 예외 taxonomy를 변경해야 한다.
+
+- [ticket_graph.py:50](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/ticket_graph.py:50): `"긴급"`을 규칙 상수와 별도로 중복 하드코딩했고, 예상 밖 priority를 모두 `"assign"`으로 보내는 암묵적 폴백이 있다. `PRIORITY_URGENT/NORMAL`을 재사용하고 그 외 값은 명시적 오류로 실패시켜야 한다.
+
+- [test_workflow.py:33](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:33), [test_workflow.py:50](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:50): 미지 카테고리의 priority 무폴백 계약을 검증하지 않으며, 팀 매핑 누락을 `ValidationErr`로 고정해 잘못된 taxonomy를 승인한다. `calculate_priority(unknown)` 실패 테스트와 `ConfigError` 기대값을 추가해야 한다.
+
+## 낮음
+
+- [test_workflow.py:45](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:45): 매핑 검사가 부분집합(`<=`)이라 불필요하거나 오타인 추가 키를 허용한다. “7종 전부”를 엄격히 고정하려면 집합 동등성(`==`)을 검증하는 편이 맞다.
+
+그 외는 오탐입니다. 미분류는 `manual_review→END`로 완전히 차단되고 `priority/team` 미설정도 테스트합니다. conditional-edge 매핑, 부분 상태 반환, `total=False`, 예외 전파, 라우터 등록, chat 주입 클로저의 재진입·상태 격리는 모두 적절합니다.
+
+테스트 실행은 코드 실패가 아니라 읽기 전용 환경에서 사용 가능한 임시 디렉터리가 없어 시작되지 못했습니다.
+tokens used
+29,238
+## 높음
+
+- [rules.py:30](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:30): `calculate_priority()`가 미지의 카테고리를 조용히 `"일반"`으로 처리해 무폴백 계약을 위반한다. `CATEGORIES` 소속 여부를 검증하고 미지 값은 명시적 오류로 실패시켜야 한다.
+
+## 중간
+
+- [rules.py:41](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:41), [rules.py:48](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/rules.py:48): 팀 매핑 누락은 사용자 입력 오류가 아니라 배포된 도메인 정책의 불일치이므로 `ValidationErr(422)`보다 `ConfigError(503)`가 맞다. import-time 가드는 빠른 실패라는 점에서는 적절하나 예외 taxonomy를 변경해야 한다.
+
+- [ticket_graph.py:50](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/app/workflow/ticket_graph.py:50): `"긴급"`을 규칙 상수와 별도로 중복 하드코딩했고, 예상 밖 priority를 모두 `"assign"`으로 보내는 암묵적 폴백이 있다. `PRIORITY_URGENT/NORMAL`을 재사용하고 그 외 값은 명시적 오류로 실패시켜야 한다.
+
+- [test_workflow.py:33](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:33), [test_workflow.py:50](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:50): 미지 카테고리의 priority 무폴백 계약을 검증하지 않으며, 팀 매핑 누락을 `ValidationErr`로 고정해 잘못된 taxonomy를 승인한다. `calculate_priority(unknown)` 실패 테스트와 `ConfigError` 기대값을 추가해야 한다.
+
+## 낮음
+
+- [test_workflow.py:45](C:/Users/playdata2/Documents/llm_workspace/_unified_mall_agent_project/tests/test_workflow.py:45): 매핑 검사가 부분집합(`<=`)이라 불필요하거나 오타인 추가 키를 허용한다. “7종 전부”를 엄격히 고정하려면 집합 동등성(`==`)을 검증하는 편이 맞다.
+
+그 외는 오탐입니다. 미분류는 `manual_review→END`로 완전히 차단되고 `priority/team` 미설정도 테스트합니다. conditional-edge 매핑, 부분 상태 반환, `total=False`, 예외 전파, 라우터 등록, chat 주입 클로저의 재진입·상태 격리는 모두 적절합니다.
+
+테스트 실행은 코드 실패가 아니라 읽기 전용 환경에서 사용 가능한 임시 디렉터리가 없어 시작되지 못했습니다.

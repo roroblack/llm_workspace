@@ -1,7 +1,7 @@
 # 교과목 3(초거대언어모델/LLM) 학습 공략집
 
 > **목적**: 이 문서 하나로 지금까지 진행한 28개 실습 프로젝트와 교과목 3 강의(6개 PDF)의 학습 내용을 하루 만에 복습·정리한다.
-> **구성**: 커리큘럼을 학습 순서(전처리 → 딥러닝 → LLM → 에이전트 → MCP)대로 스테이지로 나눴다(1~13 본과정 + 14 MCP 확장). 각 스테이지는 **① 개념 ② 왜 중요한가 ③ 핵심 원리·코드 감각 ④ 근거 프로젝트/PDF ⑤ 통합 앱 반영 위치** 순.
+> **구성**: 커리큘럼을 학습 순서(전처리 → 딥러닝 → LLM → 에이전트 → MCP → LangGraph)대로 스테이지로 나눴다(1~13 본과정 + 14 MCP·15 LangGraph 확장). 각 스테이지는 **① 개념 ② 왜 중요한가 ③ 핵심 원리·코드 감각 ④ 근거 프로젝트/PDF ⑤ 통합 앱 반영 위치** 순.
 > **근거**: 각 프로젝트 실제 소스 정독 + 강의 PDF 6종 정독(리포트 `reports/2026-07-12_1430`, `1520`). 추측 없이 확인된 내용만 기록(RULE.md 1).
 
 작성일시: 2026-07-12 15:40
@@ -321,6 +321,39 @@ mcp_enterprise=서버+클라이언트), PDF `0714-s/5_MCP이해_서버구축`.
 
 ---
 
+## 스테이지 15 — LangGraph 상태 그래프 워크플로 (_0715_LangGraph)
+
+**① 개념**: 에이전트의 제어 흐름을 LLM 자율(암묵 ReAct)에 맡기지 않고 **상태(State)·노드·
+조건분기 엣지를 코드로 명시**한 그래프로 오케스트레이션한다. CS 티켓을 분류→우선순위→
+(긴급 에스컬레이션 | 일반 배정 | 미분류 수동검토)로 흘려보낸다.
+
+**② 왜 중요한가**: `create_agent`는 편하지만 "언제 무엇을 할지"가 프롬프트 안에 숨는다.
+LangGraph는 흐름을 **관찰·검증·재현 가능**하게 드러낸다. 분기·재시도·휴먼인더루프 같은
+결정적 제어가 필요한 업무(승인 워크플로, 티켓 라우팅)에 적합.
+
+**③ 핵심 원리·코드 감각**:
+- `StateGraph(TypedDict상태)` + `add_node` + `add_edge(START, …)` + `add_conditional_edges(
+  노드, 라우터함수, {반환값:다음노드})` → `.compile()` → `.invoke({초기상태})`.
+- 각 노드는 **부분 상태(dict)를 반환**하면 프레임워크가 병합한다(`total=False`).
+- 라우터 함수는 상태를 보고 **다음 노드 키**를 반환 → 조건분기.
+- **무폴백 설계가 핵심**: classify가 허용 카테고리를 못 내면 → `미분류` → `manual_review→END`
+  (priority로 계속 진행하면 그게 또 다른 폴백). LLM 연결 실패/빈 입력은 노드에서 예외를 내
+  그래프 밖으로 전파(`InfraError`/`ValidationErr`). 규칙 함수의 "예상 밖 값→조용한 기본값"도
+  폴백이므로 명시적 오류(`ConfigError`)로 실패.
+
+**④ 근거 프로젝트/PDF**: `_0715_LangGraph/agent_workflow_console_project`(StateGraph CS 티켓).
+
+**⑤ 통합 앱 반영**: `app/workflow/ticket_graph.py`(TicketState + build_ticket_graph, 조건분기),
+`app/workflow/rules.py`(순수 규칙: 긴급집합·팀매핑 명명상수, 누락→ConfigError),
+`app/routers/workflow.py`(`POST /api/workflow/ticket`). classify는 기존 `prompts/classifier`
+재사용. linear 그래프는 만들지 않음(무폴백 충돌·YAGNI, Codex 합의).
+
+> ⚠️ 함정(이 스테이지에서 실제로 잡은 것): 규칙 함수 `calculate_priority`가 미지 카테고리를
+> 조용히 '일반'으로 떨구거나, 라우터가 `else→assign`으로 몰면 **암묵적 폴백**이다. "정상 경로에선
+> 도달 못 하는" 분기라도 명시적 오류로 실패시켜야 한다(무폴백은 happy-path만이 아니라 불변식에도).
+
+---
+
 ## 부록 A — 프로젝트 ↔ 스테이지 빠른 색인
 
 | 프로젝트 | 스테이지 | 한 줄 |
@@ -341,6 +374,7 @@ mcp_enterprise=서버+클라이언트), PDF `0714-s/5_MCP이해_서버구축`.
 | fastapi_llm_usage | 7 | 기능별 유즈케이스 |
 | react_tools_agent_fastapi | 13 | 통합 베이스(ReAct+RAG+Torch) |
 | _0714_MCP (simple/rag/enterprise) | 14 | MCP 서버·클라이언트(도구 표준 노출) |
+| _0715_LangGraph (agent_workflow) | 15 | LangGraph StateGraph 조건분기 워크플로 |
 
 ## 부록 B — 반드시 기억할 "함정" 5가지
 
@@ -383,6 +417,7 @@ mcp_enterprise=서버+클라이언트), PDF `0714-s/5_MCP이해_서버구축`.
 | 12+ RAG QA(근거인용·PDF) | `app/rag/qa.py`(answer+sources), `app/rag/build_index.py`(TXT+PDF), `POST /api/rag/qa` |
 | 13 통합 | `app/main.py` + 챗 UI `app/static/` |
 | 14 MCP 서버·클라이언트 | `app/mcp/server.py`(도구10·리소스2·프롬프트1·stdio), `app/mcp/client.py`, `POST /api/mcp/tools`·`/call` |
+| 15 LangGraph 워크플로 | `app/workflow/ticket_graph.py`(StateGraph 조건분기), `rules.py`(규칙상수), `POST /api/workflow/ticket` |
 
 **직접 돌려보기**: `README.md`의 실행법 참조. 로컬 Gemma로 토큰 없이 대부분 동작하며, 에이전트의 실제 도구 호출(tool-calling)만 OpenAI/Gemini 키가 필요하다(`scripts/realkey_smoke.py`).
 

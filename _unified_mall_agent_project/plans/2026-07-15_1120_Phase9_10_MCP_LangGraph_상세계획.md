@@ -7,7 +7,7 @@
   - `_0715_LangGraph/agent_workflow_console_project` — StateGraph CS 티켓 워크플로
   - 강의: `from_colab_llm/0714-s/5_MCP이해_서버구축.pdf`
 - 판정: **구현 가능** (mcp 1.28.1 = FastMCP 포함, langgraph 1.2.8 설치됨. 기존 통합 자산을 재사용하므로 자연스러운 확장)
-- **진행 상태(2026-07-18)**: Phase 9(MCP) ✅ **완료·합의**(구현리포트 1617, Codex R1·R2 잔여결함 없음). Phase 10(LangGraph) ⏳ 대기(별도 세션).
+- **진행 상태(2026-07-18)**: Phase 9(MCP) ✅ **완료·합의**(구현리포트 1617, Codex R1·R2 잔여결함 없음). Phase 10(LangGraph) ✅ **완료·합의**(구현리포트 1710, Codex 설계리뷰+구현 R1·R2 잔여결함 없음). **Phase 9·10 전부 완료.**
 
 ## 0. 구현 가능성 판단 (요약)
 | 대상 | 가능? | 근거 |
@@ -78,7 +78,14 @@ app/routers/workflow.py  # POST /api/workflow/ticket → 최종 상태(category/
   - classify(LLM): `app.prompts.classifier` 재사용(문의 분류). chat 주입 가능(테스트/로컬)
   - priority/assign(규칙): rules.py
   - 조건분기: priority가 '긴급'이면 escalate, 아니면 assign (add_conditional_edges)
-- **linear** + **conditional** 두 그래프 제공(강의 대응)
+- ~~**linear** + **conditional** 두 그래프 제공(강의 대응)~~ → **[2026-07-18 설계변경, Codex 합의]**
+  **conditional 그래프만 구현.** linear 그래프(classify→priority→assign, 분기 없음)는 (1) 엔드포인트
+  미사용이고 (2) 미분류 입력에도 계속 진행해 합의 #3의 무폴백(미분류→manual_review→END)과 정면
+  충돌하므로 YAGNI·RULE 위반. 강의 시연 목적만으로 잘못된 경로를 만들지 않는다.
+  (Codex 설계 리뷰: `reports/_codex_phase10_design_review.txt`)
+- **규칙 상수**(rules.py): 긴급={"불만","환불"}(도메인 정책, 명명 상수), 팀 매핑 7개 전부 명시,
+  기본팀 없음(누락 시 ValidationErr 명시 실패). **State에서 error 필드 제거**(미분류는 정상 수동검토
+  상태 category="미분류"+action="manual_review"로 표현, 실제 예외는 전파).
 
 ### 원칙(RULE)
 - 분류는 기존 classifier 재사용. classify 노드 오류는 **삼키지 말고** error 필드+명시 처리(레거시의 '기타 폴백'은 RULE 위반이므로 → 분류 실패 시 error 기록 후 '미분류' sentinel, 폴백성 '기타' 금지)
