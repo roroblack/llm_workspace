@@ -13,3 +13,17 @@ from app.application.answer_question import AnswerQuestion
 
 def build_answer_question(top_k: int | None = None) -> AnswerQuestion:
     return AnswerQuestion(retriever=FaissRetriever(), model=LlmGateway(), top_k=top_k)
+
+
+def build_graph_answer_question(top_k: int | None = None) -> AnswerQuestion:
+    """GraphRAG: pgvector(문서 청크) + PG 그래프(정형 관계 사실)를 결합한 RAG.
+
+    그래프 사실이 벡터 청크와 함께 근거로 들어가 관계 집계·비교 질의를 보강한다(Phase 5b).
+    같은 RetrieverPort라 AnswerQuestion을 수정 없이 재사용.
+    """
+    from app.adapters.fusion_retriever import FusionRetriever
+    from app.adapters.pg_graph_retriever import PgGraphRetriever
+    from app.adapters.pgvector_retriever import PgVectorRetriever
+
+    fusion = FusionRetriever([PgVectorRetriever(), PgGraphRetriever()])
+    return AnswerQuestion(retriever=fusion, model=LlmGateway(), top_k=top_k)
