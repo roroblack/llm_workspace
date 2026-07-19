@@ -1,8 +1,7 @@
 """FastAPI 진입점.
 
-앱 조립: 예외 핸들러 + 전 라우터(health/auth/products/orders/payments/agent/rag/nlp/
-lab/mcp/workflow) + 정적 UI. lifespan에서 DB 테이블 생성·시딩과 RAG 인덱스 빌드(멱등)를 수행.
-Phase 0~10 통합(커머스·에이전트·RAG·ML·MCP·LangGraph).
+앱 조립: trace 미들웨어 + 예외 핸들러 + 전 라우터 + 정적 UI. 기동 시 자동 DB/인덱스 설정은
+하지 않는다(REQ-OPS-01) — 명시적 `scripts.manage`로 준비하고 `/api/health/ready`로 확인한다.
 """
 
 from __future__ import annotations
@@ -15,8 +14,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.errors import register_exception_handlers
-from app.db.database import Base, SessionLocal, engine
-from app.db.seed import seed_products
+from app.obs.trace import TraceMiddleware
 from app.routers import (
     agent,
     auth,
@@ -36,18 +34,9 @@ _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    # 테이블 생성 + 시딩 (멱등)
-    Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        seed_products(db)
-    finally:
-        db.close()
-    # RAG 인덱스가 없거나 임베딩 모델이 바뀌었으면 재빌드 (stale 인덱스 방지 — 인덱싱/서비스 분리)
-    from app.rag.build_index import build_index, index_is_current
-
-    if not index_is_current():
-        build_index()
+    # 기동 시 자동 create_all/seed/index를 하지 않는다(REQ-OPS-01, Phase 2).
+    # 데이터 준비는 명시적 명령으로: `python -m scripts.manage migrate|seed|ingest`.
+    # 준비 상태는 GET /api/health/ready 로 확인(미준비 시 명시적으로 알림, 무폴백).
     yield
 
 
@@ -57,6 +46,7 @@ def create_app() -> FastAPI:
         version="0.3.0",
         lifespan=lifespan,
     )
+    app.add_middleware(TraceMiddleware)  # 요청별 trace_id + X-Trace-ID 응답 헤더
     register_exception_handlers(app)
     app.include_router(health.router)
     app.include_router(auth.router)

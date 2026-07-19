@@ -21,3 +21,11 @@ def health() -> dict:
         "provider": settings.LLM_PROVIDER,
         "readiness": settings.readiness(),
     }
+
+
+@router.get("/health/ready")
+def ready() -> dict:
+    """데이터 준비 상태(DB 테이블·RAG 인덱스). 미준비면 명시적으로 알린다(REQ-OPS-01)."""
+    from app.obs.readiness import check_readiness
+
+    return check_readiness()

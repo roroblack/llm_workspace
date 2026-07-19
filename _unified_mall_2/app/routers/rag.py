@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
 
 from app.application.answer_question import AnswerResult
 from app.composition import build_answer_question
+from app.db.database import get_db
+from app.obs.events import record_event
 from app.rag.service import search
 from app.rag.summarize import summarize_text
 
@@ -48,10 +51,19 @@ def _to_response(result: AnswerResult) -> dict:
 
 
 @router.post("/qa")
-def rag_qa(body: QARequest) -> dict:
-    """질문 → 근거 기반 답변 + 출처 인용 (환각 억제). AnswerQuestion 유스케이스 경유."""
+def rag_qa(body: QARequest, db: Session = Depends(get_db)) -> dict:
+    """질문 → 근거 기반 답변 + 출처 인용 (환각 억제). AnswerQuestion 유스케이스 경유.
+
+    관측성(NFR-OBS-01): 처리 결과를 run_events에 trace_id와 함께 기록한다(원문 저장 금지, 요약만).
+    """
     use_case = build_answer_question(top_k=body.top_k)
-    return _to_response(use_case(body.question))
+    result = use_case(body.question)
+    record_event(
+        db,
+        kind="rag_query",
+        detail={"top_k": body.top_k, "source_count": len(result.sources)},
+    )
+    return _to_response(result)
 
 
 @router.post("/summarize")

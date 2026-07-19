@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -92,3 +92,18 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     order: Mapped["Order"] = relationship(back_populates="payment")
+
+
+class RunEvent(Base):
+    """관측성 이벤트(trace 상관). 요청 처리 중 발생한 사건을 append-only로 기록한다.
+
+    kind 예: "rag_query". detail은 JSON 문자열(민감정보·원문 저장 금지, 요약만).
+    """
+
+    __tablename__ = "run_events"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    trace_id: Mapped[str] = mapped_column(String(64), index=True)
+    kind: Mapped[str] = mapped_column(String(50), index=True)
+    detail: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
