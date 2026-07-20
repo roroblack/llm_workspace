@@ -37,14 +37,13 @@ def test_new_feature_pages_served(client):
 def test_new_feature_scripts_call_the_real_endpoints(client):
     """각 페이지가 실제 백엔드 엔드포인트를 호출하는지(장식용 목업이 아님).
 
-    admin은 버튼의 data-path 속성(admin.html)에 실제 경로가 있고, admin.js는
-    그 값을 읽어 호출하는 구조라 admin.html에서 확인한다.
+    admin.js는 fetchApi() 호출 안에 실제 경로 문자열을 그대로 갖고 있다.
     """
     checks = {
         "/static/rag.js": ["/api/rag/search", "/api/rag/qa"],
         "/static/orders.js": ["/api/orders/preview", "/api/orders", "Idempotency-Key"],
-        "/static/admin.html": ["/api/admin/orders", "/api/admin/events",
-                                "/api/admin/index", "/api/admin/knowledge-gaps"],
+        "/static/admin.js": ["/api/admin/orders", "/api/admin/events",
+                              "/api/admin/index", "/api/admin/knowledge-gaps"],
         "/static/mcp.js": ["/api/mcp/tools", "/api/mcp/call"],
     }
     for path, must_contain in checks.items():
