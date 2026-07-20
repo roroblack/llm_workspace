@@ -13,8 +13,7 @@ venv/
 .pytest_cache/
 .coverage
 logs/*.log
-reports/*.md
-!reports/.gitkeep
+reports/
 
 # 벡터 인덱스 캐시
 cache/
