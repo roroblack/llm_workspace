@@ -1,0 +1,11 @@
+CREATE DATABASE IF NOT EXISTS `research_agent`
+    CHARACTER SET utf8mb4
+    COLLATE utf8mb4_unicode_ci;
+
+USE `research_agent`;
+
+CREATE TABLE IF NOT EXISTS `REPORT` (
+    `TOPIC` VARCHAR(3000) NOT NULL,
+    `RESULT` LONGTEXT NOT NULL,
+    `RESULT_TIME` DATETIME(6) NOT NULL
+) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
