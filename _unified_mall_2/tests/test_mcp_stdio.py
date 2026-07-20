@@ -77,3 +77,22 @@ def test_stdio_tool_internal_validation_error_maps_422():
     # 422로 복원돼야 한다(서버가 error_code를 실어 보내고 클라이언트가 복원).
     with pytest.raises(ValidationErr):
         _run(mcp_client.call_tool("rag_qa", {"question": "   "}))
+
+
+def test_stdio_vector_search_with_real_embedding_completes():
+    """Phase 10 후속 조사에서 발견: mcp.run() 시작 후 도구 안에서 임베딩을 지연 로드하면
+    실제 stdio 서브프로세스에서 180초+ 무응답이었다(재현 확인). server.py의
+    `_warm_up_rag_store()`(mcp.run() 시작 **전** 워밍업)로 우회했다 — 근본 SDK 메커니즘은
+    특정 못했지만(우회책), 이제 유계 시간(수십 초) 안에 매번 완료된다.
+
+    이전엔 이 조합(실제 stdio + 실제 임베딩 로딩)을 검증하는 테스트가 전혀 없었다
+    (다른 vector_search/rag_qa 케이스는 스키마·내부 검증 오류만 짚어 실제 임베딩 코드에
+    도달한 적이 없었음) — 그 공백이 이 버그가 발견되지 않은 이유였다.
+
+    한계: pytest-timeout이 설치돼 있지 않아 이 테스트 자체엔 강제 타임아웃이 없다 —
+    회귀가 다시 발생하면 이 테스트도 함께 멈춘다(자연 완료 시간에 의존).
+    """
+    result = _run(mcp_client.call_tool("vector_search", {"query": "반품"}))
+    structured = result["structured"]
+    assert structured["ok"] is True
+    assert structured["count"] > 0

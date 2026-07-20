@@ -245,5 +245,32 @@ def grounded_rag_prompt(question: str) -> str:
     )
 
 
+def _warm_up_rag_store() -> None:
+    """임베딩·FAISS 인덱스를 stdio 서버 루프 시작 **전에** 미리 로드한다.
+
+    **이것은 우회책(workaround)이지 근본 수정이 아니다** — SDK 내부의 정확한 원인(어느
+    메커니즘이 지연 로딩과 stdio 루프를 충돌시키는지)은 특정하지 못했다(Codex 지적,
+    Phase 10 후속 조사 리포트 참조). 재현으로 검증한 사실만 안다: mcp.run(transport=
+    "stdio")의 stdio 루프가 이미 돌고 있는 동안 vector_search 도구 안에서 임베딩을
+    **지연** 로드하면 180초+ 응답이 없었고, 같은 로딩을 mcp.run() 시작 **전**에 하면
+    22~27초로 매번 정상 완료됐다.
+
+    **트레이드오프(정직하게 기록)**: MCP는 호출마다 새 subprocess를 띄우므로, 이 워밍업은
+    vector_search/rag_qa/recommend_products와 무관한 `get_price` 같은 가벼운 도구 호출도
+    똑같이 부담한다(서브프로세스 1회 기동당 ~25초 고정비). 실측: stdio 통합 테스트
+    스위트가 17초 → 245초로 느려졌다(전부 통과는 함). 인덱스 로드가 실패하면(예: 파일
+    없음) **RAG와 무관한 다른 9개 도구까지 서버가 아예 못 뜬다**는 것도 인지된 위험이다.
+    범위를 **재현이 확인된 것(임베딩·FAISS)만**으로 좁혔다 — 감성분석 모델은 같은
+    문제가 있는지 검증한 적이 없어 추측만으로 워밍업에 넣지 않는다(Codex 지적 반영).
+
+    이 함수는 stdio 진입점(`__main__`)에서만 호출된다 — 테스트가 이 모듈을 인프로세스로
+    import할 때(`test_mcp.py`)는 실행되지 않아 결정론 테스트에 무거운 모델 로드를 강요하지 않는다.
+    """
+    from app.rag import service as rag_service
+
+    rag_service.get_store()
+
+
 if __name__ == "__main__":  # pragma: no cover - stdio 진입점
+    _warm_up_rag_store()
     mcp.run(transport="stdio")
