@@ -92,7 +92,56 @@ def search_knowledge_base(db: Session, query: str) -> dict[str, Any]:
     return {"ok": True, "count": len(results), "results": results}
 
 
-# name → callable (db, **args)
+def preview_order(db: Session, items_json: str) -> dict[str, Any]:
+    """주문을 **미리보기**한다(주문을 생성하지 않음). 인자: items_json
+    (예: '[{"product_code":"P0001","quantity":2}]'). 총액·재고 충족 여부를 계산해 돌려준다."""
+    import json
+
+    from app.application.commerce import OrderLine
+    from app.composition import build_preview_order
+
+    try:
+        raw = json.loads(items_json)
+        lines = [
+            OrderLine(product_code=str(it["product_code"]), quantity=int(it["quantity"]))
+            for it in raw
+        ]
+    except (ValueError, TypeError, KeyError) as exc:
+        # 인자 형식 오류는 예상된 '비즈니스 실패' → 관찰로 돌려 에이전트가 고쳐 부르게 한다.
+        return _fail("bad_arguments", f"items_json 형식 오류: {exc}")
+
+    try:
+        preview = build_preview_order(db)(lines)
+    except Exception as exc:  # noqa: BLE001 — 검증 실패(빈 목록·수량<=0)를 관찰로 전달
+        from app.core.errors import ValidationErr
+
+        if isinstance(exc, ValidationErr):
+            return _fail("invalid_items", str(exc))
+        raise  # 인프라 실패는 삼키지 않고 전파
+    return {
+        "ok": True,
+        "total": preview.total,
+        "feasible": preview.feasible,
+        "issues": preview.issues,
+        "lines": [
+            {
+                "product_code": ln.product_code,
+                "name": ln.name,
+                "unit_price": ln.unit_price,
+                "quantity": ln.quantity,
+                "subtotal": ln.subtotal,
+                "available": ln.available,
+                "sufficient": ln.sufficient,
+            }
+            for ln in preview.lines
+        ],
+        # 이 응답은 승인 토큰이 아니다 — 가격·재고는 변할 수 있고 주문은 사용자의 명시 승인으로만 성립.
+        "note": "미리보기입니다. 주문은 생성되지 않았습니다. 가격·재고는 변동될 수 있으며, "
+        "실제 주문은 사용자가 Idempotency-Key와 함께 승인해야 성립합니다.",
+    }
+
+
+# name → callable (db, **args). **읽기 전용만** 등록한다(쓰기 도구 금지 — TEST-AGT-NOWRITE-001).
 TOOL_MAP = {
     "get_price": get_price,
     "get_stock": get_stock,
@@ -100,6 +149,7 @@ TOOL_MAP = {
     "search_product": search_product,
     "get_exchange_rate": get_exchange_rate,
     "search_knowledge_base": search_knowledge_base,
+    "preview_order": preview_order,
 }
 
 
@@ -126,4 +176,10 @@ TOOLS_SCHEMA = [
     _schema("search_product", "상품명 키워드 검색", "keyword", "검색 키워드"),
     _schema("get_exchange_rate", "통화 환율 조회", "currency", "USD/EUR/JPY"),
     _schema("search_knowledge_base", "정책·매뉴얼 지식 문서 검색(RAG)", "query", "자연어 질문"),
+    _schema(
+        "preview_order",
+        "주문 미리보기(주문을 생성하지 않음). 총액·재고 충족 여부 계산",
+        "items_json",
+        '주문 항목 JSON 배열 예: [{"product_code":"P0001","quantity":2}]',
+    ),
 ]

@@ -45,6 +45,23 @@ def build_place_order(db):
     return PlaceOrder(orders=SqlOrderRepository(db))
 
 
+def build_chat_commerce(db, chat_fn=None, max_steps: int = 3):
+    """상담 에이전트 + 자기검증 조립(Phase 7).
+
+    에이전트는 읽기 전용 도구만 사용하며, 초안은 근거 정합성 검사를 거쳐 나간다
+    (미지지면 차단). 검증기는 초안과 **같은 모델** — 독립 검증이 아님에 유의.
+    """
+    from app.adapters.react_agent_adapter import ReactAgentAdapter
+    from app.application.chat_commerce import ChatCommerce
+    from app.application.self_verify import SelfVerify
+    from app.core.model_registry import get_active_profile
+
+    model = LlmGateway()
+    model_id = get_active_profile().provider_model_id
+    agent = ReactAgentAdapter(db, chat_fn=chat_fn, max_steps=max_steps)
+    return ChatCommerce(agent=agent, verify=SelfVerify(model, model_id=model_id))
+
+
 def build_hybrid_answer_question(top_k: int | None = None, rerank: bool = False) -> AnswerQuestion:
     """Hybrid RAG: dense(pgvector) + lexical(pg_trgm)을 RRF로 결합(Phase 4).
 
