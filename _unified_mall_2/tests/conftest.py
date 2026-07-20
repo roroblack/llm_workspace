@@ -63,3 +63,8 @@ def auth_header(client: TestClient, username: str, password: str) -> dict:
     resp = client.post("/auth/login", data={"username": username, "password": password})
     token = resp.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
+
+
+def order_headers(auth: dict, key: str | None = None) -> dict:
+    """주문 생성용 헤더: 인증 + Idempotency-Key(Phase 6, 필수). key 미지정 시 새 키 생성."""
+    return {**auth, "Idempotency-Key": key or uuid.uuid4().hex}

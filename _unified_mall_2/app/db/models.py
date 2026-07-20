@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, func
+from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -79,6 +79,24 @@ class OrderItem(Base):
     quantity: Mapped[int] = mapped_column(Integer)
 
     order: Mapped["Order"] = relationship(back_populates="items")
+
+
+class OrderIdempotency(Base):
+    """주문 승인 멱등 레코드(Phase 6). (user_id, idempotency_key) 유일.
+
+    같은 키·같은 요청지문(request_hash)이면 기존 order를 재생(중복 주문·재고차감 0);
+    같은 키·다른 지문이면 ConflictErr(409). place와 **같은 트랜잭션**에서 기록한다.
+    """
+
+    __tablename__ = "order_idempotency"
+    __table_args__ = (UniqueConstraint("user_id", "idempotency_key", name="uq_user_idem_key"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), index=True)
+    idempotency_key: Mapped[str] = mapped_column(String(80))
+    request_hash: Mapped[str] = mapped_column(String(64))  # 요청 라인 정규 지문(SHA-256 hex)
+    order_id: Mapped[int] = mapped_column(ForeignKey("orders.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Payment(Base):

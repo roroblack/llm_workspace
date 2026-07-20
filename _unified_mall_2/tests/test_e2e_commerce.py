@@ -1,6 +1,6 @@
 """E2E: 가입 → 로그인 → 주문 → 결제 (DoD 핵심 시나리오)."""
 
-from tests.conftest import auth_header
+from tests.conftest import auth_header, order_headers
 
 
 def test_signup_login_order_pay_flow(client, unique_user):
@@ -11,7 +11,7 @@ def test_signup_login_order_pay_flow(client, unique_user):
     order = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 2}]},
-        headers=headers,
+        headers=order_headers(headers),
     ).json()
     order_no = order["order_no"]
     assert order["status"] == "PENDING"
@@ -43,7 +43,7 @@ def test_double_payment_rejected(client, unique_user):
     order_no = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 1}]},
-        headers=headers,
+        headers=order_headers(headers),
     ).json()["order_no"]
     client.post("/api/payments", json={"order_no": order_no, "method": "card"}, headers=headers)
     # 중복 결제 → 422
@@ -59,7 +59,7 @@ def test_pay_others_order_forbidden(client, unique_user):
     order_no = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 1}]},
-        headers=ha,
+        headers=order_headers(ha),
     ).json()["order_no"]
 
     ub, pb = unique_user()

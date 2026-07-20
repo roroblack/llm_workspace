@@ -29,6 +29,22 @@ def build_graph_answer_question(top_k: int | None = None) -> AnswerQuestion:
     return AnswerQuestion(retriever=fusion, model=LlmGateway(), top_k=top_k)
 
 
+def build_preview_order(db):
+    """미리보기 유스케이스(읽기전용) — SqlCatalog 주입(Phase 6)."""
+    from app.adapters.sql_catalog import SqlCatalog
+    from app.application.commerce import PreviewOrder
+
+    return PreviewOrder(catalog=SqlCatalog(db))
+
+
+def build_place_order(db):
+    """승인(주문 생성) 유스케이스 — SqlOrderRepository 주입(Phase 6, 멱등·원자)."""
+    from app.adapters.sql_order_repo import SqlOrderRepository
+    from app.application.commerce import PlaceOrder
+
+    return PlaceOrder(orders=SqlOrderRepository(db))
+
+
 def build_hybrid_answer_question(top_k: int | None = None, rerank: bool = False) -> AnswerQuestion:
     """Hybrid RAG: dense(pgvector) + lexical(pg_trgm)을 RRF로 결합(Phase 4).
 

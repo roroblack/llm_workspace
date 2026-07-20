@@ -74,6 +74,13 @@ class NotFoundErr(AppError):
     error_code = "not_found"
 
 
+class ConflictErr(AppError):
+    """리소스 충돌 (같은 멱등키·다른 payload 등)."""
+
+    http_status = 409
+    error_code = "conflict"
+
+
 def register_exception_handlers(app: Any) -> None:
     """AppError 계열을 정의된 HTTP 상태 + 구조화 본문으로 매핑한다.
 

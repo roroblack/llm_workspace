@@ -32,6 +32,23 @@ class OrderCreateRequest(BaseModel):
     items: list[OrderLineRequest] = Field(min_length=1)
 
 
+class PreviewLineResponse(BaseModel):
+    product_code: str
+    name: str | None
+    unit_price: int | None
+    quantity: int
+    subtotal: int
+    available: int | None
+    sufficient: bool
+
+
+class OrderPreviewResponse(BaseModel):
+    lines: list[PreviewLineResponse]
+    total: int
+    feasible: bool
+    issues: list[str]
+
+
 class OrderItemResponse(BaseModel):
     product_name: str
     unit_price: int

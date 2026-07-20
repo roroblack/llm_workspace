@@ -1,6 +1,6 @@
 """주문 테스트: 생성·재고·본인조회·403·seed."""
 
-from tests.conftest import auth_header
+from tests.conftest import auth_header, order_headers
 
 
 def test_products_seeded(client):
@@ -35,7 +35,7 @@ def test_create_order_snapshot_and_total(client, unique_user):
     r = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 2}]},
-        headers=headers,
+        headers=order_headers(headers),
     )
     assert r.status_code == 200
     body = r.json()
@@ -53,7 +53,7 @@ def test_stock_decremented(client, unique_user):
     client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 1}]},
-        headers=headers,
+        headers=order_headers(headers),
     )
     after = client.get("/api/products/P0001").json()["stock"]
     assert after == before - 1
@@ -65,7 +65,7 @@ def test_insufficient_stock_422(client, unique_user):
     r = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0002", "quantity": 99999}]},
-        headers=headers,
+        headers=order_headers(headers),
     )
     assert r.status_code == 422
 
@@ -76,7 +76,7 @@ def test_unknown_product_404(client, unique_user):
     r = client.post(
         "/api/orders",
         json={"items": [{"product_code": "NOPE", "quantity": 1}]},
-        headers=headers,
+        headers=order_headers(headers),
     )
     assert r.status_code == 404
 
@@ -88,7 +88,7 @@ def test_other_users_order_forbidden_403(client, unique_user):
     order_no = client.post(
         "/api/orders",
         json={"items": [{"product_code": "P0001", "quantity": 1}]},
-        headers=ha,
+        headers=order_headers(ha),
     ).json()["order_no"]
 
     # user B가 A의 주문 조회 시도 → 403
