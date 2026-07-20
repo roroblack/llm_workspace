@@ -35,11 +35,9 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임�
 
 from app.core.errors import AppError  # noqa: E402
 from app.db.database import SessionLocal  # noqa: E402
-from app.db.models import Product  # noqa: E402
 from app.ml import intent as ml_intent  # noqa: E402
 from app.ml import recommend as ml_recommend  # noqa: E402
 from app.ml import sentiment as ml_sentiment  # noqa: E402
-from app.rag import qa as rag_qa_mod  # noqa: E402
 from app.rag import service as rag_service  # noqa: E402
 from app.tools import commerce_tools  # noqa: E402
 
@@ -151,8 +149,18 @@ def rag_qa(question: str, top_k: TopK | None = None) -> dict[str, Any]:
     """지식 문서 근거로 질문에 답한다(환각 억제·출처 인용). 인자: question, top_k(1~10, 미지정=기본).
 
     LLM 호출이 포함된다(설정된 provider 사용). 키/서버 없으면 예외 전파.
+
+    Phase 8 parity: REST `/api/rag/qa`와 **동일한 AnswerQuestion 유스케이스 + 동일한 변환**
+    (`rag_view.answer_to_dict`)을 쓴다. 구현이 두 벌이 되지 않도록 레거시 `rag.qa`는 제거됐다.
     """
-    return _guard(lambda: rag_qa_mod.answer(question, k=top_k))  # None→RAG_TOP_K
+
+    def _run() -> dict[str, Any]:
+        from app.adapters.rag_view import answer_to_dict
+        from app.composition import build_answer_question
+
+        return answer_to_dict(build_answer_question(top_k=top_k)(question))  # None→RAG_TOP_K
+
+    return _guard(_run)
 
 
 # --------------------------------------------------------------------------
@@ -204,7 +212,10 @@ def product_catalog() -> str:
     """상품 카탈로그를 JSON으로 노출한다(자체 세션 open/close)."""
 
     def _load(db: Any) -> list[dict[str, Any]]:
-        rows = db.query(Product).order_by(Product.product_code).all()
+        from app.services.catalog_query import list_products
+
+        # 질의는 REST와 공용 1벌(세션 독립 DTO 반환), 세션 수명은 with_db가 소유.
+        # projection은 의도적으로 REST와 다르다 — 이 리소스 계약은 재고를 노출하지 않는다.
         return [
             {
                 "product_code": p.product_code,
@@ -212,7 +223,7 @@ def product_catalog() -> str:
                 "category": p.category,
                 "price": p.price,
             }
-            for p in rows
+            for p in list_products(db)
         ]
 
     items = with_db(_load)

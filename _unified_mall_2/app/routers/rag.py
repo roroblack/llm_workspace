@@ -36,18 +36,11 @@ def rag_search(body: SearchRequest) -> dict:
     return {"results": search(body.query, k=body.top_k, source=body.source)}
 
 
-def _page(locator: str | None) -> int | None:
-    """Citation.locator(문자열) → 레거시 HTTP 응답의 page(int|None) 형태 유지."""
-    return int(locator) if locator and locator.isdigit() else None
-
-
 def _to_response(result: AnswerResult) -> dict:
-    return {
-        "answer": result.answer,
-        "sources": [
-            {"source": c.source, "page": _page(c.locator)} for c in result.sources
-        ],
-    }
+    # 변환은 rag_view 1벌만 사용한다 — MCP와 응답이 어긋나지 않도록(Phase 8 parity).
+    from app.adapters.rag_view import answer_to_dict
+
+    return answer_to_dict(result)
 
 
 @router.post("/qa")

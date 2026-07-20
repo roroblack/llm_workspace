@@ -161,14 +161,23 @@ def test_pdf_indexed_with_page_metadata():
 
 
 def test_qa_over_pdf_with_mock_llm():
-    """QA가 PDF 근거로 답변하고 출처(파일·1-based page)를 반환하는지 (mock LLM)."""
-    from app.rag import qa
+    """QA가 PDF 근거로 답변하고 출처(파일·1-based page)를 반환하는지 (mock LLM).
 
-    res = qa.answer(
-        "제주 지역 반품 배송비는 얼마인가요?",
-        k=5,
-        chat_complete=lambda p: "제주 지역 왕복 반품 배송비는 10,000원입니다.",
+    Phase 8: 레거시 `rag.qa` 삭제에 따라 **AnswerQuestion 유스케이스 + rag_view 변환**
+    (REST·MCP 공용 경로)으로 이관. 검증 대상(실 인덱스 근거·1-based page)은 동일.
+    """
+    from app.adapters.faiss_retriever import FaissRetriever
+    from app.adapters.rag_view import answer_to_dict
+    from app.application.answer_question import AnswerQuestion
+
+    class _Model:
+        def complete(self, prompt, *, max_tokens=None, temperature=0.0):
+            return "제주 지역 왕복 반품 배송비는 10,000원입니다."
+
+    result = AnswerQuestion(retriever=FaissRetriever(), model=_Model(), top_k=5)(
+        "제주 지역 반품 배송비는 얼마인가요?"
     )
+    res = answer_to_dict(result)
     assert "10,000" in res["answer"]
     assert res["sources"], "출처가 있어야 함"
     pdf_src = [s for s in res["sources"] if s["source"].endswith(".pdf")]

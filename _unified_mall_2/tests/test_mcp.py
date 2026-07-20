@@ -196,30 +196,47 @@ def test_vector_search_top_k_none_delegates_to_config(monkeypatch):
     assert captured["k"] is None
 
 
+def _patch_use_case(monkeypatch, captured: dict, result):
+    """Phase 8: rag_qa는 REST와 동일한 AnswerQuestion 유스케이스를 쓴다.
+
+    레거시 `rag.qa.answer` 대신 composition을 가로채 인자 위임을 검증한다.
+    """
+    import app.composition as composition
+
+    def _fake_build(top_k=None):
+        captured["top_k"] = top_k
+
+        def _uc(question):
+            captured["question"] = question
+            return result
+
+        return _uc
+
+    monkeypatch.setattr(composition, "build_answer_question", _fake_build)
+
+
 def test_rag_qa_passes_args_through(monkeypatch):
+    from app.application.answer_question import AnswerResult, Citation
+
     captured: dict = {}
+    result = AnswerResult(answer="a", sources=[Citation(source="p.pdf", locator="3")])
+    _patch_use_case(monkeypatch, captured, result)
 
-    def _fake_answer(question, k=None):
-        captured.update(question=question, k=k)
-        return {"answer": "a", "sources": []}
-
-    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
     _b, s = _run(mcp.call_tool("rag_qa", {"question": "교환?", "top_k": 2}))
-    assert captured == {"question": "교환?", "k": 2}
+    assert captured == {"question": "교환?", "top_k": 2}
     assert s["answer"] == "a"
+    # 변환도 REST와 공용(rag_view) → locator "3"이 page 3으로
+    assert s["sources"] == [{"source": "p.pdf", "page": 3}]
 
 
 def test_rag_qa_top_k_none_delegates_to_config(monkeypatch):
+    from app.application.answer_question import AnswerResult
+
     captured: dict = {}
-
-    def _fake_answer(question, k=None):
-        captured["k"] = k
-        return {"answer": "a", "sources": []}
-
-    monkeypatch.setattr(mcp_server.rag_qa_mod, "answer", _fake_answer)
+    _patch_use_case(monkeypatch, captured, AnswerResult(answer="a", sources=[]))
     _run(mcp.call_tool("rag_qa", {"question": "교환?"}))
-    # top_k 미지정 → None 위임(qa.answer가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
-    assert captured["k"] is None
+    # top_k 미지정 → None 위임(유스케이스가 RAG_TOP_K로 결정). 3 재하드코딩 아님.
+    assert captured["top_k"] is None
 
 
 def test_recommend_top_k_none_uses_function_default(monkeypatch):
