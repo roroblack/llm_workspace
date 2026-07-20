@@ -88,6 +88,10 @@
     elements.adminLoginBtn = document.getElementById("adminLoginBtn");
     elements.logoutBtn = document.getElementById("logoutBtn");
     elements.loginStatus = document.getElementById("loginStatus");
+
+    elements.loggedOutGate = document.getElementById("loggedOutGate");
+    elements.dashboardHeader = document.getElementById("dashboardHeader");
+    elements.dashboardMain = document.getElementById("dashboardMain");
   }
 
   /*
@@ -184,6 +188,13 @@
 
   function synchronizeAuthentication() {
     const authenticated = hasToken();
+
+    // 토큰이 없으면 대시보드 본문(헤더+패널) 자체를 렌더링하지 않는다 — 로그인 전
+    // "확인 중" 같은 빈 카드가 마치 동작 중인 것처럼 보이는 걸 막는다(무폴백: 미인증 상태를
+    // 스켈레톤 UI로 가리지 않고 명시적인 로그인 게이트로 보여준다).
+    elements.loggedOutGate.hidden = authenticated;
+    elements.dashboardHeader.hidden = !authenticated;
+    elements.dashboardMain.hidden = !authenticated;
 
     elements.authNotice.hidden = authenticated;
     elements.refreshButton.disabled = !authenticated || state.loading;

@@ -53,8 +53,9 @@ def main() -> None:
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(f"{BASE}/static/admin.html")
 
-        # 9. 401 미인증 — 로그인 전 초기 로드 상태(대시보드가 자동으로 401을 맞음)
-        page.wait_for_selector("#authNotice:not([hidden])", timeout=15000)
+        # 9. 401 미인증 — 로그인 전에는 대시보드 본문을 렌더링하지 않고 로그인 게이트만 보여준다
+        # (API 호출 자체가 발생하지 않으므로 authNotice가 아니라 loggedOutGate로 확인한다).
+        page.wait_for_selector("#loggedOutGate:not([hidden])", timeout=15000)
         page.screenshot(path=str(OUT / "09_admin_401_unauthenticated.png"), full_page=True)
         print("saved 09")
 

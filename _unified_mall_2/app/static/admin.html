@@ -701,6 +701,12 @@
     .login-status { align-self: flex-end; font-size: 12.5px; color: var(--muted); padding-bottom: 8px; }
     .login-hint { margin: 10px 0 0; font-size: 12px; color: var(--muted); line-height: 1.5; }
     .login-hint code { background: #f1f2f6; padding: 1px 5px; border-radius: 4px; }
+    .logged-out-gate {
+      max-width: 1400px; margin: 40px auto; padding: 32px 30px; text-align: center;
+      color: var(--muted);
+    }
+    .logged-out-gate p:first-child { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 8px; }
+    .logged-out-gate-sub { margin: 0; font-size: 13px; line-height: 1.6; }
   </style>
 </head>
 
@@ -735,7 +741,13 @@
     </div>
   </section>
 
-  <header class="app-header">
+  <div id="loggedOutGate" class="logged-out-gate">
+    <p>🔒 관리자 로그인이 필요합니다.</p>
+    <p class="logged-out-gate-sub">위 로그인 폼에서 인증하면 대시보드가 표시됩니다. 로그인 전에는
+      주문·이벤트·지식갭 데이터를 요청하지 않습니다.</p>
+  </div>
+
+  <header id="dashboardHeader" class="app-header" hidden>
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
 
@@ -756,7 +768,7 @@
     </div>
   </header>
 
-  <main class="dashboard">
+  <main id="dashboardMain" class="dashboard" hidden>
     <div id="authNotice" class="auth-notice" hidden>
       관리자 로그인이 필요합니다. 기존 로그인 폼에서 로그인한 뒤 다시 시도해주세요.
     </div>
