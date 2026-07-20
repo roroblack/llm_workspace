@@ -230,15 +230,22 @@ def test_card_regex_does_not_partially_mask_longer_digit_runs():
     assert "[CARD]" in mask_pii("카드 1234 5678 9012 3456 입니다")  # 정상 16자리는 마스킹
 
 
-def test_knowledge_gaps_endpoint_masks_on_output(client, unique_user):
-    """저장 시 마스킹을 우회한 데이터가 있어도 출력에서 다시 가린다(심층 방어)."""
+def test_knowledge_gaps_endpoint_masks_on_output_and_flags_anomaly(client, unique_user):
+    """저장 시 마스킹을 우회한 데이터가 있으면 (1) 출력은 안전하게 가리되 (2) 조용히
+    덮지 않고 감사기록(run_events)을 남긴다 — 무조건 재마스킹만 하면 그 자체가
+    "이상 상태를 조용히 고치는" 폴백이 되므로, 발견 사실을 반드시 신호로 남겨야 한다."""
     from app.db.database import SessionLocal
     from app.db.models import KnowledgeGap as KG
+    from app.db.models import RunEvent
 
     db = SessionLocal()
     try:  # 마스킹을 거치지 않고 직접 삽입(우회 상황 재현)
-        db.add(KG(question="원문 leak@example.com 남음", trace_id="t1"))
+        leaked = db.execute(
+            KG.__table__.insert().values(question="원문 leak@example.com 남음", trace_id="t1")
+        )
         db.commit()
+        gap_id = leaked.inserted_primary_key[0]
+        events_before = db.query(RunEvent).filter(RunEvent.kind == "kgap_unmasked_detected").count()
     finally:
         db.close()
 
@@ -246,7 +253,52 @@ def test_knowledge_gaps_endpoint_masks_on_output(client, unique_user):
     headers = auth_header(client, u, p)
     _set_role(u, ROLE_ADMIN)
     body = client.get("/api/admin/knowledge-gaps", headers=headers).json()
+
+    # (1) 안전: API 응답에 원문이 없다
     assert all("leak@example.com" not in row["question"] for row in body)
+
+    # (2) 정직: 조용히 고쳐 넘어가지 않고 감사 이벤트로 남긴다
+    db = SessionLocal()
+    try:
+        events_after = db.query(RunEvent).filter(RunEvent.kind == "kgap_unmasked_detected").all()
+        assert len(events_after) == events_before + 1
+        assert f'"gap_id": {gap_id}' in events_after[-1].detail
+    finally:
+        db.close()
+
+
+def test_properly_masked_gap_does_not_trigger_anomaly_event(client, unique_user):
+    """정상적으로 마스킹돼 저장된 데이터는 이상 신호를 만들지 않는다(노이즈 방지).
+
+    다른 테스트가 남긴 마스킹-안 된 행이 DB에 계속 남아 조회 때마다 계속 이벤트를 내는
+    것은 **의도된 동작**(고치지 않고 방치되면 볼 때마다 알림)이라 전역 카운트로는 격리가
+    안 된다 — 이 테스트가 만든 gap_id를 특정해 검증한다.
+    """
+    from app.db.database import SessionLocal
+    from app.db.models import KnowledgeGap as KG
+    from app.db.models import RunEvent
+    from app.obs.pii import mask_pii
+
+    db = SessionLocal()
+    try:
+        row = KG(question=mask_pii("hong@example.com 관련 질문"), trace_id="t2")
+        db.add(row)
+        db.commit()
+        gap_id = row.id
+    finally:
+        db.close()
+
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    _set_role(u, ROLE_ADMIN)
+    client.get("/api/admin/knowledge-gaps", headers=headers)
+
+    db = SessionLocal()
+    try:
+        events = db.query(RunEvent).filter(RunEvent.kind == "kgap_unmasked_detected").all()
+        assert not any(f'"gap_id": {gap_id}' in e.detail for e in events)
+    finally:
+        db.close()
 
 
 def test_abstention_enqueues_gap_and_answer_does_not(client, unique_user, monkeypatch):

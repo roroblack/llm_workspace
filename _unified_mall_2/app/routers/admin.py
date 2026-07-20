@@ -87,21 +87,28 @@ def admin_list_knowledge_gaps(
     resolved: bool | None = None,
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[dict]:
-    """지식보강 큐 — 근거 없어 답하지 못한 질문(PII 마스킹 후 저장된 형태)."""
+    """지식보강 큐 — 근거 없어 답하지 못한 질문(PII 마스킹 후 저장된 형태).
+
+    출력 시 다시 mask_pii를 거는 것은 "혹시 몰라서 조용히 덮는" 폴백이 되면 안 된다
+    (RULE.md 무폴백 — 이상 상태를 발견하면 침묵하지 말 것). 그래서 마스킹 전/후 값이
+    다르면 **저장 시 마스킹이 뚫렸다는 뜻**이므로, 응답은 안전하게 가리되(PII 미유출)
+    그 사실을 run_events에 감사기록으로 남겨 조용히 덮지 않는다.
+    """
+    from app.obs.events import record_event
+    from app.obs.pii import mask_pii
+
     q = db.query(KnowledgeGap)
     if resolved is not None:
         q = q.filter(KnowledgeGap.resolved == resolved)
     rows = q.order_by(KnowledgeGap.id.desc()).limit(limit).all()
-    # 저장 시 마스킹 불변식에만 기대지 않는다 — 과거 데이터·직접 SQL 삽입·스캔 우회가 있으면
-    # 원문이 남아 있을 수 있으므로 출력 시에도 한 겹 더 마스킹한다(심층 방어, Codex 지적).
-    from app.obs.pii import mask_pii
 
-    return [
-        {
-            "id": g.id,
-            "question": mask_pii(g.question),
-            "trace_id": g.trace_id,
-            "resolved": g.resolved,
-        }
-        for g in rows
-    ]
+    out = []
+    for g in rows:
+        masked = mask_pii(g.question)
+        if masked != g.question:
+            # 쓰기 경로 불변식 위반 탐지 — 조용히 고치고 넘어가지 않고 신호를 남긴다.
+            record_event(db, "kgap_unmasked_detected", {"gap_id": g.id})
+        out.append(
+            {"id": g.id, "question": masked, "trace_id": g.trace_id, "resolved": g.resolved}
+        )
+    return out
