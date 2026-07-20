@@ -1,0 +1,133 @@
+"""TEST-MATRIX-001 — 요구사항 매트릭스 정적 검증(Phase 10).
+
+`requirements_matrix.yaml`에 적힌 pytest node id가 (1) 실제로 **pytest 자신의 수집기로
+collect**되고 (2) skip/xfail로 죽어있지 않은지 확인한다.
+
+Codex 지적 반영: 최초 버전은 `import + hasattr`로만 "존재"를 확인했는데, 이는 pytest가
+실제로 그 node를 collect할 수 있다는 보장이 아니다(fixture 의존성 문제·수집 훅 등으로
+import는 되지만 collect는 실패할 수 있음). 이번 버전은 `pytest --collect-only`를 파일당
+1회 서브프로세스로 실행해 **실제 수집된 node id 목록**과 대조한다(더 강한 보장).
+또한 node 문자열 파싱 실패를 조용히 건너뛰지 않는다 — 매트릭스의 모든 항목은 예외 없이
+검증 대상이어야 하며, 형식이 안 맞으면 그 자체로 실패다(가짜/오타 매핑을 숨기지 않음).
+"""
+
+from __future__ import annotations
+
+import functools
+import pathlib
+import re
+import subprocess
+import sys
+
+import pytest
+import yaml
+
+_MATRIX_PATH = pathlib.Path(__file__).resolve().parent / "requirements_matrix.yaml"
+_REPO_ROOT = pathlib.Path(__file__).resolve().parents[1]
+_NODE_RE = re.compile(r"^(tests/[\w./]+\.py)::(\w+)$")
+
+
+def _load_matrix() -> list[dict]:
+    data = yaml.safe_load(_MATRIX_PATH.read_text(encoding="utf-8"))
+    return data["requirements"]
+
+
+def _parse_node(node: str) -> tuple[str, str]:
+    """`tests/test_x.py::test_y` → (상대경로, 함수명). 형식이 안 맞으면 예외(조용한 스킵 없음)."""
+    m = _NODE_RE.match(node)
+    if not m:
+        raise ValueError(f"node id 형식이 아닙니다(가짜/오타 매핑 의심): {node!r}")
+    return m.group(1), m.group(2)
+
+
+@functools.lru_cache(maxsize=None)
+def _all_collected_node_ids() -> frozenset[str]:
+    """`pytest --collect-only tests/`를 **전체 1회**만 실행해 실제 collect된 전체 node id
+    집합을 반환한다(프로세스 시작 시 1회 계산 후 캐시).
+
+    import+hasattr보다 강한 보장: pytest 자신의 수집기를 그대로 쓴다. 처음엔 매트릭스
+    항목마다(또는 파일마다) 서브프로세스를 새로 띄웠는데, 무거운 앱 임포트(torch·
+    sentence-transformers 등)가 매번 재실행돼 파일 15개 기준 2분을 넘겨 비현실적이었다.
+    전체 스위트를 **한 번만** collect해 20초 안팎으로 낮췄다(측정 확인).
+    """
+    proc = subprocess.run(
+        [sys.executable, "-m", "pytest", "--collect-only", "tests/"],
+        cwd=_REPO_ROOT,
+        capture_output=True,
+        text=True,
+        timeout=90,
+    )
+    if proc.returncode != 0:
+        # 일부 파일만 수집 오류가 나도 나머지 파일의 정상 node는 여전히 출력에 섞여 나온다
+        # (Codex 지적) — "결과가 비어있지 않음"만으로는 전체 성공을 보장 못 하므로 exit code로 확인.
+        raise RuntimeError(
+            f"전체 collect가 실패했습니다(returncode={proc.returncode}). "
+            f"stdout={proc.stdout[-800:]!r} stderr={proc.stderr[-800:]!r}"
+        )
+    ids = {line.strip() for line in proc.stdout.splitlines() if "::" in line}
+    if not ids:
+        raise RuntimeError(
+            f"전체 collect 결과가 비어 있습니다. "
+            f"stdout={proc.stdout[-500:]!r} stderr={proc.stderr[-500:]!r}"
+        )
+    return frozenset(ids)
+
+
+def _is_collected(node: str) -> bool:
+    """node가 실제 collect 결과에 있는지 확인. 파라미터화 함수는 `node[param]` 형태로
+    collect되므로 정확 일치뿐 아니라 접두 매칭도 인정한다(매트릭스는 파라미터 값을
+    명시하지 않고 함수 전체를 가리키는 것이 정상 용법)."""
+    collected = _all_collected_node_ids()
+    return node in collected or any(c.startswith(f"{node}[") for c in collected)
+
+
+def _skip_or_xfail_marks(rel_path: str, func_name: str) -> set[str]:
+    """함수 자체의 pytestmark만 본다(모듈/클래스 상속 마크나 동적 skipif는 한계로 인정 — §리포트)."""
+    import importlib
+
+    module = importlib.import_module(rel_path[:-3].replace("/", "."))
+    func = getattr(module, func_name, None)
+    if func is None:
+        return set()
+    return {m.name for m in getattr(func, "pytestmark", [])}
+
+
+def _iter_all_entries():
+    for req in _load_matrix():
+        for t in req["tests"]:
+            yield req["id"], t["node"], t.get("basis")
+
+
+@pytest.mark.parametrize(
+    "req_id,node,basis", list(_iter_all_entries()), ids=lambda v: str(v)[:40]
+)
+def test_matrix_node_is_actually_collectible_and_not_skipped(req_id, node, basis):
+    rel_path, func_name = _parse_node(node)  # 형식 오류는 여기서 바로 실패(조용한 제외 없음)
+    file_path = _REPO_ROOT / rel_path
+    assert file_path.exists(), f"[{req_id}] 파일이 없습니다: {rel_path}"
+
+    assert _is_collected(node), f"[{req_id}] pytest가 실제로 이 node를 collect하지 못했습니다: {node}"
+
+    mark_names = _skip_or_xfail_marks(rel_path, func_name)
+    assert "skip" not in mark_names, f"[{req_id}] {node}가 skip 처리돼 있어 실행되지 않습니다."
+    assert "xfail" not in mark_names, f"[{req_id}] {node}가 xfail이라 실패를 검증하지 않습니다."
+
+    assert isinstance(basis, str) and basis.strip(), (
+        f"[{req_id}] {node}에 basis(직접확인 근거, 문자열)가 비어 있습니다."
+    )
+
+
+def test_matrix_covers_every_must_req_at_least_once():
+    """매트릭스에 등재된 REQ가 최소 1개 이상이고 중복 id가 없는지.
+
+    한계(정직): 이 프로젝트의 "정본 MUST 목록"을 별도 기계 판독 가능 소스로 관리하지
+    않으므로, 여기서는 개수 하한과 중복 없음만 확인한다 — v3.2 계획서 표와의 완전 대조는
+    수행하지 않는다(Codex 지적, 리포트에 한계로 명시).
+    """
+    reqs = _load_matrix()
+    ids = [r["id"] for r in reqs]
+    assert len(ids) == len(set(ids)), "매트릭스에 중복 REQ id가 있습니다."
+    assert len(ids) >= 20, f"MUST REQ 수가 비정상적으로 적습니다: {len(ids)}"
+    for r in reqs:
+        assert r["status"] == "DONE", f"{r['id']}가 DONE이 아닙니다: {r['status']}"
+        assert r["tests"], f"{r['id']}에 매핑된 테스트가 없습니다."
