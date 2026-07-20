@@ -39,8 +39,14 @@ JSON_METHODS_NOTE = (
 
 
 def wrap_user_input(text: str) -> str:
-    """사용자 입력을 구분자로 감싸 데이터 영역으로 격리한다 (인젝션 방어)."""
-    return f"{INPUT_START}\n{text}\n{INPUT_END}"
+    """사용자 입력을 구분자로 감싸 데이터 영역으로 격리한다 (인젝션 방어).
+
+    입력에 구분자 문자열이 그대로 들어있으면 경계를 탈출해 가짜 종료 표시를 심을 수
+    있다(Phase 7 self_verify.py에서 고친 것과 같은 계열의 결함 — 이 함수엔 없었다).
+    감싸기 전에 구분자를 무력화한다.
+    """
+    safe = text.replace(INPUT_START, "< < <").replace(INPUT_END, "> > >")
+    return f"{INPUT_START}\n{safe}\n{INPUT_END}"
 
 
 def build_classify_prompt(text: str, fewshot: list[tuple[str, str]] | None = None) -> str:

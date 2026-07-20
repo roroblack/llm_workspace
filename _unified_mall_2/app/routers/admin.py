@@ -45,26 +45,30 @@ def admin_list_events(
     kind: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
 ) -> list[dict]:
-    """관측 이벤트(run_events) 조회 — trace 상관 추적용."""
+    """관측 이벤트(run_events) 조회 — trace 상관 추적용.
+
+    detail은 "요약만, 원문·PII 금지" 관례(RunEvent 독스트링)지만 자유 문자열이라 그 관례가
+    깨질 수 있다. knowledge-gaps와 같은 이유로, 마스킹이 실제로 값을 바꾸면(=관례 위반 증거)
+    응답은 안전하게 가리되 조용히 덮지 않고 감사기록을 남긴다(RULE.md 무폴백).
+    """
     q = db.query(RunEvent)
     if trace_id:
         q = q.filter(RunEvent.trace_id == trace_id)
     if kind:
         q = q.filter(RunEvent.kind == kind)
     rows = q.order_by(RunEvent.id.desc()).limit(limit).all()
-    # detail은 "요약만" 관례지만 자유 문자열이라 무엇이든 들어올 수 있다 → 출력 시에도
-    # 마스킹을 한 겹 더 건다(심층 방어, Codex 지적).
+
+    from app.obs.events import record_event
     from app.obs.pii import mask_pii
 
-    return [
-        {
-            "id": e.id,
-            "trace_id": e.trace_id,
-            "kind": e.kind,
-            "detail": mask_pii(e.detail),
-        }
-        for e in rows
-    ]
+    out = []
+    for e in rows:
+        masked = mask_pii(e.detail)
+        if masked != e.detail:
+            # detail 요약-only 불변식 위반 탐지 — 조용히 고치고 넘어가지 않고 신호를 남긴다.
+            record_event(db, "run_event_unmasked_detected", {"event_id": e.id})
+        out.append({"id": e.id, "trace_id": e.trace_id, "kind": e.kind, "detail": masked})
+    return out
 
 
 #: /index가 노출할 필드 화이트리스트. check_readiness()를 그대로 흘리면 내부 경로·구성이

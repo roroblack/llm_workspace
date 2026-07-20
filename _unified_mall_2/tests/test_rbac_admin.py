@@ -230,6 +230,42 @@ def test_card_regex_does_not_partially_mask_longer_digit_runs():
     assert "[CARD]" in mask_pii("카드 1234 5678 9012 3456 입니다")  # 정상 16자리는 마스킹
 
 
+def test_events_endpoint_masks_on_output_and_flags_anomaly(client, unique_user):
+    """`/api/admin/events`도 knowledge-gaps와 같은 결함이 있었다(전수 재점검으로 발견).
+
+    detail이 "요약만" 관례를 어기고 원문 PII를 담고 있으면, 응답은 안전하게 가리되
+    조용히 덮지 않고 감사기록(run_event_unmasked_detected)을 남겨야 한다.
+    """
+    from app.db.database import SessionLocal
+    from app.db.models import RunEvent
+
+    db = SessionLocal()
+    try:  # record_event를 거치지 않고 직접 삽입(관례 위반 재현)
+        leaked = db.execute(
+            RunEvent.__table__.insert().values(
+                trace_id="t9", kind="test_kind", detail="원문 leak2@example.com 남음"
+            )
+        )
+        db.commit()
+        event_id = leaked.inserted_primary_key[0]
+    finally:
+        db.close()
+
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    _set_role(u, ROLE_ADMIN)
+    body = client.get("/api/admin/events", headers=headers).json()
+
+    assert all("leak2@example.com" not in row["detail"] for row in body)  # (1) 안전
+
+    db = SessionLocal()
+    try:  # (2) 정직: 감사 이벤트로 남는다
+        events = db.query(RunEvent).filter(RunEvent.kind == "run_event_unmasked_detected").all()
+        assert any(f'"event_id": {event_id}' in e.detail for e in events)
+    finally:
+        db.close()
+
+
 def test_knowledge_gaps_endpoint_masks_on_output_and_flags_anomaly(client, unique_user):
     """저장 시 마스킹을 우회한 데이터가 있으면 (1) 출력은 안전하게 가리되 (2) 조용히
     덮지 않고 감사기록(run_events)을 남긴다 — 무조건 재마스킹만 하면 그 자체가
