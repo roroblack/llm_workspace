@@ -16,6 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from app.core.errors import register_exception_handlers
 from app.obs.trace import TraceMiddleware
 from app.routers import (
+    admin,
     agent,
     auth,
     health,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(lab.router)
     app.include_router(mcp.router)
     app.include_router(workflow.router)
+    app.include_router(admin.router)
 
     # 정적 UI
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

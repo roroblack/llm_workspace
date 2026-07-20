@@ -8,7 +8,16 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from sqlalchemy import DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.database import Base
@@ -20,6 +29,9 @@ class User(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     username: Mapped[str] = mapped_column(String(50), unique=True, index=True)
     hashed_password: Mapped[str] = mapped_column(String(255))
+    # 역할(Phase 9). JWT에 넣지 않고 **매 요청 DB에서 읽는다** — 강등이 즉시 반영되도록.
+    # 허용값은 app.auth.roles.ROLES. 알 수 없는 값은 USER로 폴백하지 않고 명시적 오류.
+    role: Mapped[str] = mapped_column(String(20), default="USER", server_default="USER")
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
@@ -110,6 +122,23 @@ class Payment(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     order: Mapped["Order"] = relationship(back_populates="payment")
+
+
+class KnowledgeGap(Base):
+    """지식보강 큐(Phase 9) — RAG가 근거를 못 찾아 abstention한 질문을 모은다.
+
+    `run_events`는 "원문 저장 금지(요약만)" 관례지만 이 큐는 **질문 자체가 목적**이라 질문을
+    저장한다. 대신 저장 전에 PII를 마스킹하고(app.obs.pii), 관리자 전용으로만 노출하며,
+    보존기간이 지난 항목은 `manage.py purge-gaps`로 파기한다.
+    """
+
+    __tablename__ = "knowledge_gaps"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    question: Mapped[str] = mapped_column(Text)  # 마스킹된 질문
+    trace_id: Mapped[str] = mapped_column(String(64), index=True, default="")
+    resolved: Mapped[bool] = mapped_column(Boolean, default=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class RunEvent(Base):

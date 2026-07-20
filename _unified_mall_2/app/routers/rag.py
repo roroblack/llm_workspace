@@ -6,10 +6,11 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
-from app.application.answer_question import AnswerResult
+from app.application.answer_question import NO_ANSWER, AnswerResult
 from app.composition import build_answer_question
 from app.db.database import get_db
 from app.obs.events import record_event
+from app.obs.knowledge_gaps import record_knowledge_gap
 from app.rag.service import search
 from app.rag.summarize import summarize_text
 
@@ -56,6 +57,10 @@ def rag_qa(body: QARequest, db: Session = Depends(get_db)) -> dict:
         kind="rag_query",
         detail={"top_k": body.top_k, "source_count": len(result.sources)},
     )
+    # 지식보강 큐(Phase 9): 근거를 못 찾아 답하지 못한 질문을 모은다 = 문서 보강 대상.
+    # 유스케이스는 순수(DB 무지)라 **인터페이스 계층인 여기서** 기록한다(Clean Arch 경계).
+    if result.answer == NO_ANSWER:
+        record_knowledge_gap(db, body.question)
     return _to_response(result)
 
 
