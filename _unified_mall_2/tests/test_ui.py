@@ -17,6 +17,49 @@ def test_static_js_served(client):
     assert "observation" in r.text
 
 
+def test_new_feature_pages_served(client):
+    """Phase 1~10에서 만든 기능(RAG backend·승인루프·관리자·MCP)을 UI에서 실제로
+    쓸 수 있는지 — 정적 페이지가 서빙되고 해당 API 엔드포인트를 실제로 호출하는지 확인.
+    """
+    pages = {
+        "/static/rag.html": ["backend", "faiss"],
+        "/static/orders.html": ["Idempotency-Key", "미리보기"],
+        "/static/admin.html": ["require_admin", "관리자"],
+        "/static/mcp.html": ["get_price", "MCP"],
+    }
+    for path, must_contain in pages.items():
+        r = client.get(path)
+        assert r.status_code == 200, f"{path} 서빙 실패"
+        for text in must_contain:
+            assert text in r.text, f"{path}에 '{text}' 없음"
+
+
+def test_new_feature_scripts_call_the_real_endpoints(client):
+    """각 페이지가 실제 백엔드 엔드포인트를 호출하는지(장식용 목업이 아님).
+
+    admin은 버튼의 data-path 속성(admin.html)에 실제 경로가 있고, admin.js는
+    그 값을 읽어 호출하는 구조라 admin.html에서 확인한다.
+    """
+    checks = {
+        "/static/rag.js": ["/api/rag/search", "/api/rag/qa"],
+        "/static/orders.js": ["/api/orders/preview", "/api/orders", "Idempotency-Key"],
+        "/static/admin.html": ["/api/admin/orders", "/api/admin/events",
+                                "/api/admin/index", "/api/admin/knowledge-gaps"],
+        "/static/mcp.js": ["/api/mcp/tools", "/api/mcp/call"],
+    }
+    for path, must_contain in checks.items():
+        r = client.get(path)
+        assert r.status_code == 200
+        for text in must_contain:
+            assert text in r.text, f"{path}에 '{text}' 없음"
+
+
+def test_index_nav_links_to_new_pages(client):
+    r = client.get("/static/index.html")
+    for path in ("rag.html", "orders.html", "admin.html", "mcp.html"):
+        assert path in r.text
+
+
 def test_lab_token_compare_endpoint(client):
     r = client.post(
         "/api/lab/token-compare",

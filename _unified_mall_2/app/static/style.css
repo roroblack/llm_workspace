@@ -6,7 +6,47 @@ body {
 header { background: #2f3640; color: #fff; padding: 16px 24px; }
 header h1 { margin: 0 0 4px; font-size: 20px; }
 header .sub { margin: 0; font-size: 13px; color: #c7cdd6; }
-main { max-width: 760px; margin: 0 auto; padding: 20px; }
+nav.top-nav { display: flex; gap: 6px; margin-top: 12px; flex-wrap: wrap; }
+nav.top-nav a {
+  color: #c7cdd6; text-decoration: none; font-size: 13px; padding: 5px 10px;
+  border-radius: 6px; border: 1px solid transparent;
+}
+nav.top-nav a:hover { border-color: #4a69bd; }
+nav.top-nav a.active { background: #4a69bd; color: #fff; }
+main { max-width: 880px; margin: 0 auto; padding: 20px; }
+
+/* ---- shared panel/form components for feature pages ---- */
+.panel { background: #fff; border: 1px solid #dcdde1; border-radius: 8px; padding: 16px 18px; margin-bottom: 16px; }
+.panel h2 { margin: 0 0 10px; font-size: 15px; color: #2f3640; }
+.panel p.hint { margin: 0 0 12px; font-size: 12.5px; color: #7f8c8d; }
+.row { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: #576574; }
+.field input, .field select {
+  padding: 8px 10px; border: 1px solid #dcdde1; border-radius: 6px; font-size: 13.5px; min-width: 160px;
+}
+.btn {
+  padding: 9px 16px; border: 0; border-radius: 6px; background: #4a69bd; color: #fff;
+  font-size: 13.5px; cursor: pointer; white-space: nowrap;
+}
+.btn:hover { background: #3c58a0; }
+.btn:disabled { background: #a5b1c2; cursor: default; }
+.btn.secondary { background: #e2e6ea; color: #2f3640; }
+.btn.secondary:hover { background: #d4d9df; }
+.btn.danger { background: #eb4d4b; }
+.btn.danger:hover { background: #d43f3d; }
+pre.result {
+  background: #1e272e; color: #dcdde1; padding: 12px 14px; border-radius: 8px;
+  font-size: 12px; line-height: 1.5; overflow-x: auto; margin: 8px 0 0; white-space: pre-wrap;
+}
+.badge { display: inline-block; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; margin-left: 8px; }
+.badge.ok { background: #d1f2e0; color: #0a7d4b; }
+.badge.warn { background: #fdecd2; color: #a15c07; }
+.badge.err { background: #fbdada; color: #c0392b; }
+table.data { border-collapse: collapse; width: 100%; font-size: 13px; margin-top: 8px; }
+table.data th { text-align: left; background: #f1f2f6; padding: 6px 10px; border-bottom: 1px solid #dcdde1; }
+table.data td { padding: 6px 10px; border-bottom: 1px solid #eceff3; }
+.auth-status { font-size: 12.5px; color: #576574; }
+.auth-status strong { color: #2f3640; }
 #settings {
   display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
   background: #fff; border: 1px solid #dcdde1; border-radius: 8px; padding: 10px 14px; margin-bottom: 14px;

@@ -10,9 +10,17 @@
   <header>
     <h1>🛍️ 승승장구몰 AI 커머스 에이전트</h1>
     <p class="sub">가격·재고·주문·환율·정책 문서를 도구로 확인하는 ReAct 에이전트</p>
+    <nav class="top-nav">
+      <a href="/static/index.html" class="active">💬 에이전트 채팅</a>
+      <a href="/static/rag.html">🔎 RAG 검색</a>
+      <a href="/static/orders.html">🛒 주문·승인</a>
+      <a href="/static/admin.html">🛡️ 관리자</a>
+      <a href="/static/mcp.html">🔌 MCP</a>
+    </nav>
   </header>
 
   <main>
+    <p class="auth-status" id="authStatusBar"></p>
     <section id="settings">
       <label>max_steps
         <input id="maxSteps" type="number" min="1" max="6" value="3" />
@@ -28,6 +36,7 @@
     </form>
   </main>
 
+  <script src="/static/common.js"></script>
   <script src="/static/app.js"></script>
 </body>
 </html>

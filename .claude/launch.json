@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "unified-mall-2-api",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["_unified_mall_2/scripts/run_dev_server.py"],
+      "port": 8080
+    }
+  ]
+}
