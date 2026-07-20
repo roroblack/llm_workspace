@@ -61,3 +61,92 @@ function updateAuthStatusBar() {
 }
 
 document.addEventListener("DOMContentLoaded", updateAuthStatusBar);
+
+// --- 음성 STT/TTS 공용 헬퍼 (Phase 11) ---
+// STT/TTS는 /api/voice/*를 그대로 호출한다 — 페이지마다 따로 구현하지 않고 여기서 공유.
+
+function transcribeBlob(blob) {
+  const form = new FormData();
+  form.append("audio", blob, "recording.webm");
+  return apiFetch("/api/voice/stt", { method: "POST", body: form });
+}
+
+async function synthesizeAndPlay(text) {
+  const resp = await fetch("/api/voice/tts", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ text }),
+  });
+  if (!resp.ok) {
+    let body;
+    try { body = await resp.json(); } catch { body = null; }
+    const err = new Error((body && body.message) || `TTS 요청 실패: HTTP ${resp.status}`);
+    err.status = resp.status;
+    throw err;
+  }
+  const blob = await resp.blob();
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+  await audio.play();
+  return audio;
+}
+
+// 마이크 버튼 하나로 녹음 시작/종료를 토글하는 헬퍼.
+// onResult(text)/onError(err)/onStateChange("idle"|"recording"|"transcribing")를 받는다.
+// 마이크 권한 거부는 조용히 넘어가지 않고 onError로 명시 전달한다(무폴백).
+function createVoiceRecorder({ onResult, onError, onStateChange }) {
+  let mediaRecorder = null;
+  let chunks = [];
+  let recording = false;
+
+  function setState(state) {
+    if (onStateChange) onStateChange(state);
+  }
+
+  async function start() {
+    let stream;
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (err) {
+      onError(new Error("마이크 권한이 거부되었거나 사용할 수 없습니다: " + err.message));
+      return;
+    }
+    chunks = [];
+    mediaRecorder = new MediaRecorder(stream);
+    mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+    mediaRecorder.onstop = async () => {
+      stream.getTracks().forEach((t) => t.stop());
+      setState("transcribing");
+      try {
+        const blob = new Blob(chunks, { type: mediaRecorder.mimeType || "audio/webm" });
+        const { status, ok, body } = await transcribeBlob(blob);
+        if (!ok) {
+          throw new Error((body && body.message) || `STT 요청 실패: HTTP ${status}`);
+        }
+        onResult(body.text);
+      } catch (err) {
+        onError(err);
+      } finally {
+        setState("idle");
+      }
+    };
+    mediaRecorder.start();
+    recording = true;
+    setState("recording");
+  }
+
+  function stop() {
+    if (mediaRecorder && recording) {
+      mediaRecorder.stop();
+      recording = false;
+    }
+  }
+
+  return {
+    toggle() {
+      if (recording) stop(); else start();
+    },
+    isRecording() { return recording; },
+  };
+}

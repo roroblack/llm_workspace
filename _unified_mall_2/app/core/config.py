@@ -65,6 +65,15 @@ class Settings(BaseSettings):
     SENTIMENT_MODEL: str = "monologg/koelectra-base-finetuned-nsmc"
     SENTIMENT_DEVICE: int = -1  # -1=CPU
 
+    # --- 음성 (Phase 11, STT/TTS) ---
+    # GPU 미검출 환경(Codex 검토) — CPU + int8로 검증한 크기만 기본값으로 둔다.
+    STT_MODEL: str = "small"
+    STT_DEVICE: str = "cpu"
+    STT_COMPUTE_TYPE: str = "int8"
+    STT_LANGUAGE: str = "ko"
+    # SAPI5 보이스 ID 부분 문자열로 찾는다(전체 ID는 OS마다 다름) — 없으면 ConfigError.
+    TTS_VOICE_MATCH: str = "KO-KR"
+
     # --- Lab (비용 추정) ---
     # 1M 토큰당 USD [input, output]. 로컬(local)은 과금 없음이라 미등록 → 비용추정 불가.
     PRICE_TABLE: dict[str, list[float]] = {

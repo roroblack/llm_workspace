@@ -25,12 +25,18 @@
       <label>max_steps
         <input id="maxSteps" type="number" min="1" max="6" value="3" />
       </label>
+      <label class="voice-toggle">
+        <input id="ttsToggle" type="checkbox" />
+        응답 음성으로 듣기(TTS)
+      </label>
       <span class="hint">로컬 Gemma는 도구호출을 못하므로 실제 도구 사용은 OpenAI/Gemini 키 필요</span>
     </section>
 
     <section id="transcript" aria-live="polite"></section>
+    <p id="voiceStatus" class="voice-status" aria-live="polite"></p>
 
     <form id="chatForm">
+      <button id="micBtn" type="button" title="음성으로 입력">🎤</button>
       <input id="question" type="text" placeholder="예: P0001 재고와 반품 정책 알려줘" autocomplete="off" />
       <button type="submit">전송</button>
     </form>

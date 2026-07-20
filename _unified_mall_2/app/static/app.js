@@ -6,7 +6,10 @@ const form = document.getElementById("chatForm");
 const input = document.getElementById("question");
 const transcript = document.getElementById("transcript");
 const maxSteps = document.getElementById("maxSteps");
-const sendBtn = form.querySelector("button");
+const sendBtn = form.querySelector("button[type=submit]");
+const micBtn = document.getElementById("micBtn");
+const ttsToggle = document.getElementById("ttsToggle");
+const voiceStatus = document.getElementById("voiceStatus");
 
 function addMessage(cls, text) {
   const div = document.createElement("div");
@@ -58,6 +61,13 @@ form.addEventListener("submit", async (e) => {
       addMessage("bot", `오류(${resp.status}): ${data.message || JSON.stringify(data)}`);
     } else {
       renderBot(data);
+      if (ttsToggle.checked && data.answer) {
+        try {
+          await synthesizeAndPlay(data.answer);
+        } catch (err) {
+          addMessage("bot", "🔇 음성 재생 실패: " + err.message);
+        }
+      }
     }
   } catch (err) {
     addMessage("bot", "요청 실패: " + err.message);
@@ -66,3 +76,30 @@ form.addEventListener("submit", async (e) => {
     input.focus();
   }
 });
+
+const voiceRecorder = createVoiceRecorder({
+  onResult(text) {
+    input.value = text;
+    voiceStatus.textContent = "";
+    input.focus();
+  },
+  onError(err) {
+    voiceStatus.textContent = "🎤 " + err.message;
+  },
+  onStateChange(state) {
+    if (state === "recording") {
+      micBtn.classList.add("is-recording");
+      micBtn.textContent = "⏹";
+      voiceStatus.textContent = "녹음 중... 다시 누르면 인식합니다.";
+    } else if (state === "transcribing") {
+      micBtn.classList.remove("is-recording");
+      micBtn.textContent = "🎤";
+      voiceStatus.textContent = "음성 인식 중...";
+    } else {
+      micBtn.classList.remove("is-recording");
+      micBtn.textContent = "🎤";
+    }
+  },
+});
+
+micBtn.addEventListener("click", () => voiceRecorder.toggle());

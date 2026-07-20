@@ -38,3 +38,6 @@ tiktoken==0.13.0
 # Phase 3 (pgvector 학습 트랙 — userspace PG)
 psycopg[binary]==3.3.4
 pgvector==0.5.0
+# Phase 11 (음성 STT/TTS — 로컬, API 키 불필요)
+faster-whisper==1.2.1
+pyttsx3==2.99

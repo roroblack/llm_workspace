@@ -27,6 +27,7 @@ from app.routers import (
     payments,
     products,
     rag,
+    voice,
     workflow,
 )
 
@@ -61,6 +62,7 @@ def create_app() -> FastAPI:
     app.include_router(mcp.router)
     app.include_router(workflow.router)
     app.include_router(admin.router)
+    app.include_router(voice.router)
 
     # 정적 UI
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
