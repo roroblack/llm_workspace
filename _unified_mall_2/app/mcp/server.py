@@ -236,8 +236,10 @@ def product_catalog() -> str:
 @mcp.prompt()
 def grounded_rag_prompt(question: str) -> str:
     """검색 먼저·근거만 사용하는 RAG 지침 프롬프트를 생성한다."""
+    from app.core.config import get_settings
+
     return (
-        "너는 승승장구몰 고객지원 AI다. 반드시 아래 절차를 지켜라.\n"
+        f"너는 {get_settings().BRAND_NAME} 고객지원 AI다. 반드시 아래 절차를 지켜라.\n"
         "1) 먼저 vector_search 도구로 관련 근거를 검색한다.\n"
         "2) 검색된 근거에 있는 내용만 사용해 답한다(모르면 모른다고 답한다).\n"
         "3) 답변 끝에 사용한 출처를 명시한다.\n\n"

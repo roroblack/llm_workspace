@@ -1,4 +1,4 @@
-// 승승장구몰 에이전트 챗 UI
+// 바로봄 에이전트 챗 UI
 // 멀티턴은 백엔드 메모리가 아니라 화면 transcript 누적으로 표현한다.
 // 에이전트 응답 스키마: {answer, steps:[{step,action,action_input,observation}], stopped_by}
 

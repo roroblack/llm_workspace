@@ -26,6 +26,11 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    # --- 브랜드 ---
+    # 몰 이름 단일 소스(RULE 3.1 하드코딩 금지). 프롬프트·API 타이틀이 전부 이 값을 참조한다.
+    # 프론트엔드(정적 HTML)는 app/static/common.js의 BRAND_NAME 상수가 대응하는 단일 소스다.
+    BRAND_NAME: str = "바로봄"
+
     # --- LLM 프로바이더 선택 ---
     LLM_PROVIDER: Literal["local", "openai", "gemini"] = "local"
 

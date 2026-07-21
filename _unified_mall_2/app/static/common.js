@@ -1,6 +1,22 @@
 // 공용 인증/요청 헬퍼 — 데모 프론트엔드 전 페이지가 공유한다.
 // 토큰은 localStorage에 저장(로컬 데모 서버 전제, 프로덕션 보안모델 아님).
 
+// --- 브랜드명 단일 소스(프론트엔드) ---
+// 몰 이름을 바꾸려면 이 값 하나만 바꾸면 모든 페이지 타이틀/헤더에 반영된다.
+// 백엔드(프롬프트·API 타이틀)는 app/core/config.py의 BRAND_NAME이 대응하는 단일 소스다.
+const BRAND_NAME = "바로봄";
+
+// 타이틀의 {{BRAND}} 토큰과 [data-brand] 요소에 브랜드명을 주입한다.
+function applyBrand() {
+  if (document.title.includes("{{BRAND}}")) {
+    document.title = document.title.split("{{BRAND}}").join(BRAND_NAME);
+  }
+  document.querySelectorAll("[data-brand]").forEach((el) => {
+    el.textContent = BRAND_NAME;
+  });
+}
+document.addEventListener("DOMContentLoaded", applyBrand);
+
 const AUTH_KEY = "mall_demo_token";
 const USER_KEY = "mall_demo_username";
 

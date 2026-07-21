@@ -13,6 +13,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
+from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.obs.trace import TraceMiddleware
 from app.routers import (
@@ -44,7 +45,7 @@ async def lifespan(_app: FastAPI):
 
 def create_app() -> FastAPI:
     app = FastAPI(
-        title="승승장구몰 AI 커머스 에이전트",
+        title=f"{get_settings().BRAND_NAME} AI 커머스 에이전트",
         version="0.3.0",
         lifespan=lifespan,
     )
