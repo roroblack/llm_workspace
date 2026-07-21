@@ -198,3 +198,14 @@ function createVoiceRecorder({ onResult, onError, onStateChange }) {
     isRecording() { return recording; },
   };
 }
+
+// --- 웹캠 정지 프레임 캡처(Phase 13 얼굴 등록/인증 공용) ---
+// videoEl의 현재 프레임을 JPEG Blob으로 캡처한다. 스트림이 없으면 null.
+function captureFrameBlob(videoEl) {
+  if (!videoEl || !videoEl.videoWidth) return Promise.resolve(null);
+  const canvas = document.createElement("canvas");
+  canvas.width = videoEl.videoWidth;
+  canvas.height = videoEl.videoHeight;
+  canvas.getContext("2d").drawImage(videoEl, 0, 0);
+  return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
+}

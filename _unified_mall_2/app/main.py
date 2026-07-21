@@ -20,6 +20,7 @@ from app.routers import (
     admin,
     agent,
     auth,
+    face,
     health,
     lab,
     mcp,
@@ -64,6 +65,7 @@ def create_app() -> FastAPI:
     app.include_router(workflow.router)
     app.include_router(admin.router)
     app.include_router(voice.router)
+    app.include_router(face.router)
 
     # 정적 UI
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")

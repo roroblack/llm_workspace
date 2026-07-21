@@ -27,6 +27,7 @@ def test_new_feature_pages_served(client):
         "/static/admin.html": ["require_admin", "관리자"],
         "/static/mcp.html": ["get_price", "MCP"],
         "/static/video.html": ["화상 상담", "AI 상담원", "카메라 없이 텍스트로 계속"],
+        "/static/mypage.html": ["얼굴 로그인", "얼굴 2차 인증", "라이브니스"],
     }
     for path, must_contain in pages.items():
         r = client.get(path)
@@ -49,7 +50,9 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
         # video.js는 상담을 직접 호출하고, STT/TTS는 common.js 헬퍼(createVoiceRecorder/
         # synthesizeAndPlay) 경유 — 그 헬퍼가 실제 음성 엔드포인트를 호출한다.
         "/static/video.js": ["/api/agent/chat", "createVoiceRecorder", "synthesizeAndPlay"],
-        "/static/common.js": ["/api/voice/stt", "/api/voice/tts"],
+        "/static/common.js": ["/api/voice/stt", "/api/voice/tts", "captureFrameBlob"],
+        "/static/mypage.js": ["/auth/login", "/auth/login/face", "/api/face/register",
+                              "/api/face/status", "captureFrameBlob"],
     }
     for path, must_contain in checks.items():
         r = client.get(path)
@@ -60,7 +63,7 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
 
 def test_index_nav_links_to_new_pages(client):
     r = client.get("/static/index.html")
-    for path in ("rag.html", "orders.html", "video.html", "admin.html", "mcp.html"):
+    for path in ("rag.html", "orders.html", "video.html", "mypage.html", "admin.html", "mcp.html"):
         assert path in r.text
 
 

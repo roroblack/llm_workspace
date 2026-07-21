@@ -79,6 +79,17 @@ class Settings(BaseSettings):
     # SAPI5 보이스 ID 부분 문자열로 찾는다(전체 ID는 OS마다 다름) — 없으면 ConfigError.
     TTS_VOICE_MATCH: str = "KO-KR"
 
+    # --- 얼굴 로그인 2차 인증 (Phase 13) ---
+    # 임베딩: insightface(onnxruntime, CPU). 라이브니스: Silent-Face MiniFASNetV2 ONNX(패시브).
+    FACE_EMBED_MODEL: str = "buffalo_l"  # insightface 모델팩(최초 사용시 자동 다운로드)
+    FACE_ANTISPOOF_ONNX: Path = ROOT_DIR / "data" / "models" / "minifasnet_v2.onnx"
+    FACE_ANTISPOOF_SCALE: float = 2.7  # Silent-Face 2.7 모델의 크롭 스케일(원본 파이프라인 기준)
+    # 코사인 유사도 임계(정규화 임베딩). buffalo_l 동일인 판정 관례값 — 실데이터 튜닝 아님(문서화).
+    FACE_MATCH_THRESHOLD: float = 0.40
+    # 라이브니스 live 클래스 확률 임계(0~1). 라이브러리 기본 근사 — 실환경 검증 아님(문서화).
+    FACE_LIVENESS_THRESHOLD: float = 0.50
+    FACE_MAX_ATTEMPTS: int = 5  # 얼굴 2차인증 연속 실패 허용 횟수(초과 시 잠금, 데모: 인메모리)
+
     # --- Lab (비용 추정) ---
     # 1M 토큰당 USD [input, output]. 로컬(local)은 과금 없음이라 미등록 → 비용추정 불가.
     PRICE_TABLE: dict[str, list[float]] = {

@@ -15,6 +15,19 @@ class TokenResponse(BaseModel):
     token_type: str = "bearer"
 
 
+class LoginResponse(BaseModel):
+    """로그인 응답 — 얼굴 미등록이면 access_token 발급, 등록됐으면 얼굴 2차인증 요구.
+
+    face_2fa_required=True인 경우 access_token은 없고 challenge_token(단명 pre2fa)만 있다.
+    프론트는 challenge_token으로 `/auth/login/face`를 호출해 최종 access_token을 받는다.
+    """
+
+    face_2fa_required: bool = False
+    access_token: str | None = None
+    token_type: str = "bearer"
+    challenge_token: str | None = None
+
+
 class ProductResponse(BaseModel):
     product_code: str
     name: str

@@ -43,3 +43,7 @@ faster-whisper==1.2.1
 pyttsx3==2.99
 # 브랜드 리네이밍 정책 PDF 생성 + Phase 14 관리자 요약보고서 PDF
 reportlab==5.0.0
+# Phase 13 (얼굴 로그인 2차인증 — 임베딩 insightface + 패시브 라이브니스 Silent-Face ONNX)
+insightface==0.7.3
+onnxruntime==1.20.1
+opencv-python==4.10.0.84

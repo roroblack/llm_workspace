@@ -13,6 +13,7 @@ from sqlalchemy import (
     DateTime,
     ForeignKey,
     Integer,
+    LargeBinary,
     String,
     Text,
     UniqueConstraint,
@@ -35,6 +36,22 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
     orders: Mapped[list["Order"]] = relationship(back_populates="user")
+
+
+class FaceCredential(Base):
+    """얼굴 로그인 2차 인증 자격증명(Phase 13) — 사용자당 1개, opt-in.
+
+    원본 사진은 저장하지 않고 정규화 임베딩(512 float32) 바이트만 저장한다.
+    등록은 이미 로그인된 세션에서만 가능(미인증 상태에서 얼굴만으로 등록/로그인 경로 없음 —
+    체인 잠김 방지). 얼굴 미등록 계정은 비밀번호 로그인만으로 토큰을 받는다(2차인증 미적용).
+    """
+
+    __tablename__ = "face_credentials"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), unique=True, index=True)
+    embedding: Mapped[bytes] = mapped_column(LargeBinary)  # np.float32[512].tobytes()
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
 class Product(Base):
