@@ -172,22 +172,25 @@ regCameraBtn.addEventListener("click", async () => {
   }
 });
 
+const ENROLL_SHOTS = 3;  // 여러 샷을 품질 게이팅 후 임베딩 평균(견고성↑) — 백엔드와 맞춤
+
 regCaptureBtn.addEventListener("click", async () => {
   regCaptureBtn.disabled = true;
-  regStatus.textContent = "얼굴 분석·등록 중…";
   try {
-    const blob = await captureFrameBlob(regVideo);
-    if (!blob) { regStatus.textContent = "카메라 프레임을 캡처하지 못했습니다."; return; }
+    // 짧은 간격으로 여러 프레임 촬영(미세한 자세/표정 변화로 견고한 기준 임베딩).
     const fd = new FormData();
-    fd.append("image", blob, "face.jpg");
-    const resp = await fetch("/api/face/register", {
-      method: "POST",
-      headers: authHeaders(),
-      body: fd,
-    });
+    for (let i = 0; i < ENROLL_SHOTS; i++) {
+      regStatus.textContent = `촬영 중… (${i + 1}/${ENROLL_SHOTS}) 정면을 유지하세요.`;
+      const blob = await captureFrameBlob(regVideo);
+      if (blob) fd.append("images", blob, `face${i}.jpg`);
+      await new Promise((r) => setTimeout(r, 500));
+    }
+    if (!fd.has("images")) { regStatus.textContent = "카메라 프레임을 캡처하지 못했습니다."; return; }
+    regStatus.textContent = "얼굴 분석·등록 중…";
+    const resp = await fetch("/api/face/register", { method: "POST", headers: authHeaders(), body: fd });
     const body = await resp.json().catch(() => null);
     if (resp.ok && body && body.registered) {
-      regStatus.textContent = `등록 완료 (라이브니스 live=${body.live_prob}).`;
+      regStatus.textContent = `등록 완료 (품질 통과 ${body.shots_used}/${body.shots_submitted}장 평균).`;
       await refreshFaceStatus();
     } else {
       regStatus.textContent = (body && body.message) || `등록 실패 (HTTP ${resp.status})`;

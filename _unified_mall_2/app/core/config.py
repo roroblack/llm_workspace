@@ -90,6 +90,29 @@ class Settings(BaseSettings):
     FACE_LIVENESS_THRESHOLD: float = 0.50
     FACE_MAX_ATTEMPTS: int = 5  # 얼굴 2차인증 연속 실패 허용 횟수(초과 시 잠금, 데모: 인메모리)
 
+    # 품질 게이팅(Codex 권고): 저품질 입력을 조용히 통과시키지 않고 명시적 재촬영 요구(무폴백).
+    # 등록(strict)이 검증(loose)보다 엄격 — 나쁜 기준 임베딩이 이후 매칭을 오염시키는 걸 막는다.
+    # 임계는 112×112 정렬 얼굴 기준 시작값이며 실 genuine/impostor 분포로 튜닝 필요(문서화).
+    FACE_QUALITY_REGISTER: dict[str, float] = {
+        "min_blur": 100.0,   # 라플라시안 분산(낮으면 흐림)
+        "min_bright": 45.0, "max_bright": 210.0,  # 정렬 crop 평균 밝기
+        "min_face_px": 100.0,  # 원본 얼굴 폭(px)
+        "max_yaw": 15.0, "max_pitch": 15.0,  # 정면 이탈 각(roll은 정렬로 보정되어 제외)
+        "min_det": 0.60,  # 검출 신뢰도
+    }
+    FACE_QUALITY_VERIFY: dict[str, float] = {
+        "min_blur": 60.0,
+        "min_bright": 35.0, "max_bright": 220.0,
+        "min_face_px": 80.0,
+        "max_yaw": 25.0, "max_pitch": 20.0,
+        "min_det": 0.50,
+    }
+    # CLAHE(대비 보정)는 정상광엔 오히려 임베딩을 흔들 수 있어(실측), 정렬 crop 평균 밝기가
+    # 이 값 미만일 때만 luminance 채널에 약하게 적용(등록·검증 동일 파이프라인).
+    FACE_CLAHE_BRIGHTNESS: float = 80.0
+    FACE_CLAHE_CLIP: float = 2.0
+    FACE_ENROLL_SHOTS: int = 3  # 등록 시 촬영 장수(품질통과분 임베딩 평균 — 견고성↑)
+
     # --- Lab (비용 추정) ---
     # 1M 토큰당 USD [input, output]. 로컬(local)은 과금 없음이라 미등록 → 비용추정 불가.
     PRICE_TABLE: dict[str, list[float]] = {

@@ -13,10 +13,11 @@ import time
 from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
-from app.core.errors import AuthErr, ForbiddenErr
+from app.core.errors import AuthErr, ForbiddenErr, ValidationErr
 from app.db.models import FaceCredential, User
 from app.ml.face import (
     analyze_face,
+    average_embeddings,
     cosine_similarity,
     embedding_from_bytes,
     embedding_to_bytes,
@@ -35,14 +36,38 @@ def has_face(db: Session, user_id: int) -> bool:
     return db.query(FaceCredential).filter(FaceCredential.user_id == user_id).first() is not None
 
 
-def register_face(db: Session, user: User, image_bytes: bytes) -> dict:
-    """로그인된 세션에서만 호출됨(라우터가 get_current_user로 보장). 라이브니스 게이트 후 저장."""
-    result = analyze_face(image_bytes)  # 품질/단일얼굴/라이브니스/임베딩
-    if not result["is_live"]:
-        record_event(db, "face_register_liveness_fail", {"user_id": user.id, "live_prob": result["live_prob"]})
+def register_face(db: Session, user: User, images: list[bytes]) -> dict:
+    """로그인된 세션에서만 호출됨(라우터가 get_current_user로 보장).
+
+    다중 이미지 등록(Codex 권고): 각 샷을 **엄격 품질 게이팅**(strict) + 라이브니스로 거른 뒤
+    통과분의 임베딩을 평균한다 — 나쁜 기준 임베딩이 이후 매칭을 오염시키는 걸 막는다. 품질 미달은
+    조용히 넘기지 않고 재촬영 사유를 그대로 전파(무폴백).
+    """
+    if not images:
+        raise ValidationErr("등록할 이미지가 없습니다.")
+
+    embeddings = []
+    quality_passed = 0
+    last_quality_err: ValidationErr | None = None
+    for img in images:
+        try:
+            result = analyze_face(img, strict=True)  # 품질 미달이면 ValidationErr
+        except ValidationErr as exc:
+            last_quality_err = exc  # 이 샷은 재촬영 필요 — 다음 샷 시도
+            continue
+        quality_passed += 1
+        if result["is_live"]:
+            embeddings.append(result["embedding"])
+
+    if quality_passed == 0:
+        # 어떤 샷도 품질을 통과 못함 → 사용성 사유를 명시(재촬영 안내).
+        raise last_quality_err or ValidationErr("등록할 얼굴 품질이 충분하지 않습니다. 다시 촬영하세요.")
+    if not embeddings:
+        # 품질은 통과했으나 라이브니스 전멸 → 위조 신호(일반 메시지).
+        record_event(db, "face_register_liveness_fail", {"user_id": user.id})
         raise AuthErr(_GENERIC_FAIL)
 
-    blob = embedding_to_bytes(result["embedding"])
+    blob = embedding_to_bytes(average_embeddings(embeddings))
     cred = db.query(FaceCredential).filter(FaceCredential.user_id == user.id).first()
     if cred is None:
         cred = FaceCredential(user_id=user.id, embedding=blob)
@@ -50,8 +75,8 @@ def register_face(db: Session, user: User, image_bytes: bytes) -> dict:
     else:
         cred.embedding = blob  # 재등록(덮어쓰기)
     db.commit()
-    record_event(db, "face_registered", {"user_id": user.id})
-    return {"registered": True, "live_prob": result["live_prob"]}
+    record_event(db, "face_registered", {"user_id": user.id, "shots_used": len(embeddings)})
+    return {"registered": True, "shots_used": len(embeddings), "shots_submitted": len(images)}
 
 
 def _check_attempts(db: Session, user_id: int) -> None:

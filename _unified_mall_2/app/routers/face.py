@@ -25,7 +25,8 @@ class FaceStatusResponse(BaseModel):
 
 class FaceRegisterResponse(BaseModel):
     registered: bool
-    live_prob: float
+    shots_used: int
+    shots_submitted: int
 
 
 @router.get("/status", response_model=FaceStatusResponse)
@@ -37,14 +38,19 @@ def face_status(
 
 @router.post("/register", response_model=FaceRegisterResponse)
 async def face_register(
-    image: UploadFile = File(...),
+    images: list[UploadFile] = File(...),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> FaceRegisterResponse:
-    image_bytes = await image.read()
-    if not image_bytes:
+    """다중 이미지 등록(여러 샷을 품질 게이팅 후 임베딩 평균). 단일 샷도 허용."""
+    blobs = []
+    for f in images:
+        b = await f.read()
+        if b:
+            blobs.append(b)
+    if not blobs:
         raise ValidationErr("업로드된 이미지가 비어 있습니다.")
-    result = face_service.register_face(db, user, image_bytes)
+    result = face_service.register_face(db, user, blobs)
     return FaceRegisterResponse(**result)
 
 

@@ -1,13 +1,16 @@
-"""얼굴 임베딩 + 패시브 라이브니스 (Phase 13, 로컬 CPU).
+"""얼굴 임베딩 + 패시브 라이브니스 + 품질 게이팅 (Phase 13, 로컬 CPU).
 
-임베딩: insightface FaceAnalysis(buffalo_l, onnxruntime/CPU) — 정규화 512차원.
-라이브니스: Silent-Face MiniFASNetV2 ONNX(패시브, 단일 프레임) — [live, print, replay] softmax.
-둘 다 lazy 로드·싱글턴 캐시. 모델 로드 실패는 ConfigError, 입력 문제(얼굴 없음/복수/이미지
-파손)는 ValidationErr — 조용히 통과시키지 않는다(무폴백).
+파이프라인(무폴백): 디코드 → 단일 얼굴 → **품질 게이팅**(흐림·밝기·크기·자세·검출신뢰도) →
+라이브니스 → 정렬(112×112) → 저조도 조건부 CLAHE → 임베딩. 저품질은 조용히 통과시키지 않고
+명시적 재촬영 사유를 돌려준다(ValidationErr). 모델 로드 실패는 ConfigError.
 
-한계(정직 기록): (1) Silent-Face 단일 모델(원본 2모델 앙상블 아님). (2) 이 헤드리스 환경에서는
-실 웹캠 라이브 vs 사진 쌍으로 정확도를 검증할 수 없어 임계값은 라이브러리 근사 기본값이다.
-(3) 재생영상·딥페이크·카메라 주입 공격 및 공인 PAD(iBeta 등) 성능을 보장하지 않는다.
+인식률 관련(실측 근거): 검출·모델보다 **정보 손실(블러·저해상)과 등록 오염**이 병목이라,
+품질 게이팅 + 다중 이미지 등록(임베딩 평균)이 실질 레버다. CLAHE는 정상광에선 임베딩을 오히려
+흔들어(실측) 저조도에서만 조건부 적용한다. insightface(ArcFace)는 CPU 오픈소스의 강한 기준선이며
+저품질 특화 AdaFace 스왑은 현재 수치엔 과설계(고정 테스트셋에서 이득 실증 시에만 채택).
+
+한계: 라이브니스는 Silent-Face 단일 모델(앙상블 아님)이고 이 환경에서 실 라이브/사진 쌍으로
+정확도 검증 불가. insightface 사전학습 모델은 비상업 연구용 라이선스.
 """
 
 from __future__ import annotations
@@ -77,27 +80,68 @@ def _detect_single_face(bgr: np.ndarray):
     return faces[0]
 
 
-def _get_new_box(src_w: int, src_h: int, bbox_xywh: tuple[float, float, float, float], scale: float):
-    """Silent-Face 원본 크롭 로직 — bbox 중심 기준 scale배 확대 후 이미지 경계로 클램프."""
-    x, y, bw, bh = bbox_xywh
-    scale = min((src_h - 1) / bh, (src_w - 1) / bw, scale)
-    nw, nh = bw * scale, bh * scale
-    cx, cy = x + bw / 2, y + bh / 2
-    lx, ly = cx - nw / 2, cy - nh / 2
-    rx, ry = cx + nw / 2, cy + nh / 2
-    if lx < 0:
-        rx -= lx
-        lx = 0
-    if ly < 0:
-        ry -= ly
-        ly = 0
-    if rx > src_w - 1:
-        lx -= rx - (src_w - 1)
-        rx = src_w - 1
-    if ry > src_h - 1:
-        ly -= ry - (src_h - 1)
-        ry = src_h - 1
-    return int(lx), int(ly), int(rx), int(ry)
+def _aligned_crop(bgr: np.ndarray, face) -> np.ndarray:
+    from insightface.utils import face_align
+
+    return face_align.norm_crop(bgr, face.kps, image_size=112)  # BGR 112×112
+
+
+def _check_quality(bgr: np.ndarray, face, aligned: np.ndarray, *, strict: bool) -> None:
+    """품질 미달이면 조용히 통과시키지 않고 사유를 담아 ValidationErr(무폴백)."""
+    import cv2
+
+    settings = get_settings()
+    q = settings.FACE_QUALITY_REGISTER if strict else settings.FACE_QUALITY_VERIFY
+
+    face_px = float(face.bbox[2] - face.bbox[0])
+    if face_px < q["min_face_px"]:
+        raise ValidationErr("얼굴이 너무 작습니다. 카메라에 조금 더 가까이 와서 다시 촬영하세요.")
+
+    det = float(getattr(face, "det_score", 1.0))
+    if det < q["min_det"]:
+        raise ValidationErr("얼굴이 뚜렷하지 않습니다. 정면을 보고 다시 촬영하세요.")
+
+    gray = cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY)
+    blur = float(cv2.Laplacian(gray, cv2.CV_64F).var())
+    if blur < q["min_blur"]:
+        raise ValidationErr("이미지가 흐릿합니다. 흔들림 없이 초점을 맞춰 다시 촬영하세요.")
+
+    bright = float(gray.mean())
+    if bright < q["min_bright"]:
+        raise ValidationErr("너무 어둡습니다. 조명을 밝게 하고 다시 촬영하세요.")
+    if bright > q["max_bright"]:
+        raise ValidationErr("너무 밝습니다(과노출). 조명을 낮추고 다시 촬영하세요.")
+
+    # pose = [pitch, yaw, roll] (insightface). roll은 정렬로 보정되므로 pitch·yaw만 본다.
+    pose = getattr(face, "pose", None)
+    if pose is not None:
+        pitch, yaw = abs(float(pose[0])), abs(float(pose[1]))
+        if yaw > q["max_yaw"] or pitch > q["max_pitch"]:
+            raise ValidationErr("고개가 많이 돌아가 있습니다. 정면을 바라보고 다시 촬영하세요.")
+
+
+def _maybe_clahe(aligned: np.ndarray) -> np.ndarray:
+    """정렬 crop 평균 밝기가 임계 미만(저조도)일 때만 luminance에 약한 CLAHE(등록·검증 동일)."""
+    import cv2
+
+    settings = get_settings()
+    gray = cv2.cvtColor(aligned, cv2.COLOR_BGR2GRAY)
+    if float(gray.mean()) >= settings.FACE_CLAHE_BRIGHTNESS:
+        return aligned  # 정상광엔 적용 안 함(정상광 CLAHE는 임베딩을 흔든다 — 실측)
+    lab = cv2.cvtColor(aligned, cv2.COLOR_BGR2LAB)
+    lch, ach, bch = cv2.split(lab)
+    lch = cv2.createCLAHE(clipLimit=settings.FACE_CLAHE_CLIP, tileGridSize=(8, 8)).apply(lch)
+    return cv2.cvtColor(cv2.merge((lch, ach, bch)), cv2.COLOR_LAB2BGR)
+
+
+def _embed(aligned: np.ndarray) -> np.ndarray:
+    app = _get_face_app()
+    rec = app.models["recognition"]
+    feat = rec.get_feat(aligned).flatten().astype(np.float32)
+    norm = float(np.linalg.norm(feat))
+    if norm == 0.0:
+        raise ValidationErr("임베딩을 계산할 수 없습니다. 다시 촬영하세요.")
+    return feat / norm
 
 
 def _liveness_prob(bgr: np.ndarray, bbox: np.ndarray) -> float:
@@ -121,22 +165,55 @@ def _liveness_prob(bgr: np.ndarray, bbox: np.ndarray) -> float:
     return float(prob[0])  # [live, print, replay]
 
 
-def analyze_face(image_bytes: bytes) -> dict[str, Any]:
-    """디코드 → 단일 얼굴 → 라이브니스 → 임베딩. 게이트 순서를 이 함수가 강제한다.
+def _get_new_box(src_w: int, src_h: int, bbox_xywh, scale: float):
+    """Silent-Face 원본 크롭 로직 — bbox 중심 기준 scale배 확대 후 이미지 경계로 클램프."""
+    x, y, bw, bh = bbox_xywh
+    scale = min((src_h - 1) / bh, (src_w - 1) / bw, scale)
+    nw, nh = bw * scale, bh * scale
+    cx, cy = x + bw / 2, y + bh / 2
+    lx, ly = cx - nw / 2, cy - nh / 2
+    rx, ry = cx + nw / 2, cy + nh / 2
+    if lx < 0:
+        rx -= lx
+        lx = 0
+    if ly < 0:
+        ry -= ly
+        ly = 0
+    if rx > src_w - 1:
+        lx -= rx - (src_w - 1)
+        rx = src_w - 1
+    if ry > src_h - 1:
+        ly -= ry - (src_h - 1)
+        ry = src_h - 1
+    return int(lx), int(ly), int(rx), int(ry)
 
-    라이브니스는 임베딩 전에 계산하되, 통과 여부 판정(임계 비교)은 호출자가 하도록
-    확률·bool을 함께 돌려준다(호출자가 무폴백 게이트를 구성).
+
+def analyze_face(image_bytes: bytes, *, strict: bool = False) -> dict[str, Any]:
+    """디코드 → 단일 얼굴 → 품질 게이팅 → 라이브니스 → 정렬 → 조건부 CLAHE → 임베딩.
+
+    게이트 순서를 이 함수가 강제한다. 품질 미달/얼굴 문제는 ValidationErr(명시적 재촬영),
+    라이브니스 통과 여부 판정은 호출자가 하도록 확률·bool을 함께 돌려준다.
     """
     settings = get_settings()
     bgr = _decode_image(image_bytes)
     face = _detect_single_face(bgr)
+    aligned = _aligned_crop(bgr, face)
+    _check_quality(bgr, face, aligned, strict=strict)  # 품질 미달이면 여기서 실패
     live_prob = _liveness_prob(bgr, face.bbox)
     is_live = live_prob >= settings.FACE_LIVENESS_THRESHOLD
-    return {
-        "embedding": np.asarray(face.normed_embedding, dtype=np.float32),
-        "live_prob": round(live_prob, 4),
-        "is_live": is_live,
-    }
+    embedding = _embed(_maybe_clahe(aligned))
+    return {"embedding": embedding, "live_prob": round(live_prob, 4), "is_live": is_live}
+
+
+def average_embeddings(embeddings: list[np.ndarray]) -> np.ndarray:
+    """다중 등록: 품질 통과 임베딩들을 평균 후 재정규화(견고한 기준 임베딩)."""
+    if not embeddings:
+        raise ValidationErr("등록에 사용할 유효한 얼굴이 없습니다.")
+    mean = np.mean(np.stack(embeddings), axis=0).astype(np.float32)
+    norm = float(np.linalg.norm(mean))
+    if norm == 0.0:
+        raise ValidationErr("등록 임베딩을 계산할 수 없습니다. 다시 촬영하세요.")
+    return mean / norm
 
 
 def cosine_similarity(a: np.ndarray, b: np.ndarray) -> float:

@@ -5,6 +5,8 @@
 주의: 라이브니스 모델은 정지 사진 크롭을 위조(spoof)로 판정하는 게 정상 동작이다(사진/화면
 = 위조). 따라서 신원 매칭·토큰 흐름을 종단 검증하는 테스트는 라이브니스 임계값을 0으로 낮춰
 (정지 이미지도 통과) 로직만 확인한다 — 실 웹캠 라이브 얼굴 수용은 이 환경에서 검증 불가.
+품질 게이팅은 라이브니스와 별개로 항상 적용된다(t1 group photo는 face[0]만 strict 통과,
+face[5]가 다른 인물로 loose 통과).
 """
 
 from __future__ import annotations
@@ -22,8 +24,12 @@ from app.ml.face import analyze_face, cosine_similarity
 pytestmark = pytest.mark.ml
 
 
-def _single_face_jpgs():
-    """insightface 샘플 t1에서 단일 얼굴 크롭 3장(동일인 2장 + 타인 1장) JPEG 바이트."""
+def _crops():
+    """t1에서 품질 게이트를 통과하는 크롭 생성.
+
+    반환: A 등록샷 2장(face[0], strict 통과), A 검증샷(face[0]), B 검증샷(face[5], 타인),
+    블러샷(품질 거부용).
+    """
     import insightface
     from insightface.app import FaceAnalysis
 
@@ -38,31 +44,45 @@ def _single_face_jpgs():
         X1, Y1 = max(0, int(x1 - w * margin)), max(0, int(y1 - h * margin))
         X2 = min(img.shape[1], int(x2 + w * margin))
         Y2 = min(img.shape[0], int(y2 + h * margin))
-        ok, buf = cv2.imencode(".jpg", img[Y1:Y2, X1:X2])
-        return buf.tobytes()
+        return img[Y1:Y2, X1:X2]
 
-    return crop(faces[0], 0.6), crop(faces[0], 0.85), crop(faces[1], 0.6)
+    def jpg(bgr):
+        return cv2.imencode(".jpg", bgr)[1].tobytes()
+
+    a_reg1 = jpg(crop(faces[0], 0.6))
+    a_reg2 = jpg(crop(faces[0], 0.85))
+    a_verify = jpg(crop(faces[0], 0.7))
+    b_verify = jpg(crop(faces[5], 0.7))  # 다른 인물(loose 통과)
+    blurry = jpg(cv2.GaussianBlur(crop(faces[0], 0.6), (31, 31), 0))
+    return a_reg1, a_reg2, a_verify, b_verify, blurry
 
 
-_A1, _A2, _B1 = _single_face_jpgs()
+_A_REG1, _A_REG2, _A_VERIFY, _B_VERIFY, _BLURRY = _crops()
 
 
 def test_embedding_same_person_high_similarity():
-    ra1 = analyze_face(_A1)
-    ra2 = analyze_face(_A2)
+    ra1 = analyze_face(_A_REG1)
+    ra2 = analyze_face(_A_VERIFY)
     assert cosine_similarity(ra1["embedding"], ra2["embedding"]) >= 0.40
 
 
 def test_embedding_different_person_low_similarity():
-    ra1 = analyze_face(_A1)
-    rb1 = analyze_face(_B1)
-    assert cosine_similarity(ra1["embedding"], rb1["embedding"]) < 0.40
+    ra = analyze_face(_A_REG1)
+    rb = analyze_face(_B_VERIFY)
+    assert cosine_similarity(ra["embedding"], rb["embedding"]) < 0.40
 
 
 def test_liveness_returns_valid_probability():
-    r = analyze_face(_A1)
+    r = analyze_face(_A_REG1)
     assert 0.0 <= r["live_prob"] <= 1.0
     assert isinstance(r["is_live"], bool)
+
+
+def test_quality_gate_rejects_blurry_on_register():
+    from app.core.errors import ValidationErr
+
+    with pytest.raises(ValidationErr):
+        analyze_face(_BLURRY, strict=True)  # 흐림 → 등록 엄격 게이트 거부
 
 
 @pytest.fixture
@@ -79,23 +99,26 @@ def _signup_login(client):
     u = f"face_{uuid.uuid4().hex[:8]}"
     client.post("/auth/signup", json={"username": u, "password": "pass1234"})
     r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
-    body = r.json()
-    return u, body["access_token"]  # 얼굴 미등록이라 바로 토큰
+    return u, r.json()["access_token"]
 
 
-def _img_file(b: bytes):
+def _reg_files(*blobs):
+    return [("images", (f"face{i}.jpg", io.BytesIO(b), "image/jpeg")) for i, b in enumerate(blobs)]
+
+
+def _img_file(b):
     return {"image": ("face.jpg", io.BytesIO(b), "image/jpeg")}
 
 
 def test_no_face_user_logs_in_without_2fa(client):
     u, token = _signup_login(client)
-    assert token  # 얼굴 미등록 → access_token 즉시 발급
+    assert token
     r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
     assert r.json()["face_2fa_required"] is False
 
 
 def test_face_register_requires_auth(client):
-    r = client.post("/api/face/register", files=_img_file(_A1))
+    r = client.post("/api/face/register", files=_reg_files(_A_REG1))
     assert r.status_code == 401
 
 
@@ -103,38 +126,33 @@ def test_full_2fa_flow_match_and_mismatch(client, relax_liveness):
     u, token = _signup_login(client)
     hdr = {"Authorization": f"Bearer {token}"}
 
-    # 등록(로그인 세션 전용)
-    r = client.post("/api/face/register", files=_img_file(_A1), headers=hdr)
-    assert r.status_code == 200 and r.json()["registered"] is True
+    # 다중 이미지 등록(품질 통과분 평균)
+    r = client.post("/api/face/register", files=_reg_files(_A_REG1, _A_REG2), headers=hdr)
+    assert r.status_code == 200, r.text
+    assert r.json()["registered"] is True and r.json()["shots_used"] >= 1
 
-    # 이제 로그인하면 얼굴 2차인증 요구(access_token 없음, challenge만)
+    # 로그인 → 얼굴 2차인증 요구
     r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
     body = r.json()
-    assert body["face_2fa_required"] is True
-    assert body.get("access_token") is None
-    challenge = body["challenge_token"]
-    ch_hdr = {"Authorization": f"Bearer {challenge}"}
+    assert body["face_2fa_required"] is True and body.get("access_token") is None
+    ch_hdr = {"Authorization": f"Bearer {body['challenge_token']}"}
 
-    # 같은 사람 얼굴 → 최종 토큰 발급
-    r = client.post("/auth/login/face", files=_img_file(_A2), headers=ch_hdr)
-    assert r.status_code == 200
-    final = r.json()["access_token"]
-    assert final
+    # 같은 사람 → 토큰 발급
+    r = client.post("/auth/login/face", files=_img_file(_A_VERIFY), headers=ch_hdr)
+    assert r.status_code == 200 and r.json()["access_token"]
 
-    # 타인 얼굴 → 실패(일반 메시지, 토큰 없음)
+    # 타인(품질 통과) → 불일치 401
     r2 = client.post("/auth/login", data={"username": u, "password": "pass1234"})
     ch2 = {"Authorization": f"Bearer {r2.json()['challenge_token']}"}
-    r = client.post("/auth/login/face", files=_img_file(_B1), headers=ch2)
+    r = client.post("/auth/login/face", files=_img_file(_B_VERIFY), headers=ch2)
     assert r.status_code == 401
 
 
 def test_pre2fa_token_rejected_by_protected_endpoint(client, relax_liveness):
     u, token = _signup_login(client)
     hdr = {"Authorization": f"Bearer {token}"}
-    client.post("/api/face/register", files=_img_file(_A1), headers=hdr)
-
+    client.post("/api/face/register", files=_reg_files(_A_REG1, _A_REG2), headers=hdr)
     r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
     challenge = r.json()["challenge_token"]
-    # pre2fa 토큰으로 보호 리소스 접근 시도 → 거부
     r = client.get("/api/face/status", headers={"Authorization": f"Bearer {challenge}"})
     assert r.status_code == 401
