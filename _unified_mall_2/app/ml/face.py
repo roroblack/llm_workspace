@@ -4,13 +4,16 @@
 라이브니스 → 정렬(112×112) → 저조도 조건부 CLAHE → 임베딩. 저품질은 조용히 통과시키지 않고
 명시적 재촬영 사유를 돌려준다(ValidationErr). 모델 로드 실패는 ConfigError.
 
-인식률 관련(실측 근거): 검출·모델보다 **정보 손실(블러·저해상)과 등록 오염**이 병목이라,
-품질 게이팅 + 다중 이미지 등록(임베딩 평균)이 실질 레버다. CLAHE는 정상광에선 임베딩을 오히려
-흔들어(실측) 저조도에서만 조건부 적용한다. insightface(ArcFace)는 CPU 오픈소스의 강한 기준선이며
-저품질 특화 AdaFace 스왑은 현재 수치엔 과설계(고정 테스트셋에서 이득 실증 시에만 채택).
+인식 백엔드(실측 근거): 검출·정렬은 insightface RetinaFace(우수) 유지, **인식 임베딩은 기본
+AdaFace IR-101(WebFace12M)** — 저품질 벤치마크(TinyFace/IJB-S) SOTA이고 이 환경에서도 열화
+이미지 매칭이 ArcFace(buffalo_l r50)보다 전 항목 우위임을 실측(블러 k21 0.578→0.665, 저조도
+×0.12 0.869→0.923, 저해상 0.15배 0.299→0.389, 타인 분리는 동일 ~0). config FACE_RECOGNITION으로
+"insightface"(r50) 선택 가능. 그 외 병목은 정보 손실·등록 오염이라 품질 게이팅 + 다중 등록이
+실질 레버. CLAHE는 정상광에선 임베딩을 흔들어(실측) 저조도에서만 조건부 적용.
 
 한계: 라이브니스는 Silent-Face 단일 모델(앙상블 아님)이고 이 환경에서 실 라이브/사진 쌍으로
-정확도 검증 불가. insightface 사전학습 모델은 비상업 연구용 라이선스.
+정확도 검증 불가. insightface 사전학습 모델·AdaFace 모두 연구/비상업 성격 — 상용 시 라이선스
+확인 필요. AdaFace ONNX는 Google Drive 배포본이라 다운로드 재현성이 HTTP 호스팅보다 약함(문서화).
 """
 
 from __future__ import annotations
@@ -55,6 +58,23 @@ def _get_antispoof_session():
         return ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     except Exception as exc:  # noqa: BLE001
         raise ConfigError(f"라이브니스 모델 로드 실패: {exc}") from exc
+
+
+@lru_cache(maxsize=1)
+def _get_adaface_session():
+    import onnxruntime as ort
+
+    settings = get_settings()
+    path = settings.FACE_ADAFACE_ONNX
+    if not path.exists():
+        raise ConfigError(
+            f"AdaFace ONNX 모델이 없습니다: {path}. "
+            "`python -m scripts.fetch_face_model`로 내려받으세요(또는 config FACE_RECOGNITION=insightface)."
+        )
+    try:
+        return ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+    except Exception as exc:  # noqa: BLE001
+        raise ConfigError(f"AdaFace 모델 로드 실패: {exc}") from exc
 
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
@@ -135,9 +155,23 @@ def _maybe_clahe(aligned: np.ndarray) -> np.ndarray:
 
 
 def _embed(aligned: np.ndarray) -> np.ndarray:
-    app = _get_face_app()
-    rec = app.models["recognition"]
-    feat = rec.get_feat(aligned).flatten().astype(np.float32)
+    """정렬된 112×112 BGR crop → 정규화 512차원 임베딩.
+
+    기본 백엔드는 AdaFace IR-101(저품질 강함). insightface는 config로 선택 가능.
+    """
+    import cv2
+
+    settings = get_settings()
+    if settings.FACE_RECOGNITION == "adaface":
+        sess = _get_adaface_session()
+        rgb = cv2.cvtColor(aligned, cv2.COLOR_BGR2RGB).astype(np.float32)
+        rgb = ((rgb / 255.0) - 0.5) / 0.5  # [-1, 1] (AdaFace 전처리)
+        blob = rgb.transpose(2, 0, 1)[None]
+        feat = sess.run(None, {sess.get_inputs()[0].name: blob})[0][0].astype(np.float32)
+    else:
+        rec = _get_face_app().models["recognition"]
+        feat = rec.get_feat(aligned).flatten().astype(np.float32)
+
     norm = float(np.linalg.norm(feat))
     if norm == 0.0:
         raise ValidationErr("임베딩을 계산할 수 없습니다. 다시 촬영하세요.")

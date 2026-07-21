@@ -80,12 +80,18 @@ class Settings(BaseSettings):
     TTS_VOICE_MATCH: str = "KO-KR"
 
     # --- 얼굴 로그인 2차 인증 (Phase 13) ---
-    # 임베딩: insightface(onnxruntime, CPU). 라이브니스: Silent-Face MiniFASNetV2 ONNX(패시브).
-    FACE_EMBED_MODEL: str = "buffalo_l"  # insightface 모델팩(최초 사용시 자동 다운로드)
+    # 검출·정렬: insightface RetinaFace(buffalo_l, 우수). 인식 임베딩: AdaFace IR-101(기본) —
+    # 저품질 벤치마크(TinyFace/IJB-S) SOTA이고 이 프로젝트에서도 열화 이미지 매칭이 ArcFace(r50)보다
+    # 전 항목 우위임을 실측(블러 k21 0.578→0.665, 저해상 0.15배 0.299→0.389). 라이브니스: Silent-Face.
+    FACE_EMBED_MODEL: str = "buffalo_l"  # insightface 모델팩(검출·정렬·자세, 최초 사용시 자동 다운로드)
+    # 인식 백엔드 선택: "adaface"(기본, 저품질 강함) 또는 "insightface"(buffalo_l r50 임베딩).
+    FACE_RECOGNITION: str = "adaface"
+    FACE_ADAFACE_ONNX: Path = ROOT_DIR / "data" / "models" / "adaface_ir101_webface12m.onnx"
     FACE_ANTISPOOF_ONNX: Path = ROOT_DIR / "data" / "models" / "minifasnet_v2.onnx"
     FACE_ANTISPOOF_SCALE: float = 2.7  # Silent-Face 2.7 모델의 크롭 스케일(원본 파이프라인 기준)
-    # 코사인 유사도 임계(정규화 임베딩). buffalo_l 동일인 판정 관례값 — 실데이터 튜닝 아님(문서화).
-    FACE_MATCH_THRESHOLD: float = 0.40
+    # 코사인 유사도 임계(정규화 임베딩). AdaFace 기준값(타인 유사도 ~0이라 여유 큼) — 실데이터
+    # 튜닝 아님(문서화). insightface 백엔드로 바꾸면 이 값도 재튜닝 필요(관례상 ~0.35~0.40).
+    FACE_MATCH_THRESHOLD: float = 0.30
     # 라이브니스 live 클래스 확률 임계(0~1). 라이브러리 기본 근사 — 실환경 검증 아님(문서화).
     FACE_LIVENESS_THRESHOLD: float = 0.50
     FACE_MAX_ATTEMPTS: int = 5  # 얼굴 2차인증 연속 실패 허용 횟수(초과 시 잠금, 데모: 인메모리)
