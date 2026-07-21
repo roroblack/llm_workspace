@@ -5,3 +5,4 @@ data/vector_store/
 .env
 .venv/
 data/pgdata/
+generated_reports/

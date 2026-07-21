@@ -8,6 +8,7 @@ fail-closed 설계: 권한 검사를 엔드포인트마다 붙이면 새 엔드�
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 
 from app.auth.roles import require_admin
@@ -83,6 +84,28 @@ def admin_index_status() -> dict:
 
     status = check_readiness()
     return {k: status[k] for k in _INDEX_FIELDS if k in status}
+
+
+@router.get("/report")
+def admin_report(db: Session = Depends(get_db)) -> Response:
+    """현재 대시보드 데이터(준비상태·주문·이벤트·지식갭)를 요약한 PDF 보고서.
+
+    서버에도 `generated_reports/`에 스냅샷을 저장하고, 같은 PDF를 다운로드로 반환한다.
+    라우터 전역 require_admin으로 보호됨.
+    """
+    from datetime import datetime
+
+    from app.services.admin_report import build_admin_report_pdf, save_admin_report
+
+    now = datetime.now()
+    save_admin_report(db)  # 서버 보관용 스냅샷
+    pdf = build_admin_report_pdf(db, generated_at=now)
+    filename = f"admin_report_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
+    return Response(
+        content=pdf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/knowledge-gaps")

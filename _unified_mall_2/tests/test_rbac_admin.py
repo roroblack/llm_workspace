@@ -205,6 +205,20 @@ def test_knowledge_gap_can_only_be_created_through_masking_path():
     assert offenders == [], f"마스킹을 우회한 KnowledgeGap 생성: {offenders}"
 
 
+def test_admin_report_requires_admin_and_returns_pdf(client, unique_user):
+    """요약보고서: 미인증 401, 일반 403, 관리자는 PDF(200). 폰트 없는 비Windows는 503 허용."""
+    assert client.get("/api/admin/report").status_code == 401  # 미인증
+    u, p = unique_user()
+    headers = auth_header(client, u, p)
+    assert client.get("/api/admin/report", headers=headers).status_code == 403  # 일반 사용자
+    _set_role(u, ROLE_ADMIN)
+    r = client.get("/api/admin/report", headers=headers)
+    assert r.status_code in (200, 503)  # 503 = 한글 폰트 미설치(무폴백 ConfigError)
+    if r.status_code == 200:
+        assert r.headers["content-type"] == "application/pdf"
+        assert r.content[:4] == b"%PDF"
+
+
 def test_admin_index_exposes_only_allowlisted_fields(client, unique_user):
     u, p = unique_user()
     headers = auth_header(client, u, p)

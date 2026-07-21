@@ -707,6 +707,17 @@
     }
     .logged-out-gate p:first-child { font-size: 17px; font-weight: 700; color: var(--text); margin: 0 0 8px; }
     .logged-out-gate-sub { margin: 0; font-size: 13px; line-height: 1.6; }
+
+    /* 인쇄: 네비/로그인/버튼을 숨기고 대시보드 데이터만 깔끔히 인쇄 */
+    @media print {
+      body { min-width: 0; background: #fff; }
+      nav.top-nav, .login-panel, .header-actions, .filters, #authNotice, #errorBanner { display: none !important; }
+      .app-header { box-shadow: none; color: #000; background: #fff; border-bottom: 1px solid #000; }
+      .brand h1, .brand p { color: #000; }
+      .dashboard { width: 100%; margin: 0; }
+      .panel, .summary-card { box-shadow: none; break-inside: avoid; }
+      a[href]:after { content: ""; }
+    }
   </style>
 </head>
 
@@ -765,6 +776,12 @@
         아직 갱신되지 않음
       </span>
 
+      <button id="reportButton" class="refresh-button" type="button" title="요약보고서 PDF 다운로드">
+        📄 보고서 PDF
+      </button>
+      <button id="printButton" class="refresh-button" type="button" title="현재 화면 인쇄">
+        🖨 인쇄
+      </button>
       <button id="refreshButton" class="refresh-button" type="button">
         새로고침
       </button>

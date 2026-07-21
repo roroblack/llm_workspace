@@ -47,7 +47,7 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
         "/static/orders.js": ["/api/orders/preview", "/api/orders", "Idempotency-Key", "submitLogin"],
         "/static/admin.js": ["/api/admin/orders", "/api/admin/events",
                               "/api/admin/index", "/api/admin/knowledge-gaps",
-                              "submitLogin", "/api/face/status"],
+                              "/api/admin/report", "submitLogin", "/api/face/status"],
         "/static/mcp.js": ["/api/mcp/tools", "/api/mcp/call"],
         # video.js는 상담을 직접 호출하고, STT/TTS는 common.js 헬퍼(createVoiceRecorder/
         # synthesizeAndPlay) 경유 — 그 헬퍼가 실제 음성 엔드포인트를 호출한다.

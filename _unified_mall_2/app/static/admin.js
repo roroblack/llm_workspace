@@ -44,6 +44,8 @@
 
   function cacheElements() {
     elements.refreshButton = document.getElementById("refreshButton");
+    elements.reportButton = document.getElementById("reportButton");
+    elements.printButton = document.getElementById("printButton");
     elements.lastUpdated = document.getElementById("lastUpdated");
     elements.authNotice = document.getElementById("authNotice");
     elements.errorBanner = document.getElementById("errorBanner");
@@ -147,10 +149,37 @@
     document.dispatchEvent(new CustomEvent("auth:changed"));
   }
 
+  async function downloadReport() {
+    elements.reportButton.disabled = true;
+    try {
+      const resp = await fetch("/api/admin/report", { headers: authHeaders() });
+      if (!resp.ok) {
+        handlePossibleAuthenticationError({ status: resp.status });
+        showError(`보고서 생성 실패 (HTTP ${resp.status})`);
+        return;
+      }
+      const blob = await resp.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "admin_report.pdf";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      showError("보고서 요청 실패: " + err.message);
+    } finally {
+      elements.reportButton.disabled = false;
+    }
+  }
+
   function bindEvents() {
     elements.refreshButton.addEventListener("click", () => {
       refreshDashboard();
     });
+    elements.reportButton.addEventListener("click", downloadReport);
+    elements.printButton.addEventListener("click", () => window.print());
 
     elements.dismissErrorButton.addEventListener("click", hideError);
 
