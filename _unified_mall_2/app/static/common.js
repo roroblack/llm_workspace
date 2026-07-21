@@ -87,7 +87,22 @@ function transcribeBlob(blob) {
   return apiFetch("/api/voice/stt", { method: "POST", body: form });
 }
 
-async function synthesizeAndPlay(text) {
+// 현재 재생 중인 TTS 오디오(새 응답 전 정리용) — 페이지 전역 단일 재생.
+let _currentTtsAudio = null;
+
+function stopCurrentTts() {
+  if (_currentTtsAudio) {
+    try { _currentTtsAudio.pause(); } catch { /* noop */ }
+    _currentTtsAudio = null;
+  }
+}
+
+// hooks: { onSpeakStart(), onSpeakEnd() } — 아바타 애니메이션 동기화용(선택).
+// 애니메이션은 실제 'playing' 이벤트에서 시작하고 ended/pause/error/abort에서 모두 해제한다.
+async function synthesizeAndPlay(text, hooks) {
+  hooks = hooks || {};
+  stopCurrentTts(); // 새 발화 전 이전 발화 중단(중복 재생 방지)
+
   const resp = await fetch("/api/voice/tts", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -103,7 +118,24 @@ async function synthesizeAndPlay(text) {
   const blob = await resp.blob();
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
-  audio.addEventListener("ended", () => URL.revokeObjectURL(url));
+  _currentTtsAudio = audio;
+
+  let ended = false;
+  const release = () => {
+    if (ended) return;
+    ended = true;
+    URL.revokeObjectURL(url);
+    if (_currentTtsAudio === audio) _currentTtsAudio = null;
+    if (typeof hooks.onSpeakEnd === "function") hooks.onSpeakEnd();
+  };
+  audio.addEventListener("playing", () => {
+    if (typeof hooks.onSpeakStart === "function") hooks.onSpeakStart();
+  });
+  audio.addEventListener("ended", release);
+  audio.addEventListener("pause", release);
+  audio.addEventListener("error", release);
+  audio.addEventListener("abort", release);
+
   await audio.play();
   return audio;
 }
