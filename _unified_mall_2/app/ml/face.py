@@ -1,8 +1,9 @@
 """얼굴 임베딩 + 패시브 라이브니스 + 품질 게이팅 (Phase 13, 로컬 CPU).
 
-파이프라인(무폴백): 디코드 → 단일 얼굴 → **품질 게이팅**(흐림·밝기·크기·자세·검출신뢰도) →
-라이브니스 → 정렬(112×112) → 저조도 조건부 CLAHE → 임베딩. 저품질은 조용히 통과시키지 않고
-명시적 재촬영 사유를 돌려준다(ValidationErr). 모델 로드 실패는 ConfigError.
+파이프라인(무폴백): 디코드 → 대상 얼굴(여러 명이면 **가장 앞=가장 큰 얼굴** 선택) →
+**품질 게이팅**(흐림·밝기·크기·자세·검출신뢰도) → 라이브니스 → 정렬(112×112) → 저조도 조건부
+CLAHE → 임베딩. 저품질은 조용히 통과시키지 않고 명시적 재촬영 사유를 돌려준다(ValidationErr).
+모델 로드 실패는 ConfigError.
 
 인식 백엔드(실측 근거): 검출·정렬은 insightface RetinaFace(우수) 유지, **인식 임베딩은 기본
 AdaFace IR-101(WebFace12M)**. config FACE_RECOGNITION으로 adaface/lvface/insightface 선택.
@@ -95,14 +96,21 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
     return img
 
 
-def _detect_single_face(bgr: np.ndarray):
-    """정확히 한 명의 얼굴만 허용(0명/복수는 사용성 오류 — 신원/라이브니스 정보 누출 아님)."""
+def _detect_primary_face(bgr: np.ndarray):
+    """대상 얼굴을 고른다. 여러 명이 잡히면 **가장 앞(=bbox 면적 최대, 카메라에 가장 가까운)**
+    사람을 선택한다(배경 인물 무시). 얼굴이 하나도 없으면 재촬영 요구(무폴백).
+    """
     app = _get_face_app()
     faces = app.get(bgr)
     if not faces:
         raise ValidationErr("얼굴이 감지되지 않았습니다. 얼굴을 화면 중앙에 맞춰 다시 촬영하세요.")
     if len(faces) > 1:
-        raise ValidationErr("얼굴이 여러 개 감지되었습니다. 한 사람만 나오게 촬영하세요.")
+        # 면적이 큰 얼굴 = 카메라에 가까운(앞에 있는) 사람.
+        faces = sorted(
+            faces,
+            key=lambda f: (f.bbox[2] - f.bbox[0]) * (f.bbox[3] - f.bbox[1]),
+            reverse=True,
+        )
     return faces[0]
 
 
@@ -241,7 +249,7 @@ def analyze_face(image_bytes: bytes, *, strict: bool = False) -> dict[str, Any]:
     """
     settings = get_settings()
     bgr = _decode_image(image_bytes)
-    face = _detect_single_face(bgr)
+    face = _detect_primary_face(bgr)
     aligned = _aligned_crop(bgr, face)
     _check_quality(bgr, face, aligned, strict=strict)  # 품질 미달이면 여기서 실패
     live_prob = _liveness_prob(bgr, face.bbox)
