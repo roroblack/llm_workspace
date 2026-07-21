@@ -48,13 +48,32 @@ def _fetch_gdrive(file_id: str, out: Path) -> None:
     print(f"[fetch_face_model] 완료: {out} ({out.stat().st_size} bytes)")
 
 
+def _fetch_hf(repo: str, filename: str, out: Path) -> None:
+    out.parent.mkdir(parents=True, exist_ok=True)
+    if out.exists() and out.stat().st_size > 0:
+        print(f"[fetch_face_model] 이미 존재: {out} ({out.stat().st_size} bytes)")
+        return
+    import shutil
+
+    from huggingface_hub import hf_hub_download
+
+    print(f"[fetch_face_model] HuggingFace에서 다운로드: {repo}/{filename}")
+    cached = hf_hub_download(repo, filename)
+    shutil.copy(cached, out)
+    print(f"[fetch_face_model] 완료: {out} ({out.stat().st_size} bytes)")
+
+
 def main() -> None:
     settings = get_settings()
     _fetch_http(_ANTISPOOF_URL, settings.FACE_ANTISPOOF_ONNX)
-    if settings.FACE_RECOGNITION == "adaface":
-        _fetch_gdrive(_ADAFACE_GDRIVE_ID, settings.FACE_ADAFACE_ONNX)
+    backend = settings.FACE_RECOGNITION
+    if backend == "adaface":
+        _fetch_gdrive(_ADAFACE_GDRIVE_ID, settings.FACE_ADAFACE_ONNX)  # AdaFace: Google Drive
+    elif backend == "lvface":
+        _fetch_hf("bytedance-research/LVFace", "LVFace-S_Glint360K/LVFace-S_Glint360K.onnx",
+                  settings.FACE_LVFACE_ONNX)
     else:
-        print("[fetch_face_model] FACE_RECOGNITION=insightface — AdaFace 건너뜀.")
+        print("[fetch_face_model] FACE_RECOGNITION=insightface — 별도 인식 모델 다운로드 없음.")
 
 
 if __name__ == "__main__":

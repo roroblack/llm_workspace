@@ -84,9 +84,14 @@ class Settings(BaseSettings):
     # 저품질 벤치마크(TinyFace/IJB-S) SOTA이고 이 프로젝트에서도 열화 이미지 매칭이 ArcFace(r50)보다
     # 전 항목 우위임을 실측(블러 k21 0.578→0.665, 저해상 0.15배 0.299→0.389). 라이브니스: Silent-Face.
     FACE_EMBED_MODEL: str = "buffalo_l"  # insightface 모델팩(검출·정렬·자세, 최초 사용시 자동 다운로드)
-    # 인식 백엔드 선택: "adaface"(기본, 저품질 강함) 또는 "insightface"(buffalo_l r50 임베딩).
+    # 인식 백엔드 선택(실측 근거로 기본=adaface):
+    #   "adaface"   — AdaFace IR-101. 저품질(흐림·저조도·저해상) 최강. CPU 느림(~550ms/장).
+    #   "lvface"    — LVFace-S(ViT). 일반/고품질 벤치마크 SOTA·빠름(~96ms)이나 저품질은 오히려 약함.
+    #   "insightface" — buffalo_l r50. 중간·빠름(~100ms).
+    # 웹캠 로그인은 저품질이 실제 조건이라 adaface가 이 용도에 최선(LVFace의 SOTA는 고품질 한정).
     FACE_RECOGNITION: str = "adaface"
     FACE_ADAFACE_ONNX: Path = ROOT_DIR / "data" / "models" / "adaface_ir101_webface12m.onnx"
+    FACE_LVFACE_ONNX: Path = ROOT_DIR / "data" / "models" / "LVFace-S_Glint360K.onnx"
     FACE_ANTISPOOF_ONNX: Path = ROOT_DIR / "data" / "models" / "minifasnet_v2.onnx"
     FACE_ANTISPOOF_SCALE: float = 2.7  # Silent-Face 2.7 모델의 크롭 스케일(원본 파이프라인 기준)
     # 코사인 유사도 임계(정규화 임베딩). AdaFace 기준값(타인 유사도 ~0이라 여유 큼) — 실데이터

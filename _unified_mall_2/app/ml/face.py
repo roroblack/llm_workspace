@@ -5,11 +5,16 @@
 명시적 재촬영 사유를 돌려준다(ValidationErr). 모델 로드 실패는 ConfigError.
 
 인식 백엔드(실측 근거): 검출·정렬은 insightface RetinaFace(우수) 유지, **인식 임베딩은 기본
-AdaFace IR-101(WebFace12M)** — 저품질 벤치마크(TinyFace/IJB-S) SOTA이고 이 환경에서도 열화
-이미지 매칭이 ArcFace(buffalo_l r50)보다 전 항목 우위임을 실측(블러 k21 0.578→0.665, 저조도
-×0.12 0.869→0.923, 저해상 0.15배 0.299→0.389, 타인 분리는 동일 ~0). config FACE_RECOGNITION으로
-"insightface"(r50) 선택 가능. 그 외 병목은 정보 손실·등록 오염이라 품질 게이팅 + 다중 등록이
-실질 레버. CLAHE는 정상광에선 임베딩을 흔들어(실측) 저조도에서만 조건부 적용.
+AdaFace IR-101(WebFace12M)**. config FACE_RECOGNITION으로 adaface/lvface/insightface 선택.
+동일 셋업 열화 매칭 실측(동일인 코사인, 높을수록 좋음):
+    degrade      buffalo_l  AdaFace  LVFace-S  LVFace-B
+    블러 k21       0.578    0.665    0.379     0.279
+    저조도 ×0.12    0.869    0.923    0.881     0.880
+    저해상 0.15배   0.299    0.389    0.120     0.057
+→ **AdaFace가 저품질 전 항목 최강.** LVFace는 일반/고품질 벤치마크(MR-All) SOTA이자 CPU가 빠르나
+(~96ms vs AdaFace ~550ms) **저품질에선 buffalo_l보다도 약함** — 웹캠 로그인처럼 저품질이 실제
+조건인 용도엔 AdaFace가 최선(LVFace의 SOTA는 고품질 한정). 그 외 병목은 정보 손실·등록 오염이라
+품질 게이팅 + 다중 등록이 실질 레버. CLAHE는 정상광에선 임베딩을 흔들어(실측) 저조도만 조건부 적용.
 
 한계: 라이브니스는 Silent-Face 단일 모델(앙상블 아님)이고 이 환경에서 실 라이브/사진 쌍으로
 정확도 검증 불가. insightface 사전학습 모델·AdaFace 모두 연구/비상업 성격 — 상용 시 라이선스
@@ -60,21 +65,22 @@ def _get_antispoof_session():
         raise ConfigError(f"라이브니스 모델 로드 실패: {exc}") from exc
 
 
-@lru_cache(maxsize=1)
-def _get_adaface_session():
+@lru_cache(maxsize=2)
+def _get_onnx_recognizer(path_str: str):
     import onnxruntime as ort
 
-    settings = get_settings()
-    path = settings.FACE_ADAFACE_ONNX
+    from pathlib import Path
+
+    path = Path(path_str)
     if not path.exists():
         raise ConfigError(
-            f"AdaFace ONNX 모델이 없습니다: {path}. "
+            f"인식 ONNX 모델이 없습니다: {path}. "
             "`python -m scripts.fetch_face_model`로 내려받으세요(또는 config FACE_RECOGNITION=insightface)."
         )
     try:
         return ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
     except Exception as exc:  # noqa: BLE001
-        raise ConfigError(f"AdaFace 모델 로드 실패: {exc}") from exc
+        raise ConfigError(f"인식 모델 로드 실패({path.name}): {exc}") from exc
 
 
 def _decode_image(image_bytes: bytes) -> np.ndarray:
@@ -162,15 +168,20 @@ def _embed(aligned: np.ndarray) -> np.ndarray:
     import cv2
 
     settings = get_settings()
-    if settings.FACE_RECOGNITION == "adaface":
-        sess = _get_adaface_session()
+    backend = settings.FACE_RECOGNITION
+    if backend in ("adaface", "lvface"):
+        # AdaFace·LVFace 동일 전처리: RGB 112, [-1,1].
+        path = settings.FACE_ADAFACE_ONNX if backend == "adaface" else settings.FACE_LVFACE_ONNX
+        sess = _get_onnx_recognizer(str(path))
         rgb = cv2.cvtColor(aligned, cv2.COLOR_BGR2RGB).astype(np.float32)
-        rgb = ((rgb / 255.0) - 0.5) / 0.5  # [-1, 1] (AdaFace 전처리)
+        rgb = ((rgb / 255.0) - 0.5) / 0.5
         blob = rgb.transpose(2, 0, 1)[None]
         feat = sess.run(None, {sess.get_inputs()[0].name: blob})[0][0].astype(np.float32)
-    else:
+    elif backend == "insightface":
         rec = _get_face_app().models["recognition"]
         feat = rec.get_feat(aligned).flatten().astype(np.float32)
+    else:
+        raise ConfigError(f"알 수 없는 FACE_RECOGNITION 백엔드: {backend}")
 
     norm = float(np.linalg.norm(feat))
     if norm == 0.0:
