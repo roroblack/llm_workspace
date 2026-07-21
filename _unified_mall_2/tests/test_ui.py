@@ -67,6 +67,33 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
             assert text in r.text, f"{path}에 '{text}' 없음"
 
 
+def test_customer_and_admin_apps_are_physically_separated():
+    """고객 앱(공개 포트)과 운영 앱(내부 포트)이 실제로 분리됐는지 — 관리자 API/페이지가
+    고객 앱에는 물리적으로 없어야(404) 하고 운영 앱에는 있어야 한다.
+
+    실제 프로덕션 패턴(별도 서비스/포트/서브도메인, 관리자는 VPN 뒤)의 축소판.
+    """
+    from fastapi.testclient import TestClient
+
+    from app.main import admin_app, customer_app
+
+    cust = TestClient(customer_app)
+    adm = TestClient(admin_app)
+
+    # 고객 앱: 관리자 API 라우터 자체가 없음 → 404 (401/403이 아니라)
+    assert cust.get("/api/admin/orders").status_code == 404
+    # 고객 앱: 운영 정적 페이지 차단, 고객 페이지는 서빙
+    assert cust.get("/static/admin.html").status_code == 404
+    assert cust.get("/static/facebench.html").status_code == 404
+    assert cust.get("/static/shop.html").status_code == 200
+    # 고객 앱 랜딩은 스토어
+    assert "스토어" in cust.get("/").text
+
+    # 운영 앱: 관리자 API 존재(미인증 401), 관리자 페이지 서빙
+    assert adm.get("/api/admin/orders").status_code == 401
+    assert adm.get("/static/admin.html").status_code == 200
+
+
 def test_customer_web_and_ops_tools_are_separated(client):
     """고객 웹(client)과 운영/개발 도구는 nav가 분리돼야 한다.
 

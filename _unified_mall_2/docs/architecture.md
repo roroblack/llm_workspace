@@ -131,7 +131,35 @@ sequenceDiagram
 | 얼굴 | insightface(검출/정렬) + AdaFace(인식, 기본) + Silent-Face(라이브니스) | 저품질 특화 AdaFace, DirectML 7× 가속(Iris Xe) |
 | 보고서 | reportlab(PDF, 한글 폰트 임베딩) | 관리자 요약 보고서 생성/저장/인쇄 |
 
-## 7. 관측성·보안·거버넌스
+## 7. 고객 웹 ↔ 운영 도구 분리 (실제 프로덕션 패턴)
+
+실무에서는 고객 사이트와 관리자 대시보드를 **별도 서비스/포트/서브도메인**으로 나누고, 관리자
+쪽은 VPN·사내망·IP 화이트리스트 뒤에 둬 공개 인터넷에 노출하지 않는다. 이 프로젝트는 그 패턴을
+**두 개의 ASGI 앱 + 두 포트**로 축소 재현한다.
+
+```mermaid
+flowchart LR
+  subgraph PUB["공개 (인터넷)"]
+    C["고객<br/>브라우저"]
+  end
+  subgraph INT["내부 (VPN/사내망 가정)"]
+    O["운영자"]
+  end
+  C -->|":8080"| CA["customer_app<br/>관리자 라우터 미포함<br/>운영 정적페이지 차단"]
+  O -->|":8081"| AA["admin_app<br/>관리자 대시보드 + 운영 도구 전체"]
+  CA --> DB[("공유 DB/모델")]
+  AA --> DB
+```
+
+- `customer_app`(8080): `/api/admin/*`이 **물리적으로 404**(라우터를 싣지 않음). 운영 정적 페이지
+  (admin/facebench/mcp/rag/orders)도 404. 실측: 8080에서 `/api/admin/orders`→404, `/static/admin.html`
+  →404, `/static/shop.html`→200.
+- `admin_app`(8081): 관리자 대시보드 + 운영 도구 전체. 실측: `/api/admin/orders`→401(인증필요),
+  `/static/admin.html`→200.
+- 실행: `python -m scripts.run_customer_server` / `python -m scripts.run_admin_server`.
+  (`run_dev_server.py`의 전체 앱은 테스트·개발 편의용.)
+
+## 8. 관측성·보안·거버넌스
 
 - **관측성**: 요청별 trace_id(X-Trace-ID) + run_events(요약만, 원문·PII 금지).
 - **RBAC**: role을 JWT에 넣지 않고 매 요청 DB 조회(강등 즉시 반영). 관리자 라우터 전역
@@ -140,7 +168,7 @@ sequenceDiagram
   이벤트를 남긴다(무폴백).
 - **거버넌스**: plans/history/reports append-only, 각 Phase마다 Codex 교차검증.
 
-## 8. 한계 (정직 기록)
+## 9. 한계 (정직 기록)
 
 - 얼굴 라이브니스는 단일 모델(앙상블 아님)·헤드리스 환경에서 실 웹캠 라이브 정확도 미검증.
 - DirectML은 Windows 전용(비Windows는 plain onnxruntime로 CPU).

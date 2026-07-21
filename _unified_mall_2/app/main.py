@@ -1,7 +1,16 @@
-"""FastAPI 진입점.
+"""FastAPI 진입점 — 고객/운영 분리 지원.
 
-앱 조립: trace 미들웨어 + 예외 핸들러 + 전 라우터 + 정적 UI. 기동 시 자동 DB/인덱스 설정은
+앱 조립: trace 미들웨어 + 예외 핸들러 + 라우터 + 정적 UI. 기동 시 자동 DB/인덱스 설정은
 하지 않는다(REQ-OPS-01) — 명시적 `scripts.manage`로 준비하고 `/api/health/ready`로 확인한다.
+
+**고객 웹 ↔ 운영 도구 분리(실제 프로덕션 패턴 축소판)**: 실무에선 고객 사이트와 관리자
+대시보드를 별도 서비스/포트/서브도메인으로 나누고, 관리자 쪽은 VPN·사내망 뒤에 둔다. 여기서는
+세 가지 앱을 제공한다:
+  - `app`          : 전체(모든 라우터) — 테스트·개발 편의용 기본.
+  - `customer_app` : **관리자 라우터 미포함** + 운영 페이지 정적 차단 → 공개 포트(8080)용.
+                     이 포트에서 `/api/admin/*`은 **물리적으로 404**(라우터가 없음).
+  - `admin_app`    : 전체(관리자 대시보드 + 운영 도구) → 내부 포트(8081)용.
+운영 스크립트: `run_dev_server.py`(customer 8080), `run_admin_server.py`(admin 8081).
 """
 
 from __future__ import annotations
@@ -10,7 +19,7 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.config import get_settings
@@ -35,6 +44,12 @@ from app.routers import (
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
+# 고객 포트에서 서빙하지 않을 운영/개발 정적 페이지·스크립트(고객 웹 노출 금지).
+_OPS_STATIC = {
+    "admin.html", "admin.js", "facebench.html", "facebench.js",
+    "mcp.html", "mcp.js", "rag.html", "rag.js", "orders.html", "orders.js",
+}
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -44,14 +59,19 @@ async def lifespan(_app: FastAPI):
     yield
 
 
-def create_app() -> FastAPI:
+def create_app(role: str = "full") -> FastAPI:
+    """role: full(전체) | customer(관리자 제외·운영페이지 차단) | admin(전체·관리자 랜딩)."""
+    settings = get_settings()
+    suffix = {"customer": " (고객)", "admin": " (운영)", "full": ""}.get(role, "")
     app = FastAPI(
-        title=f"{get_settings().BRAND_NAME} AI 커머스 에이전트",
+        title=f"{settings.BRAND_NAME} AI 커머스 에이전트{suffix}",
         version="0.3.0",
         lifespan=lifespan,
     )
-    app.add_middleware(TraceMiddleware)  # 요청별 trace_id + X-Trace-ID 응답 헤더
+    app.add_middleware(TraceMiddleware)
     register_exception_handlers(app)
+
+    # 공용·고객 라우터(양쪽 공통)
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(products.router)
@@ -63,18 +83,35 @@ def create_app() -> FastAPI:
     app.include_router(lab.router)
     app.include_router(mcp.router)
     app.include_router(workflow.router)
-    app.include_router(admin.router)
     app.include_router(voice.router)
     app.include_router(face.router)
 
-    # 정적 UI
+    # 관리자 라우터: 고객 앱에는 **싣지 않는다** → 고객 포트에서 /api/admin/*은 404.
+    if role != "customer":
+        app.include_router(admin.router)
+
+    # 고객 앱은 운영/개발 정적 페이지를 차단(정적 마운트보다 먼저 매칭됨).
+    if role == "customer":
+        @app.get("/static/{filename}", include_in_schema=False)
+        def _block_ops_static(filename: str):
+            if filename in _OPS_STATIC:
+                return PlainTextResponse("운영 도구는 관리자 포트에서 접근하세요.", status_code=404)
+            target = _STATIC_DIR / filename
+            if not target.is_file():
+                return PlainTextResponse("Not Found", status_code=404)
+            return FileResponse(str(target))
+
     app.mount("/static", StaticFiles(directory=str(_STATIC_DIR)), name="static")
+
+    landing = {"customer": "shop.html", "admin": "admin.html"}.get(role, "index.html")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
-        return FileResponse(str(_STATIC_DIR / "index.html"))
+        return FileResponse(str(_STATIC_DIR / landing))
 
     return app
 
 
-app = create_app()
+app = create_app("full")            # 테스트·개발 편의(전체)
+customer_app = create_app("customer")  # 공개 포트(8080) — 관리자 API·운영 페이지 없음
+admin_app = create_app("admin")     # 내부 포트(8081) — 전체
