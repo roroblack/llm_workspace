@@ -45,6 +45,8 @@ pyttsx3==2.99
 reportlab==5.0.0
 # Phase 13 (얼굴 로그인 2차인증 — 검출/정렬 insightface + 인식 AdaFace ONNX + 라이브니스 Silent-Face)
 insightface==0.7.3
-onnxruntime==1.20.1
+# Windows: onnxruntime-directml(iGPU/GPU 가속, CPU EP 포함). 실측 AdaFace 531ms→74ms(7배).
+# 비Windows·GPU 없음이면 plain onnxruntime로 바꾸면 됨(코드는 가용 EP만 자동 사용).
+onnxruntime-directml==1.24.4
 opencv-python==4.10.0.84
 gdown==6.1.0  # AdaFace ONNX(Google Drive) 다운로드용

@@ -49,6 +49,21 @@ def _get_face_app():
     return app
 
 
+def _resolve_providers(requested: list[str]) -> list[str]:
+    """요청 EP 중 이 설치에서 실제 가용한 것만 남긴다(항상 CPU 보장).
+
+    plain onnxruntime(CPU 전용)이면 DmlExecutionProvider가 자동 제외돼 CPU로 돈다 —
+    존재하지 않는 EP를 넘겨 세션 생성이 깨지는 걸 막는 것(조용한 성능 저하 아님, 가용성 기반).
+    """
+    import onnxruntime as ort
+
+    available = set(ort.get_available_providers())
+    resolved = [p for p in requested if p in available]
+    if "CPUExecutionProvider" not in resolved:
+        resolved.append("CPUExecutionProvider")
+    return resolved
+
+
 @lru_cache(maxsize=1)
 def _get_antispoof_session():
     import onnxruntime as ort
@@ -61,7 +76,9 @@ def _get_antispoof_session():
             "`python -m scripts.fetch_face_model`로 내려받으세요."
         )
     try:
-        return ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+        return ort.InferenceSession(
+            str(path), providers=_resolve_providers(settings.FACE_LIVENESS_PROVIDERS)
+        )
     except Exception as exc:  # noqa: BLE001
         raise ConfigError(f"라이브니스 모델 로드 실패: {exc}") from exc
 
@@ -79,7 +96,9 @@ def _get_onnx_recognizer(path_str: str):
             "`python -m scripts.fetch_face_model`로 내려받으세요(또는 config FACE_RECOGNITION=insightface)."
         )
     try:
-        return ort.InferenceSession(str(path), providers=["CPUExecutionProvider"])
+        return ort.InferenceSession(
+            str(path), providers=_resolve_providers(get_settings().FACE_RECOG_PROVIDERS)
+        )
     except Exception as exc:  # noqa: BLE001
         raise ConfigError(f"인식 모델 로드 실패({path.name}): {exc}") from exc
 

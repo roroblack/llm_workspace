@@ -94,6 +94,12 @@ class Settings(BaseSettings):
     FACE_LVFACE_ONNX: Path = ROOT_DIR / "data" / "models" / "LVFace-S_Glint360K.onnx"
     FACE_ANTISPOOF_ONNX: Path = ROOT_DIR / "data" / "models" / "minifasnet_v2.onnx"
     FACE_ANTISPOOF_SCALE: float = 2.7  # Silent-Face 2.7 모델의 크롭 스케일(원본 파이프라인 기준)
+    # onnxruntime 실행 프로바이더(EP). 인식 모델(AdaFace/LVFace)은 DirectML(Windows iGPU/GPU)이
+    # 훨씬 빠름(실측 AdaFace 531ms→74ms, 7배). 설치가 CPU 전용(plain onnxruntime)이면 Dml은
+    # 자동으로 제외되고 CPU로 돈다(_resolve_providers가 가용한 것만 남김). 라이브니스는 초소형
+    # 모델이라 DirectML 오버헤드가 더 커서 CPU 고정.
+    FACE_RECOG_PROVIDERS: list[str] = ["DmlExecutionProvider", "CPUExecutionProvider"]
+    FACE_LIVENESS_PROVIDERS: list[str] = ["CPUExecutionProvider"]
     # 코사인 유사도 임계(정규화 임베딩). AdaFace 기준값(타인 유사도 ~0이라 여유 큼) — 실데이터
     # 튜닝 아님(문서화). insightface 백엔드로 바꾸면 이 값도 재튜닝 필요(관례상 ~0.35~0.40).
     FACE_MATCH_THRESHOLD: float = 0.30
