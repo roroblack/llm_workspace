@@ -1,4 +1,6 @@
 * { box-sizing: border-box; }
+/* [hidden]이 display:flex 같은 클래스 규칙에 밀리지 않도록 전역 강제(모달·오버레이 숨김 보장) */
+[hidden] { display: none !important; }
 body {
   font-family: "Segoe UI", "Malgun Gothic", sans-serif;
   margin: 0; background: #f5f6fa; color: #1e272e;

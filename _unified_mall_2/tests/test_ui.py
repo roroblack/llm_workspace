@@ -67,11 +67,24 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
             assert text in r.text, f"{path}에 '{text}' 없음"
 
 
-def test_index_nav_links_to_new_pages(client):
-    r = client.get("/static/index.html")
-    for path in ("rag.html", "orders.html", "video.html", "mypage.html", "facebench.html",
-                 "admin.html", "mcp.html"):
-        assert path in r.text
+def test_customer_web_and_ops_tools_are_separated(client):
+    """고객 웹(client)과 운영/개발 도구는 nav가 분리돼야 한다.
+
+    고객 페이지(index 등)는 관리자·개발 도구를 노출하지 않고, 운영 페이지(admin 등)만
+    그 도구들을 링크한다. '사용자 화면과 관리자 대시보드 별도 제공'(프로젝트설명.txt) 충족.
+    """
+    customer = client.get("/static/index.html").text
+    # 고객 nav = 쇼핑/AI상담/화상상담/마이페이지만
+    for path in ("shop.html", "video.html", "mypage.html"):
+        assert path in customer
+    # 고객 페이지 nav에 운영/개발 도구가 노출되면 안 됨
+    for ops in ("admin.html", "mcp.html", "facebench.html", "rag.html"):
+        assert ops not in customer, f"고객 웹에 운영 도구 노출: {ops}"
+
+    # 운영 페이지(admin)는 운영 도구들을 링크
+    ops_page = client.get("/static/admin.html").text
+    for path in ("rag.html", "facebench.html", "mcp.html"):
+        assert path in ops_page
 
 
 def test_face_backend_select_endpoint(client):
