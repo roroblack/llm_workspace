@@ -79,6 +79,12 @@ class Settings(BaseSettings):
     # SAPI5 보이스 ID 부분 문자열로 찾는다(전체 ID는 OS마다 다름) — 없으면 ConfigError.
     TTS_VOICE_MATCH: str = "KO-KR"
 
+    # --- PDF 한글 폰트 (정책 문서·관리자 보고서 공용) ---
+    # 없으면 조용히 깨진 글자로 만들지 않고 ConfigError(무폴백). 비Windows는 이 경로만 바꾸면 됨
+    # (예: /usr/share/fonts/truetype/nanum/NanumGothic.ttf).
+    PDF_FONT_REGULAR: Path = Path("C:/Windows/Fonts/malgun.ttf")
+    PDF_FONT_BOLD: Path = Path("C:/Windows/Fonts/malgunbd.ttf")
+
     # --- 얼굴 로그인 2차 인증 (Phase 13) ---
     # 검출·정렬: insightface RetinaFace(buffalo_l, 우수). 인식 임베딩: AdaFace IR-101(기본) —
     # 저품질 벤치마크(TinyFace/IJB-S) SOTA이고 이 프로젝트에서도 열화 이미지 매칭이 ArcFace(r50)보다

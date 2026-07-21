@@ -236,11 +236,53 @@
       </div>
     </section>
 
+    <section class="group" id="customer">
+      <h2>🛍️ 고객·부가 서비스 화면 <span class="count">(추가 서비스 제안 구현)</span></h2>
+      <div class="shots">
+        <figure>
+          <img src="screenshots/15_shop_cart.png" alt="고객 스토어프론트 · 장바구니" />
+          <figcaption>
+            <div class="title">고객 스토어프론트 (상품·장바구니·주문)</div>
+            <div class="desc">상품 그리드·검색/분류·장바구니·주문 흐름(로그인/2FA→미리보기→결제
+              승인). 기존 커머스 백엔드(Phase 6) 재사용.</div>
+            <span class="route">GET /api/products · POST /api/orders</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/16_mypage_face_login.png" alt="마이페이지 얼굴 로그인" />
+          <figcaption>
+            <div class="title">얼굴 로그인 2차 인증 (마이페이지)</div>
+            <div class="desc">비밀번호 로그인 + 선택적 얼굴 2차 인증(패시브 라이브니스). 인식은
+              AdaFace IR-101(DirectML 가속), 저품질 특화.</div>
+            <span class="route">POST /auth/login/face · /api/face/register</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/17_video_consult.png" alt="화상 상담 아바타" />
+          <figcaption>
+            <div class="title">화상 상담 (웹캠 + AI 아바타)</div>
+            <div class="desc">고객 웹캠 + AI 아바타(TTS 재생 중 입 애니메이션). STT/TTS는 로컬
+              faster-whisper/pyttsx3.</div>
+            <span class="route">POST /api/voice/stt · /api/voice/tts</span>
+          </figcaption>
+        </figure>
+        <figure>
+          <img src="screenshots/18_facebench.png" alt="얼굴인식 백엔드 성능 비교" />
+          <figcaption>
+            <div class="title">얼굴인식 백엔드 성능 비교 + 선택</div>
+            <div class="desc">insightface·AdaFace·LVFace를 같은 얼굴로 코사인·지연 실측 비교하고,
+              활성 백엔드를 관리자 전용으로 전환.</div>
+            <span class="route">POST /api/face/benchmark · PUT /api/face/backend</span>
+          </figcaption>
+        </figure>
+      </div>
+    </section>
+
     <footer>
       화면 재캡처: <code>python scripts/run_dev_server.py</code> 기동 후
-      <code>python scripts/capture_screenshots.py && python scripts/capture_screenshots_admin.py
-      && python scripts/capture_screenshots_mcp.py</code><br />
-      테스트: CI 320 · MCP 12 · PG 10 (전부 통과) — 상세는 <a href="../reports/">../reports/</a>,
+      <code>python -m scripts.capture_screenshots && python -m scripts.capture_screenshots_admin
+      && python -m scripts.capture_screenshots_mcp && python -m scripts.capture_screenshots_customer</code><br />
+      테스트: CI 325 · MCP 12 · PG 10 (전부 통과) — 상세는 <a href="../reports/">../reports/</a>,
       요구사항 매트릭스는 <a href="../tests/requirements_matrix.yaml">../tests/requirements_matrix.yaml</a>
     </footer>
   </main>

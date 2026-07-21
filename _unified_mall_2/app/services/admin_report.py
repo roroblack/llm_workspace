@@ -18,20 +18,18 @@ from app.core.config import get_settings
 from app.core.errors import ConfigError
 from app.db.models import KnowledgeGap, Order, RunEvent
 
-_FONT_REG = Path("C:/Windows/Fonts/malgun.ttf")
-_FONT_BOLD = Path("C:/Windows/Fonts/malgunbd.ttf")
-
-
 def _register_fonts():
     from reportlab.pdfbase import pdfmetrics
     from reportlab.pdfbase.ttfonts import TTFont
 
-    if not _FONT_REG.exists() or not _FONT_BOLD.exists():
+    settings = get_settings()
+    reg, bold = settings.PDF_FONT_REGULAR, settings.PDF_FONT_BOLD
+    if not reg.exists() or not bold.exists():
         raise ConfigError(
-            f"한글 폰트를 찾을 수 없습니다: {_FONT_REG}. 맑은 고딕이 없는 환경이면 폰트 경로를 수정하세요."
+            f"한글 폰트를 찾을 수 없습니다: {reg}. config PDF_FONT_REGULAR/BOLD 경로를 수정하세요."
         )
-    pdfmetrics.registerFont(TTFont("Malgun", str(_FONT_REG)))
-    pdfmetrics.registerFont(TTFont("MalgunBd", str(_FONT_BOLD)))
+    pdfmetrics.registerFont(TTFont("Malgun", str(reg)))
+    pdfmetrics.registerFont(TTFont("MalgunBd", str(bold)))
     return "Malgun", "MalgunBd"
 
 
