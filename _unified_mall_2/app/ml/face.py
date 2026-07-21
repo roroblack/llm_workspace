@@ -260,6 +260,52 @@ def analyze_face(image_bytes: bytes, *, strict: bool = False) -> dict[str, Any]:
 
 RECOGNITION_BACKENDS = ("insightface", "adaface", "lvface")
 
+# 백엔드별 한 줄 설명(UI 표시용).
+BACKEND_NOTES = {
+    "insightface": "ArcFace r50 · 기준선 · 빠름",
+    "adaface": "AdaFace IR-101 · 저품질 강함 · CPU 느림",
+    "lvface": "LVFace ViT-S · 고품질 벤치 SOTA · 빠름 · 저품질 약함",
+}
+
+
+def _backend_available(backend: str) -> bool:
+    s = get_settings()
+    if backend == "insightface":
+        return True  # buffalo_l은 최초 사용 시 자동 다운로드
+    if backend == "adaface":
+        return s.FACE_ADAFACE_ONNX.exists()
+    if backend == "lvface":
+        return s.FACE_LVFACE_ONNX.exists()
+    return False
+
+
+def backend_status() -> dict[str, Any]:
+    s = get_settings()
+    return {
+        "active": s.FACE_RECOGNITION,
+        "match_threshold": s.FACE_MATCH_THRESHOLD,
+        "backends": [
+            {"name": be, "available": _backend_available(be), "note": BACKEND_NOTES[be]}
+            for be in RECOGNITION_BACKENDS
+        ],
+    }
+
+
+def set_active_backend(backend: str) -> dict[str, Any]:
+    """런타임에 활성 인식 백엔드를 바꾼다(프로세스 한정·미영속 — 재시작 시 config값으로 복귀).
+
+    무폴백: 알 수 없는 값·모델 파일 부재는 명시적 오류. 주의: 백엔드마다 임베딩 공간이 달라
+    **기존 등록 얼굴은 재등록해야 한다**(호출자/문서가 경고).
+    """
+    if backend not in RECOGNITION_BACKENDS:
+        raise ValidationErr(f"지원하지 않는 백엔드: {backend}")
+    if not _backend_available(backend):
+        raise ConfigError(
+            f"'{backend}' 모델 파일이 없습니다. `python -m scripts.fetch_face_model`로 내려받으세요."
+        )
+    get_settings().FACE_RECOGNITION = backend
+    return backend_status()
+
 
 def _align_from_bytes(image_bytes: bytes) -> np.ndarray:
     """벤치마크용: 디코드 → 대상(앞) 얼굴 → 정렬 crop. 품질 게이트는 걸지 않는다(모델 차이만 관찰)."""

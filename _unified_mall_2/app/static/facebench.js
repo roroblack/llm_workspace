@@ -5,6 +5,52 @@ const slots = { A: { blob: null, stream: null }, B: { blob: null, stream: null }
 
 function el(id) { return document.getElementById(id); }
 
+// --- 활성 인식 백엔드 선택 메뉴 ---
+async function loadBackends() {
+  const { ok, body } = await apiFetch("/api/face/backend");
+  if (!ok || !body) { el("backendStatus").textContent = "백엔드 정보를 불러오지 못했습니다."; return; }
+  const sel = el("backendSelect");
+  sel.innerHTML = "";
+  for (const b of body.backends) {
+    const opt = document.createElement("option");
+    opt.value = b.name;
+    opt.textContent = `${b.name} — ${b.note}` + (b.available ? "" : " (모델 없음)");
+    opt.disabled = !b.available;
+    if (b.name === body.active) opt.selected = true;
+    sel.appendChild(opt);
+  }
+  el("backendStatus").textContent = `현재 사용 중: ${body.active} · 매칭 임계값 ${body.match_threshold}`;
+}
+
+el("applyBackendBtn").addEventListener("click", async () => {
+  const backend = el("backendSelect").value;
+  el("applyBackendBtn").disabled = true;
+  try {
+    const resp = await fetch("/api/face/backend", {
+      method: "PUT",
+      headers: authHeaders({ "Content-Type": "application/json" }),
+      body: JSON.stringify({ backend }),
+    });
+    const body = await resp.json().catch(() => null);
+    if (resp.ok) {
+      el("backendStatus").textContent = `변경됨 → ${body.active} (기존 등록 얼굴은 재등록 필요)`;
+      el("backendStatus").style.color = "var(--success, #218c74)";
+    } else if (resp.status === 401 || resp.status === 403) {
+      el("backendStatus").textContent = "변경은 관리자만 가능합니다. 관리자로 로그인하세요.";
+      el("backendStatus").style.color = "#c23616";
+    } else {
+      el("backendStatus").textContent = (body && body.message) || `변경 실패 (HTTP ${resp.status})`;
+      el("backendStatus").style.color = "#c23616";
+    }
+  } catch (err) {
+    el("backendStatus").textContent = "요청 실패: " + err.message;
+  } finally {
+    el("applyBackendBtn").disabled = false;
+  }
+});
+
+loadBackends();
+
 function setSlot(which, blob, label) {
   slots[which].blob = blob;
   el("status" + which).textContent = label;

@@ -10,6 +10,7 @@ from fastapi import APIRouter, Depends, File, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
+from app.auth.roles import require_admin
 from app.auth.security import get_current_user
 from app.core.errors import ValidationErr
 from app.db.database import get_db
@@ -53,6 +54,25 @@ async def face_register(
         raise ValidationErr("업로드된 이미지가 비어 있습니다.")
     result = face_service.register_face(db, user, blobs)
     return FaceRegisterResponse(**result)
+
+
+@router.get("/backend")
+def get_backend() -> dict:
+    """현재 활성 인식 백엔드 + 선택 가능 목록(조회는 공개)."""
+    return face_ml.backend_status()
+
+
+class SetBackendRequest(BaseModel):
+    backend: str
+
+
+@router.put("/backend")
+def set_backend(body: SetBackendRequest, _admin: User = Depends(require_admin)) -> dict:
+    """활성 인식 백엔드 변경 — **관리자 전용**(전역 인증 설정이므로). 미영속(재시작 시 복귀).
+
+    주의: 백엔드마다 임베딩 공간이 달라 바꾸면 기존 등록 얼굴은 재등록해야 한다.
+    """
+    return face_ml.set_active_backend(body.backend)
 
 
 @router.post("/benchmark")

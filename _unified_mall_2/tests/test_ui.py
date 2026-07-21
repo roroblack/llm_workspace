@@ -55,7 +55,7 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
         "/static/common.js": ["/api/voice/stt", "/api/voice/tts", "captureFrameBlob",
                               "/auth/login/face", "submitLogin"],
         "/static/mypage.js": ["/auth/login", "/api/face/register", "/api/face/status", "captureFrameBlob"],
-        "/static/facebench.js": ["/api/face/benchmark"],
+        "/static/facebench.js": ["/api/face/benchmark", "/api/face/backend"],
     }
     for path, must_contain in checks.items():
         r = client.get(path)
@@ -69,6 +69,18 @@ def test_index_nav_links_to_new_pages(client):
     for path in ("rag.html", "orders.html", "video.html", "mypage.html", "facebench.html",
                  "admin.html", "mcp.html"):
         assert path in r.text
+
+
+def test_face_backend_select_endpoint(client):
+    """인식 백엔드 조회는 공개, 변경은 관리자 전용(모델 로드 없이 경로만 확인 — @ml 아님)."""
+    r = client.get("/api/face/backend")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["active"] in ("adaface", "lvface", "insightface")
+    assert len(body["backends"]) == 3
+    # 변경은 인증 필요(미인증 401)
+    r = client.put("/api/face/backend", json={"backend": "insightface"})
+    assert r.status_code == 401
 
 
 def test_lab_token_compare_endpoint(client):

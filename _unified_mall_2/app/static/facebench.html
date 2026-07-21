@@ -23,6 +23,19 @@
   </header>
 
   <main>
+    <p class="auth-status" id="authStatusBar"></p>
+
+    <div class="panel" id="backendPanel">
+      <h2>⚙️ 로그인에 사용할 인식 백엔드 선택</h2>
+      <p class="hint">현재 실제 얼굴 로그인/등록에 쓰는 모델입니다. 변경은 <strong>관리자 전용</strong>이며,
+        바꾸면 <strong>기존 등록 얼굴은 재등록</strong>해야 합니다(모델마다 임베딩 공간이 다름). 재시작 시 기본값으로 복귀.</p>
+      <div class="row">
+        <select id="backendSelect" class="filter-select"></select>
+        <button id="applyBackendBtn" type="button">적용</button>
+        <span class="hint" id="backendStatus"></span>
+      </div>
+    </div>
+
     <p class="ai-disclaimer">
       두 얼굴(A=기준/등록샷, B=비교/로그인샷)을 촬영하거나 업로드한 뒤 <strong>비교 실행</strong>을
       누르면 세 인식 백엔드의 코사인 유사도(동일인일수록 1에 가까움)·판정·임베딩 지연을 실측합니다.
