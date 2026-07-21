@@ -209,3 +209,90 @@ function captureFrameBlob(videoEl) {
   canvas.getContext("2d").drawImage(videoEl, 0, 0);
   return new Promise((resolve) => canvas.toBlob((b) => resolve(b), "image/jpeg", 0.92));
 }
+
+// --- 공통 로그인 + 얼굴 2차 인증(Phase 13) ---
+// 모든 페이지의 로그인 폼이 재사용한다. 얼굴 등록 계정이면 웹캠 오버레이로 2차 인증까지 마치고
+// 최종 토큰을 돌려준다. 무폴백: 2차 인증 실패 시 토큰을 발급하지 않고 reject.
+//
+// submitLogin(username, password) -> {token, username}  (실패 시 throw)
+
+function _face2faOverlay(challengeToken) {
+  return new Promise((resolve, reject) => {
+    const ov = document.createElement("div");
+    ov.className = "twofa-overlay";
+    ov.innerHTML =
+      '<div class="twofa-box">' +
+      '<h3>🙂 얼굴 2차 인증</h3>' +
+      '<p class="twofa-hint">등록한 얼굴로 본인 확인을 완료해야 로그인이 끝납니다.</p>' +
+      '<div class="twofa-cam"><video autoplay playsinline muted></video></div>' +
+      '<p class="twofa-status"></p>' +
+      '<div class="twofa-actions">' +
+      '<button class="twofa-shot" type="button">📸 촬영해서 인증</button>' +
+      '<button class="twofa-cancel secondary" type="button">취소</button>' +
+      "</div></div>";
+    document.body.appendChild(ov);
+    const video = ov.querySelector("video");
+    const statusEl = ov.querySelector(".twofa-status");
+    const shotBtn = ov.querySelector(".twofa-shot");
+    let stream = null;
+
+    function cleanup() {
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      ov.remove();
+    }
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then((s) => { stream = s; video.srcObject = s; statusEl.textContent = "얼굴을 중앙에 맞추고 촬영하세요."; })
+      .catch((err) => {
+        let m = "카메라를 열 수 없습니다: " + err.name;
+        if (err.name === "NotAllowedError") m = "카메라 권한이 거부되었습니다.";
+        statusEl.textContent = m;
+      });
+
+    shotBtn.addEventListener("click", async () => {
+      shotBtn.disabled = true;
+      statusEl.textContent = "얼굴 분석 중…";
+      try {
+        const blob = await captureFrameBlob(video);
+        if (!blob) { statusEl.textContent = "프레임 캡처 실패"; shotBtn.disabled = false; return; }
+        const fd = new FormData();
+        fd.append("image", blob, "face.jpg");
+        const resp = await fetch("/auth/login/face", {
+          method: "POST", headers: { Authorization: "Bearer " + challengeToken }, body: fd,
+        });
+        const body = await resp.json().catch(() => null);
+        if (resp.ok && body && body.access_token) {
+          cleanup();
+          resolve(body.access_token);
+        } else {
+          statusEl.textContent = (body && body.message) || `인증 실패 (HTTP ${resp.status})`;
+          shotBtn.disabled = false;
+        }
+      } catch (err) {
+        statusEl.textContent = "요청 실패: " + err.message;
+        shotBtn.disabled = false;
+      }
+    });
+    ov.querySelector(".twofa-cancel").addEventListener("click", () => {
+      cleanup();
+      reject(new Error("얼굴 2차 인증이 취소되었습니다."));
+    });
+  });
+}
+
+async function submitLogin(username, password) {
+  const form = new URLSearchParams({ username, password });
+  const { status, ok, body } = await apiFetch("/auth/login", { method: "POST", body: form });
+  if (!ok) {
+    const e = new Error((body && body.message) || `로그인 실패 (HTTP ${status})`);
+    e.status = status;
+    throw e;
+  }
+  if (body.face_2fa_required) {
+    const token = await _face2faOverlay(body.challenge_token); // 실패/취소 시 throw
+    setAuth(token, username);
+    return { token, username };
+  }
+  setAuth(body.access_token, username);
+  return { token: body.access_token, username };
+}

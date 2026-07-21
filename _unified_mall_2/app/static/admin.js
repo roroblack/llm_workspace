@@ -113,25 +113,31 @@
     elements.adminLoginBtn.disabled = true;
 
     try {
-      const form = new URLSearchParams({ username, password });
-      const result = await apiFetch("/auth/login", { method: "POST", body: form });
-
-      if (result.ok && result.body && result.body.access_token) {
-        setAuth(result.body.access_token, username);
-        elements.loginStatus.textContent = `로그인됨: ${username}`;
-        elements.loginStatus.style.color = "var(--success)";
-        document.dispatchEvent(new CustomEvent("auth:changed"));
-      } else {
-        elements.loginStatus.textContent =
-          `로그인 실패 (HTTP ${result.status})`;
-        elements.loginStatus.style.color = "var(--danger)";
-      }
+      // 공통 헬퍼: 얼굴 등록 계정이면 웹캠 2차 인증 오버레이까지 처리하고 최종 토큰을 준다.
+      await submitLogin(username, password);
+      elements.loginStatus.textContent = `로그인됨: ${username}`;
+      elements.loginStatus.style.color = "var(--success)";
+      document.dispatchEvent(new CustomEvent("auth:changed"));
+      maybePromptFaceEnroll();
     } catch (err) {
-      elements.loginStatus.textContent = "로그인 요청 실패: " + err.message;
+      elements.loginStatus.textContent = err.message || "로그인 실패";
       elements.loginStatus.style.color = "var(--danger)";
     } finally {
       elements.adminLoginBtn.disabled = false;
     }
+  }
+
+  // 관리자 얼굴 등록 유도: 로그인 후 얼굴 미등록이면 마이페이지 등록을 안내(무강제).
+  async function maybePromptFaceEnroll() {
+    try {
+      const { ok, body } = await apiFetch("/api/face/status", { headers: authHeaders() });
+      if (ok && body && body.registered === false) {
+        elements.loginStatus.innerHTML =
+          `로그인됨 · <strong>얼굴 미등록</strong> — ` +
+          `<a href="/static/mypage.html">마이페이지에서 얼굴을 등록</a>하면 다음 로그인부터 2차 인증이 적용됩니다.`;
+        elements.loginStatus.style.color = "var(--warning)";
+      }
+    } catch { /* 상태 조회 실패는 무시(로그인 자체는 성공) */ }
   }
 
   function handleLogout() {

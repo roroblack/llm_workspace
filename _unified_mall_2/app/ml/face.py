@@ -168,15 +168,15 @@ def _maybe_clahe(aligned: np.ndarray) -> np.ndarray:
     return cv2.cvtColor(cv2.merge((lch, ach, bch)), cv2.COLOR_LAB2BGR)
 
 
-def _embed(aligned: np.ndarray) -> np.ndarray:
+def _embed(aligned: np.ndarray, backend: str | None = None) -> np.ndarray:
     """정렬된 112×112 BGR crop → 정규화 512차원 임베딩.
 
-    기본 백엔드는 AdaFace IR-101(저품질 강함). insightface는 config로 선택 가능.
+    backend 미지정 시 config FACE_RECOGNITION 사용(기본 AdaFace). 벤치마크는 backend를 명시.
     """
     import cv2
 
     settings = get_settings()
-    backend = settings.FACE_RECOGNITION
+    backend = backend or settings.FACE_RECOGNITION
     if backend in ("adaface", "lvface"):
         # AdaFace·LVFace 동일 전처리: RGB 112, [-1,1].
         path = settings.FACE_ADAFACE_ONNX if backend == "adaface" else settings.FACE_LVFACE_ONNX
@@ -256,6 +256,51 @@ def analyze_face(image_bytes: bytes, *, strict: bool = False) -> dict[str, Any]:
     is_live = live_prob >= settings.FACE_LIVENESS_THRESHOLD
     embedding = _embed(_maybe_clahe(aligned))
     return {"embedding": embedding, "live_prob": round(live_prob, 4), "is_live": is_live}
+
+
+RECOGNITION_BACKENDS = ("insightface", "adaface", "lvface")
+
+
+def _align_from_bytes(image_bytes: bytes) -> np.ndarray:
+    """벤치마크용: 디코드 → 대상(앞) 얼굴 → 정렬 crop. 품질 게이트는 걸지 않는다(모델 차이만 관찰)."""
+    bgr = _decode_image(image_bytes)
+    face = _detect_primary_face(bgr)
+    return _aligned_crop(bgr, face)
+
+
+def benchmark_pair(image_a: bytes, image_b: bytes) -> dict[str, Any]:
+    """같은 정렬 crop에 대해 각 인식 백엔드의 코사인 유사도와 임베딩 지연(ms)을 실측한다.
+
+    A=등록샷, B=로그인샷처럼 두 장을 주면 백엔드별 '이 둘을 동일인으로 보는 정도'와 속도를 비교.
+    모델 파일이 없는 백엔드는 error로 표시(무폴백: 조용히 건너뛰지 않음)."""
+    import time
+
+    settings = get_settings()
+    aa = _maybe_clahe(_align_from_bytes(image_a))
+    ab = _maybe_clahe(_align_from_bytes(image_b))
+
+    results = []
+    for be in RECOGNITION_BACKENDS:
+        try:
+            t0 = time.perf_counter()
+            ea = _embed(aa, backend=be)
+            eb = _embed(ab, backend=be)
+            ms = (time.perf_counter() - t0) / 2 * 1000  # 임베딩 1장당 평균 ms
+            results.append({
+                "backend": be,
+                "cosine": round(cosine_similarity(ea, eb), 4),
+                "ms_per_embed": round(ms, 1),
+                "match": cosine_similarity(ea, eb) >= settings.FACE_MATCH_THRESHOLD,
+                "error": None,
+            })
+        except Exception as exc:  # noqa: BLE001 - 모델 부재 등은 error로 노출
+            results.append({"backend": be, "cosine": None, "ms_per_embed": None,
+                            "match": None, "error": str(exc)[:120]})
+    return {
+        "active_backend": settings.FACE_RECOGNITION,
+        "match_threshold": settings.FACE_MATCH_THRESHOLD,
+        "results": results,
+    }
 
 
 def average_embeddings(embeddings: list[np.ndarray]) -> np.ndarray:

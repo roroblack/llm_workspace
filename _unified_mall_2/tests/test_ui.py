@@ -28,6 +28,7 @@ def test_new_feature_pages_served(client):
         "/static/mcp.html": ["get_price", "MCP"],
         "/static/video.html": ["화상 상담", "AI 상담원", "카메라 없이 텍스트로 계속"],
         "/static/mypage.html": ["얼굴 로그인", "얼굴 2차 인증", "라이브니스"],
+        "/static/facebench.html": ["성능 비교", "insightface", "AdaFace", "LVFace"],
     }
     for path, must_contain in pages.items():
         r = client.get(path)
@@ -43,16 +44,18 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
     """
     checks = {
         "/static/rag.js": ["/api/rag/search", "/api/rag/qa"],
-        "/static/orders.js": ["/api/orders/preview", "/api/orders", "Idempotency-Key"],
+        "/static/orders.js": ["/api/orders/preview", "/api/orders", "Idempotency-Key", "submitLogin"],
         "/static/admin.js": ["/api/admin/orders", "/api/admin/events",
-                              "/api/admin/index", "/api/admin/knowledge-gaps"],
+                              "/api/admin/index", "/api/admin/knowledge-gaps",
+                              "submitLogin", "/api/face/status"],
         "/static/mcp.js": ["/api/mcp/tools", "/api/mcp/call"],
         # video.js는 상담을 직접 호출하고, STT/TTS는 common.js 헬퍼(createVoiceRecorder/
         # synthesizeAndPlay) 경유 — 그 헬퍼가 실제 음성 엔드포인트를 호출한다.
         "/static/video.js": ["/api/agent/chat", "createVoiceRecorder", "synthesizeAndPlay"],
-        "/static/common.js": ["/api/voice/stt", "/api/voice/tts", "captureFrameBlob"],
-        "/static/mypage.js": ["/auth/login", "/auth/login/face", "/api/face/register",
-                              "/api/face/status", "captureFrameBlob"],
+        "/static/common.js": ["/api/voice/stt", "/api/voice/tts", "captureFrameBlob",
+                              "/auth/login/face", "submitLogin"],
+        "/static/mypage.js": ["/auth/login", "/api/face/register", "/api/face/status", "captureFrameBlob"],
+        "/static/facebench.js": ["/api/face/benchmark"],
     }
     for path, must_contain in checks.items():
         r = client.get(path)
@@ -63,7 +66,8 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
 
 def test_index_nav_links_to_new_pages(client):
     r = client.get("/static/index.html")
-    for path in ("rag.html", "orders.html", "video.html", "mypage.html", "admin.html", "mcp.html"):
+    for path in ("rag.html", "orders.html", "video.html", "mypage.html", "facebench.html",
+                 "admin.html", "mcp.html"):
         assert path in r.text
 
 

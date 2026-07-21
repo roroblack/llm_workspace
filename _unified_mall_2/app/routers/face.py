@@ -14,6 +14,7 @@ from app.auth.security import get_current_user
 from app.core.errors import ValidationErr
 from app.db.database import get_db
 from app.db.models import FaceCredential, User
+from app.ml import face as face_ml
 from app.services import face_service
 
 router = APIRouter(prefix="/api/face", tags=["face"])
@@ -52,6 +53,23 @@ async def face_register(
         raise ValidationErr("업로드된 이미지가 비어 있습니다.")
     result = face_service.register_face(db, user, blobs)
     return FaceRegisterResponse(**result)
+
+
+@router.post("/benchmark")
+async def face_benchmark(
+    image_a: UploadFile = File(...),
+    image_b: UploadFile = File(...),
+) -> dict:
+    """두 얼굴 이미지로 인식 백엔드(insightface/adaface/lvface) 성능 실측 비교(코사인·지연).
+
+    로그인 성능 감을 잡는 개발/데모용 도구. 인증 불필요(로컬 데모). 모델 파일 없으면 해당
+    백엔드는 error로 표시.
+    """
+    a = await image_a.read()
+    b = await image_b.read()
+    if not a or not b:
+        raise ValidationErr("두 이미지가 모두 필요합니다.")
+    return face_ml.benchmark_pair(a, b)
 
 
 @router.delete("/register", response_model=FaceStatusResponse)

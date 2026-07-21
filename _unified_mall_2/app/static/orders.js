@@ -16,20 +16,21 @@ document.getElementById("signupBtn").addEventListener("click", async () => {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, password }),
     });
-    let tokenBody = signup.body;
-    let status = signup.status;
-    if (!signup.ok) {
-      // 이미 있는 아이디면 로그인으로 대체
-      const form = new URLSearchParams({ username, password });
-      const login = await apiFetch("/auth/login", { method: "POST", body: form });
-      tokenBody = login.body;
-      status = login.status;
-    }
-    if (tokenBody && tokenBody.access_token) {
-      setAuth(tokenBody.access_token, username);
+    if (signup.ok && signup.body && signup.body.access_token) {
+      // 신규 가입: 얼굴 미등록이라 2차 인증 없이 바로 토큰.
+      setAuth(signup.body.access_token, username);
       updateAuthStatusBar();
+      renderResult(document.getElementById("authResult"), signup.status, signup.body);
+    } else {
+      // 이미 있는 아이디 → 공통 헬퍼로 로그인(얼굴 등록 계정이면 웹캠 2차 인증까지).
+      try {
+        await submitLogin(username, password);
+        updateAuthStatusBar();
+        renderResult(document.getElementById("authResult"), 200, { logged_in: username });
+      } catch (err) {
+        renderResult(document.getElementById("authResult"), err.status || 400, { message: err.message });
+      }
     }
-    renderResult(document.getElementById("authResult"), status, tokenBody);
   } finally {
     btn.disabled = false;
   }
