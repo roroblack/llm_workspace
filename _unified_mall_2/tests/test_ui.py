@@ -29,6 +29,7 @@ def test_new_feature_pages_served(client):
         "/static/video.html": ["화상 상담", "AI 상담원", "카메라 없이 텍스트로 계속"],
         "/static/mypage.html": ["얼굴 로그인", "얼굴 2차 인증", "라이브니스"],
         "/static/facebench.html": ["성능 비교", "insightface", "AdaFace", "LVFace"],
+        "/static/shop.html": ["스토어", "장바구니", "주문하기"],
     }
     for path, must_contain in pages.items():
         r = client.get(path)
@@ -56,6 +57,8 @@ def test_new_feature_scripts_call_the_real_endpoints(client):
                               "/auth/login/face", "submitLogin"],
         "/static/mypage.js": ["/auth/login", "/api/face/register", "/api/face/status", "captureFrameBlob"],
         "/static/facebench.js": ["/api/face/benchmark", "/api/face/backend"],
+        "/static/shop.js": ["/api/products", "/api/orders/preview", "/api/orders",
+                            "Idempotency-Key", "submitLogin"],
     }
     for path, must_contain in checks.items():
         r = client.get(path)

@@ -8,6 +8,8 @@ data-path 클릭이 아니라 로그인/로그아웃만으로 401 → 403 → 20
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import urllib.request
 import uuid
 from pathlib import Path
@@ -16,6 +18,19 @@ from playwright.sync_api import sync_playwright
 
 BASE = "http://localhost:8080"
 OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
+_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _make_admin() -> tuple[str, str]:
+    """매 실행마다 고유 관리자 계정을 만들고 CLI로 승격한다(비번 하드코딩·DB 상태 의존 제거)."""
+    username = "capadmin_" + uuid.uuid4().hex[:8]
+    password = "cap_" + uuid.uuid4().hex[:8]
+    signup(username, password)
+    subprocess.run(
+        [sys.executable, "-m", "scripts.manage", "promote", username],
+        cwd=str(_ROOT), check=True,
+    )
+    return username, password
 
 
 def signup(username: str, password: str) -> None:
@@ -69,13 +84,13 @@ def main() -> None:
         page.screenshot(path=str(OUT / "10_admin_403_forbidden.png"), full_page=True)
         print("saved 10")
 
-        # 11. 200 관리자(demo_admin) — 로그인 성공 후 주문 패널이 실제 데이터로 채워짐.
-        # 로그인 응답 자체는 JWT를 반환하지 않지만 localStorage에 남으므로,
-        # 화면에 노출되는 상태 텍스트만 스크린샷 직전에 정리한다.
+        # 11. 200 관리자 — 로그인 성공 후 주문 패널이 실제 데이터로 채워짐.
+        # 매 실행 고유 관리자 계정을 만들어 CLI 승격 후 로그인(외부 계정/비번 의존 없음).
+        admin_user, admin_pw = _make_admin()
         page.click("#logoutBtn")
-        login(page, "demo_admin", "demoPass123")
+        login(page, admin_user, admin_pw)
         page.wait_for_selector("#ordersTableBody tr", timeout=15000)
-        redact_token_and_status(page, "로그인됨: demo_admin (관리자)")
+        redact_token_and_status(page, "로그인됨: (관리자)")
         page.screenshot(path=str(OUT / "11_admin_200_orders.png"), full_page=True)
         print("saved 11")
 

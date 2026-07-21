@@ -41,7 +41,7 @@ def test_get_stock_need_reorder_flag():
 def test_search_product():
     db = _db()
     try:
-        r = T.search_product(db, "승승")
+        r = T.search_product(db, "바로봄")
         assert r["ok"] is True
         assert r["count"] >= 1
     finally:
