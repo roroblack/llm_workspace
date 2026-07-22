@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="layout">
+    <header class="hero">
+        <div>
+            <p class="eyebrow">FINAL SYSTEM · VERSION {{ version }}</p>
+            <h1>{{ app_name }}</h1>
+            <p>RAG·도구·메모리, 고객 문의 부서 연계, 요약 및 매출 보고서를 한 화면에서 실행합니다.</p>
+        </div>
+        <a class="swagger" href="/docs" target="_blank" rel="noreferrer">Swagger 열기</a>
+    </header>
+
+    <nav class="tabs" role="tablist" aria-label="기능 선택">
+        <button class="tab active" type="button" role="tab" aria-selected="true" data-tab="integrated">RAG-TOOL-MEMORY 통합</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="complaint">문의 처리 연계 부서 연결</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="summary">요약 보고서 만들기</button>
+        <button class="tab" type="button" role="tab" aria-selected="false" data-tab="sales">임원용 매출 보고서 만들기</button>
+    </nav>
+
+    <section id="tab-integrated" class="tab-panel active" role="tabpanel">
+        <div class="architecture" aria-label="통합 처리 구조">
+            <div class="step"><b>ReAct</b><span>질문 분석과 도구 선택</span></div><div class="arrow">→</div>
+            <div class="step"><b>RAG</b><span>정책 PDF 근거 검색</span></div><div class="arrow">→</div>
+            <div class="step"><b>A2A</b><span>전문 에이전트 위임</span></div><div class="arrow">→</div>
+            <div class="step"><b>LangGraph·MCP</b><span>상태 흐름과 표준 도구</span></div>
+        </div>
+        <section class="panel">
+            <div class="controls">
+                <label>LLM 공급자
+                    <select id="provider"><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select>
+                </label>
+                <label>Thread ID<input id="threadId" value="web-user-1001"></label>
+            </div>
+            <div id="messages" class="messages" aria-live="polite">
+                <article class="message assistant"><b>상담원</b><p>주문 조회, 재고, FAQ, 정책 질문을 입력해 보세요.</p></article>
+            </div>
+            <form id="chatForm" class="action-form">
+                <textarea id="message" rows="3" placeholder="예: 주문 O000050 상태 알려줘" required></textarea>
+                <button type="submit">통합 워크플로우 실행</button>
+            </form>
+        </section>
+        <section class="panel">
+            <h2>실행 추적</h2>
+            <div id="trace" class="trace"><p class="muted">질문을 실행하면 LangGraph 단계가 표시됩니다.</p></div>
+        </section>
+    </section>
+
+    <section id="tab-complaint" class="tab-panel" role="tabpanel" hidden>
+        <section class="panel feature-head">
+            <p class="eyebrow dark">MYSQL · FASTAPI_DB</p>
+            <h2>문의 처리 연계 부서 연결</h2>
+            <p>교환·환불·반품 실행 요청을 <code>customer_complaint</code>에 미접수·미처리 상태로 등록합니다.</p>
+        </section>
+        <section class="panel">
+            <form id="complaintForm">
+                <div class="controls">
+                    <label>고객아이디 (custum_id)<input id="complaintCustomer" value="CUST-1001" required></label>
+                    <label>담당 부서
+                        <select id="complaintDepartment">
+                            <option value="">내용에 따라 자동 배정</option>
+                            <option value="CS_EXCHANGE">교환 담당</option>
+                            <option value="CS_REFUND">환불 담당</option>
+                            <option value="CS_RETURN">반품 담당</option>
+                        </select>
+                    </label>
+                </div>
+                <label>문의 내용
+                    <textarea id="complaintMessage" rows="5" placeholder="예: 주문한 상품을 환불해 주세요." required></textarea>
+                </label>
+                <button type="submit">담당 부서로 전달</button>
+            </form>
+        </section>
+        <section class="panel result-panel"><h2>처리 결과</h2><pre id="complaintResult">실행 요청을 입력하세요.</pre></section>
+    </section>
+
+    <section id="tab-summary" class="tab-panel" role="tabpanel" hidden>
+        <section class="panel feature-head">
+            <p class="eyebrow dark">MAP → REDUCE → REPORT</p>
+            <h2>요약 보고서 만들기</h2>
+            <p>긴 내용을 청크별로 요약한 뒤 하나의 보고서로 통합하고 마크다운 파일로 저장합니다.</p>
+        </section>
+        <section class="panel">
+            <form id="summaryForm">
+                <div class="controls">
+                    <label>보고서 제목<input id="summaryTitle" value="고객 문의 요약 보고서" required></label>
+                    <label>LLM 공급자<select id="summaryProvider"><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select></label>
+                </div>
+                <label>요약할 원문<textarea id="summaryText" rows="10" placeholder="회의록, 문의 내역, 조사 자료 등을 붙여 넣으세요." required></textarea></label>
+                <button type="submit">요약 보고서 생성</button>
+            </form>
+        </section>
+        <section class="panel result-panel"><h2>생성 결과</h2><pre id="summaryResult">요약할 내용을 입력하세요.</pre><a id="summaryDownload" class="download" hidden>보고서 다운로드</a></section>
+    </section>
+
+    <section id="tab-sales" class="tab-panel" role="tabpanel" hidden>
+        <section class="panel feature-head">
+            <p class="eyebrow dark">CSV FACTS → EXECUTIVE REPORT</p>
+            <h2>임원용 매출 보고서 만들기</h2>
+            <p><code>monthly_sales.csv</code>의 확정 수치로 전월 비교와 카테고리 분석 보고서를 만듭니다.</p>
+        </section>
+        <section class="panel">
+            <form id="salesForm">
+                <div class="controls">
+                    <label>대상 월 (비우면 최신 월)<input id="salesMonth" type="month" value="2026-05"></label>
+                    <label>LLM 공급자<select id="salesProvider"><option value="openai">OpenAI</option><option value="gemini">Gemini</option></select></label>
+                </div>
+                <button type="submit">임원용 매출 보고서 생성</button>
+            </form>
+        </section>
+        <section class="report-grid">
+            <article class="panel result-panel"><h2>확정 수치</h2><pre id="salesFacts">대상 월을 선택하세요.</pre></article>
+            <article class="panel result-panel"><h2>보고서</h2><pre id="salesResult">보고서를 생성하세요.</pre><a id="salesDownload" class="download" hidden>보고서 다운로드</a></article>
+        </section>
+    </section>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>
