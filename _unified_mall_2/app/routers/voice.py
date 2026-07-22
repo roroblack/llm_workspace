@@ -6,8 +6,10 @@ from fastapi import APIRouter, File, UploadFile
 from fastapi.responses import Response
 from pydantic import BaseModel, Field
 
+from app.core.config import get_settings
 from app.core.errors import ValidationErr
 from app.ml.voice import synthesize_speech, transcribe_audio
+from app.routers._uploads import read_capped
 
 router = APIRouter(prefix="/api/voice", tags=["voice"])
 
@@ -24,7 +26,7 @@ class SynthesizeRequest(BaseModel):
 
 @router.post("/stt", response_model=TranscribeResponse)
 async def speech_to_text(audio: UploadFile = File(...)) -> TranscribeResponse:
-    audio_bytes = await audio.read()
+    audio_bytes = await read_capped(audio, get_settings().VOICE_MAX_UPLOAD_BYTES, field="오디오")
     if not audio_bytes:
         raise ValidationErr("업로드된 오디오 파일이 비어 있습니다.")
     result = transcribe_audio(audio_bytes)

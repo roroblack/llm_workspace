@@ -151,9 +151,11 @@ flowchart LR
   AA --> DB
 ```
 
-- `customer_app`(8080): `/api/admin/*`이 **물리적으로 404**(라우터를 싣지 않음). 운영 정적 페이지
-  (admin/facebench/mcp/rag/orders)도 404. 실측: 8080에서 `/api/admin/orders`→404, `/static/admin.html`
-  →404, `/static/shop.html`→200.
+- `customer_app`(8080): `/api/admin/*`뿐 아니라 **운영/내부 API 라우터(rag·nlp·lab·mcp·workflow)도
+  물리적으로 404**(라우터를 싣지 않음) — 고객 웹이 호출하지 않는 분석·프로토콜·개발 엔드포인트를
+  공개 포트에서 제거해 무인증 노출·모델연산 DoS 표면을 줄인다. 공개되는 건 상품·주문·결제·에이전트·
+  음성·얼굴뿐. 운영 정적 페이지(admin/facebench/mcp/rag/orders)도 404. 실측: 8080에서
+  `/api/admin/orders`→404, `/api/rag/search`→404, `/static/admin.html`→404, `/static/shop.html`→200.
 - `admin_app`(8081): 관리자 대시보드 + 운영 도구 전체. 실측: `/api/admin/orders`→401(인증필요),
   `/static/admin.html`→200.
 - 실행: `python -m scripts.run_customer_server` / `python -m scripts.run_admin_server`.
@@ -164,6 +166,10 @@ flowchart LR
 - **관측성**: 요청별 trace_id(X-Trace-ID) + run_events(요약만, 원문·PII 금지).
 - **RBAC**: role을 JWT에 넣지 않고 매 요청 DB 조회(강등 즉시 반영). 관리자 라우터 전역
   `require_admin` fail-closed. 관리자 승격은 **CLI 전용**(UI 버튼 없음, 권한상승 사고 방지).
+- **2차인증 토큰 위생**: pre2fa 챌린지에 고유 jti를 부여해 **성공 시 일회성으로 소비**(리플레이
+  차단), 미완료(pre2fa) 토큰은 보호 리소스 접근 불가. 업로드 엔드포인트(얼굴·음성)는 config
+  상한(`FACE_MAX_UPLOAD_BYTES`/`VOICE_MAX_UPLOAD_BYTES`)으로 크기를 제한하고, 3모델을 모두 도는
+  얼굴 벤치마크는 **관리자 전용**으로 무인증 모델연산 DoS 표면을 줄인다.
 - **PII**: 지식갭·이벤트는 마스킹 후 저장, 출력 시 마스킹이 값을 바꾸면 조용히 덮지 않고 감사
   이벤트를 남긴다(무폴백).
 - **거버넌스**: plans/history/reports append-only, 각 Phase마다 Codex 교차검증.
@@ -171,6 +177,12 @@ flowchart LR
 ## 9. 한계 (정직 기록)
 
 - 얼굴 라이브니스는 단일 모델(앙상블 아님)·헤드리스 환경에서 실 웹캠 라이브 정확도 미검증.
+- 시도 제한·일회성 챌린지 소비는 **인메모리**(프로세스 재시작 시 초기화·멀티프로세스 미공유) —
+  데모 한계. 챌린지 소비는 단일 프로세스 asyncio 내에선 원자적(동시요청 1개만 통과)이나,
+  멀티프로세스·재시작 무결성은 공유 저장소(Redis 등 atomic SETNX)가 필요하다.
+- 업로드 크기 상한은 우리가 처리에 올리는 바이트를 제한하는 것으로, ASGI가 multipart를 파싱한
+  뒤 동작한다 — HTTP 요청 자체의 크기 상한(리버스 프록시/`--limit-*`)은 배포 레이어의 몫이다.
+- 얼굴 매칭 임계값은 실 genuine/impostor 분포(FAR/FRR)로 튜닝되지 않은 시작값.
 - DirectML은 Windows 전용(비Windows는 plain onnxruntime로 CPU).
 - MCP stdio 임베딩 도구 지연은 우회책(근본원인 미특정).
 - 시연영상은 별도(본 문서 범위 밖).

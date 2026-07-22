@@ -82,16 +82,25 @@ def test_customer_and_admin_apps_are_physically_separated():
 
     # 고객 앱: 관리자 API 라우터 자체가 없음 → 404 (401/403이 아니라)
     assert cust.get("/api/admin/orders").status_code == 404
+    # 고객 앱: 운영/내부 API 라우터(rag/mcp/lab/nlp/workflow)도 물리적으로 없음 → 404.
+    # (무인증 노출·모델연산 DoS 표면 축소 — 어떤 고객 페이지도 이들을 호출하지 않는다.)
+    for ops_api in ("/api/rag/search", "/api/mcp/tools", "/api/nlp/sentiment",
+                    "/api/lab/token-compare", "/api/workflow/ticket"):
+        assert cust.post(ops_api, json={}).status_code == 404, f"고객 앱에 운영 API 노출: {ops_api}"
     # 고객 앱: 운영 정적 페이지 차단, 고객 페이지는 서빙
     assert cust.get("/static/admin.html").status_code == 404
     assert cust.get("/static/facebench.html").status_code == 404
     assert cust.get("/static/shop.html").status_code == 200
+    # 고객 앱에도 있어야 하는 공개 라우터(상품·얼굴 상태 조회 등)는 살아 있음(404가 아님).
+    assert cust.get("/api/products").status_code != 404
+    assert cust.get("/api/face/backend").status_code != 404
     # 고객 앱 랜딩은 스토어
     assert "스토어" in cust.get("/").text
 
-    # 운영 앱: 관리자 API 존재(미인증 401), 관리자 페이지 서빙
+    # 운영 앱: 관리자 API 존재(미인증 401), 관리자 페이지 서빙, 운영 API도 존재(404 아님)
     assert adm.get("/api/admin/orders").status_code == 401
     assert adm.get("/static/admin.html").status_code == 200
+    assert adm.post("/api/rag/search", json={}).status_code != 404
 
 
 def test_customer_web_and_ops_tools_are_separated(client):

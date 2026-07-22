@@ -7,10 +7,11 @@
 대시보드를 별도 서비스/포트/서브도메인으로 나누고, 관리자 쪽은 VPN·사내망 뒤에 둔다. 여기서는
 세 가지 앱을 제공한다:
   - `app`          : 전체(모든 라우터) — 테스트·개발 편의용 기본.
-  - `customer_app` : **관리자 라우터 미포함** + 운영 페이지 정적 차단 → 공개 포트(8080)용.
-                     이 포트에서 `/api/admin/*`은 **물리적으로 404**(라우터가 없음).
+  - `customer_app` : **관리자 + 운영/내부 API 라우터(rag/nlp/lab/mcp/workflow) 미포함** + 운영
+                     페이지 정적 차단 → 공개 포트(8080)용. 이 포트에서 `/api/admin/*`·`/api/rag/*`
+                     등은 **물리적으로 404**(라우터가 없음).
   - `admin_app`    : 전체(관리자 대시보드 + 운영 도구) → 내부 포트(8081)용.
-운영 스크립트: `run_dev_server.py`(customer 8080), `run_admin_server.py`(admin 8081).
+운영 스크립트: `run_customer_server.py`(customer 8080), `run_admin_server.py`(admin 8081).
 """
 
 from __future__ import annotations
@@ -71,23 +72,26 @@ def create_app(role: str = "full") -> FastAPI:
     app.add_middleware(TraceMiddleware)
     register_exception_handlers(app)
 
-    # 공용·고객 라우터(양쪽 공통)
+    # 고객 웹이 실제로 호출하는 공개 라우터(shop/video/mypage/AI상담 = 상품·주문·결제·에이전트·
+    # 음성·얼굴). 이 집합만 고객 포트(8080)에 노출한다.
     app.include_router(health.router)
     app.include_router(auth.router)
     app.include_router(products.router)
     app.include_router(orders.router)
     app.include_router(payments.router)
     app.include_router(agent.router)
-    app.include_router(rag.router)
-    app.include_router(nlp.router)
-    app.include_router(lab.router)
-    app.include_router(mcp.router)
-    app.include_router(workflow.router)
     app.include_router(voice.router)
     app.include_router(face.router)
 
-    # 관리자 라우터: 고객 앱에는 **싣지 않는다** → 고객 포트에서 /api/admin/*은 404.
+    # 운영/내부 API 라우터: 분석·프로토콜·개발 도구(rag/nlp/lab/mcp/workflow)와 관리자(admin).
+    # 고객 앱에는 **싣지 않는다** → 고객 포트에서 이들 경로는 물리적으로 404(무인증 노출·DoS 표면
+    # 축소). 어떤 고객 페이지도 이 엔드포인트들을 호출하지 않는다(rag/mcp는 운영 페이지 전용).
     if role != "customer":
+        app.include_router(rag.router)
+        app.include_router(nlp.router)
+        app.include_router(lab.router)
+        app.include_router(mcp.router)
+        app.include_router(workflow.router)
         app.include_router(admin.router)
 
     # 고객 앱은 운영/개발 정적 페이지를 차단(정적 마운트보다 먼저 매칭됨).

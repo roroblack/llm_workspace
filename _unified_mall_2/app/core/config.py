@@ -112,6 +112,11 @@ class Settings(BaseSettings):
     # 라이브니스 live 클래스 확률 임계(0~1). 라이브러리 기본 근사 — 실환경 검증 아님(문서화).
     FACE_LIVENESS_THRESHOLD: float = 0.50
     FACE_MAX_ATTEMPTS: int = 5  # 얼굴 2차인증 연속 실패 허용 횟수(초과 시 잠금, 데모: 인메모리)
+    # 업로드 크기 상한(모델 연산 DoS 표면 축소, Codex 지적). 초과분은 무폴백으로 ValidationErr.
+    FACE_MAX_UPLOAD_BYTES: int = 8 * 1024 * 1024    # 얼굴 이미지 1장 상한(8MB)
+    VOICE_MAX_UPLOAD_BYTES: int = 16 * 1024 * 1024  # STT 오디오 상한(16MB)
+    # 등록 다중 샷 개수 상한(파일별 상한만으로는 개수를 늘린 합산 DoS를 못 막음 — Codex 지적).
+    FACE_MAX_ENROLL_IMAGES: int = 10                # 등록 요청당 이미지 최대 장수(기본 샷 3의 여유배)
 
     # 품질 게이팅(Codex 권고): 저품질 입력을 조용히 통과시키지 않고 명시적 재촬영 요구(무폴백).
     # 등록(strict)이 검증(loose)보다 엄격 — 나쁜 기준 임베딩이 이후 매칭을 오염시키는 걸 막는다.

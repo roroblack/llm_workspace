@@ -12,10 +12,12 @@ from sqlalchemy.orm import Session
 
 from app.auth.roles import require_admin
 from app.auth.security import get_current_user
+from app.core.config import get_settings
 from app.core.errors import ValidationErr
 from app.db.database import get_db
 from app.db.models import FaceCredential, User
 from app.ml import face as face_ml
+from app.routers._uploads import read_capped
 from app.services import face_service
 
 router = APIRouter(prefix="/api/face", tags=["face"])
@@ -45,9 +47,14 @@ async def face_register(
     db: Session = Depends(get_db),
 ) -> FaceRegisterResponse:
     """다중 이미지 등록(여러 샷을 품질 게이팅 후 임베딩 평균). 단일 샷도 허용."""
+    settings = get_settings()
+    # 개수 상한(합산 DoS 차단): 파일별 크기 상한 + 장수 상한을 함께 건다.
+    if len(images) > settings.FACE_MAX_ENROLL_IMAGES:
+        raise ValidationErr(f"등록 이미지는 최대 {settings.FACE_MAX_ENROLL_IMAGES}장까지 허용됩니다.")
+    cap = settings.FACE_MAX_UPLOAD_BYTES
     blobs = []
     for f in images:
-        b = await f.read()
+        b = await read_capped(f, cap, field="얼굴 이미지")
         if b:
             blobs.append(b)
     if not blobs:
@@ -79,14 +86,17 @@ def set_backend(body: SetBackendRequest, _admin: User = Depends(require_admin)) 
 async def face_benchmark(
     image_a: UploadFile = File(...),
     image_b: UploadFile = File(...),
+    _admin: User = Depends(require_admin),
 ) -> dict:
     """두 얼굴 이미지로 인식 백엔드(insightface/adaface/lvface) 성능 실측 비교(코사인·지연).
 
-    로그인 성능 감을 잡는 개발/데모용 도구. 인증 불필요(로컬 데모). 모델 파일 없으면 해당
-    백엔드는 error로 표시.
+    3개 모델을 모두 도는 무거운 연산이라 **관리자 전용**(운영 도구)이며 업로드 크기를 상한한다
+    — 미인증·대용량 요청으로 인한 모델 연산 DoS 표면을 줄인다(Codex 지적). 모델 파일 없으면
+    해당 백엔드는 error로 표시.
     """
-    a = await image_a.read()
-    b = await image_b.read()
+    cap = get_settings().FACE_MAX_UPLOAD_BYTES
+    a = await read_capped(image_a, cap, field="이미지 A")
+    b = await read_capped(image_b, cap, field="이미지 B")
     if not a or not b:
         raise ValidationErr("두 이미지가 모두 필요합니다.")
     return face_ml.benchmark_pair(a, b)

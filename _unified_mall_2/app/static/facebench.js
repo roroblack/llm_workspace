@@ -105,9 +105,14 @@ el("runBtn").addEventListener("click", async () => {
     const fd = new FormData();
     fd.append("image_a", slots.A.blob, "a.jpg");
     fd.append("image_b", slots.B.blob, "b.jpg");
-    const resp = await fetch("/api/face/benchmark", { method: "POST", body: fd });
+    // 벤치마크는 3개 모델을 모두 도는 무거운 연산이라 관리자 전용(운영 도구).
+    const resp = await fetch("/api/face/benchmark", { method: "POST", headers: authHeaders(), body: fd });
     const body = await resp.json().catch(() => null);
     if (!resp.ok) {
+      if (resp.status === 401 || resp.status === 403) {
+        el("runHint").textContent = "벤치마크는 관리자만 실행할 수 있습니다. 관리자로 로그인하세요.";
+        return;
+      }
       el("runHint").textContent = (body && body.message) || `실패 (HTTP ${resp.status})`;
       return;
     }

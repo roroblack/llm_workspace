@@ -148,6 +148,95 @@ def test_full_2fa_flow_match_and_mismatch(client, relax_liveness):
     assert r.status_code == 401
 
 
+def test_pre2fa_challenge_is_single_use(client, relax_liveness):
+    """성공한 pre2fa 챌린지 토큰은 일회성 — 재사용(리플레이) 시 거부해야 한다(Codex 지적)."""
+    u, token = _signup_login(client)
+    hdr = {"Authorization": f"Bearer {token}"}
+    client.post("/api/face/register", files=_reg_files(_A_REG1, _A_REG2), headers=hdr)
+
+    r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
+    challenge = r.json()["challenge_token"]
+    ch_hdr = {"Authorization": f"Bearer {challenge}"}
+
+    # 1회차: 성공 → 최종 토큰
+    r1 = client.post("/auth/login/face", files=_img_file(_A_VERIFY), headers=ch_hdr)
+    assert r1.status_code == 200 and r1.json()["access_token"]
+
+    # 2회차: 같은 챌린지 재사용 → 소비됨 → 401
+    r2 = client.post("/auth/login/face", files=_img_file(_A_VERIFY), headers=ch_hdr)
+    assert r2.status_code == 401
+
+
+def test_benchmark_requires_admin(client):
+    """벤치마크(3모델 실측)는 관리자 전용 — 미인증 401(무인증 모델연산 DoS 표면 차단)."""
+    files = {
+        "image_a": ("a.jpg", io.BytesIO(_A_VERIFY), "image/jpeg"),
+        "image_b": ("b.jpg", io.BytesIO(_B_VERIFY), "image/jpeg"),
+    }
+    r = client.post("/api/face/benchmark", files=files)
+    assert r.status_code == 401
+
+
+def test_consume_challenge_is_atomic_single_use():
+    """consume_challenge는 원자적 test-and-set — 처음만 True, 재소비/무-jti는 False."""
+    import time as _t
+
+    from app.auth.security import consume_challenge
+
+    exp = _t.time() + 300
+    payload = {"jti": uuid.uuid4().hex, "exp": exp}
+    assert consume_challenge(payload) is True    # 최초 소비
+    assert consume_challenge(payload) is False   # 재소비(리플레이/동시요청) 차단
+    assert consume_challenge({"exp": exp}) is False  # jti 없으면 소비 대상 아님(fail-closed)
+
+
+def test_challenge_consume_loser_path_returns_401(client, relax_liveness, monkeypatch):
+    """소비 경쟁의 패배 경로(consume_challenge=False)는 500(NameError)이 아닌 401이어야 한다.
+
+    get_pre2fa_challenge(조기거부)를 통과하고 verify까지 성공했지만 소비 시점에 이미 소비된
+    상황을 강제 — auth.py의 패배 경로가 AuthErr(401)를 올바로 던지는지 회귀 방지.
+    """
+    u, token = _signup_login(client)
+    hdr = {"Authorization": f"Bearer {token}"}
+    client.post("/api/face/register", files=_reg_files(_A_REG1, _A_REG2), headers=hdr)
+    r = client.post("/auth/login", data={"username": u, "password": "pass1234"})
+    ch = {"Authorization": f"Bearer {r.json()['challenge_token']}"}
+    monkeypatch.setattr("app.routers.auth.consume_challenge", lambda payload: False)
+    r = client.post("/auth/login/face", files=_img_file(_A_VERIFY), headers=ch)
+    assert r.status_code == 401
+
+
+def test_pre2fa_without_jti_is_rejected(client):
+    """jti 없는 pre2fa 토큰은 fail-closed로 거부 — 일회성 추적 불가 시 통과시키지 않음(폴백 금지)."""
+    from datetime import datetime, timedelta, timezone
+
+    from jose import jwt
+
+    from app.auth.security import STAGE_PRE2FA
+
+    s = get_settings()
+    tok = jwt.encode(
+        {"sub": "someone", "stage": STAGE_PRE2FA,
+         "exp": datetime.now(timezone.utc) + timedelta(minutes=5)},
+        s.require_secret_key(), algorithm=s.JWT_ALGORITHM,
+    )
+    r = client.post(
+        "/auth/login/face", files=_img_file(_A_VERIFY),
+        headers={"Authorization": f"Bearer {tok}"},
+    )
+    assert r.status_code == 401
+
+
+def test_face_register_rejects_too_many_images(client):
+    """등록 이미지 장수 상한(합산 DoS 차단) — 상한 초과는 디코드 전에 422로 거부."""
+    u, token = _signup_login(client)
+    hdr = {"Authorization": f"Bearer {token}"}
+    n = get_settings().FACE_MAX_ENROLL_IMAGES + 1
+    files = [("images", (f"f{i}.jpg", io.BytesIO(b"x"), "image/jpeg")) for i in range(n)]
+    r = client.post("/api/face/register", files=files, headers=hdr)
+    assert r.status_code == 422
+
+
 def test_pre2fa_token_rejected_by_protected_endpoint(client, relax_liveness):
     u, token = _signup_login(client)
     hdr = {"Authorization": f"Bearer {token}"}

@@ -8,13 +8,15 @@ from sqlalchemy.orm import Session
 
 from app.auth.security import (
     STAGE_PRE2FA,
+    Pre2FAChallenge,
+    consume_challenge,
     create_access_token,
-    get_pre2fa_user,
+    get_pre2fa_challenge,
 )
 from app.core.config import get_settings
-from app.core.errors import ValidationErr
+from app.core.errors import AuthErr, ValidationErr
 from app.db.database import get_db
-from app.db.models import User
+from app.routers._uploads import read_capped
 from app.schemas.commerce import LoginResponse, SignupRequest, TokenResponse
 from app.services import face_service, user_service
 
@@ -55,18 +57,23 @@ def login(
 @router.post("/login/face", response_model=TokenResponse)
 async def login_face(
     image: UploadFile = File(...),
-    user: User = Depends(get_pre2fa_user),
+    challenge: Pre2FAChallenge = Depends(get_pre2fa_challenge),
     db: Session = Depends(get_db),
 ) -> TokenResponse:
     """얼굴 2차 인증 단계 — pre2fa 챌린지 토큰 + 얼굴 이미지로 최종 토큰 발급.
 
     게이트: 촬영 품질/단일 얼굴 → 라이브니스 → 임베딩 비교. 실패 시 토큰 없음(무폴백).
+    성공 시 이 챌린지는 일회성으로 소비돼 재사용(리플레이)되지 않는다.
     """
-    image_bytes = await image.read()
+    user = challenge.user
+    image_bytes = await read_capped(image, get_settings().FACE_MAX_UPLOAD_BYTES, field="얼굴 이미지")
     if not image_bytes:
         raise ValidationErr("업로드된 이미지가 비어 있습니다.")
     if not face_service.has_face(db, user.id):
         # 등록이 사라진 예외적 상태 — 얼굴 인증 자체가 불가.
         raise ValidationErr("이 계정에는 등록된 얼굴이 없습니다.")
     face_service.verify_face(db, user, image_bytes)  # 실패 시 AuthErr/ForbiddenErr
+    # 원자적 소비: 동시 요청/재사용은 여기서 정확히 하나만 통과(나머지는 401).
+    if not consume_challenge(challenge.payload):
+        raise AuthErr("이미 사용된 인증 챌린지입니다. 다시 로그인해주세요.")
     return TokenResponse(access_token=create_access_token(user.username))
