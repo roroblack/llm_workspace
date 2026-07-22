@@ -27,6 +27,7 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.obs.trace import TraceMiddleware
 from app.routers import (
+    a2a,
     admin,
     agent,
     auth,
@@ -91,6 +92,7 @@ def create_app(role: str = "full") -> FastAPI:
         app.include_router(nlp.router)
         app.include_router(lab.router)
         app.include_router(mcp.router)
+        app.include_router(a2a.router)
         app.include_router(workflow.router)
         app.include_router(admin.router)
 

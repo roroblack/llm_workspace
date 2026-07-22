@@ -16,7 +16,7 @@ RAG 기반 문서 질의응답을 코어로, 커머스 승인 루프·AI 에이�
 flowchart TB
   subgraph IF["Interface 계층 · FastAPI 라우터"]
     R1["agent / rag / orders / products / payments"]
-    R2["auth / admin / face / voice / nlp / lab / mcp / workflow"]
+    R2["auth / admin / face / voice / nlp / lab / mcp / a2a / workflow"]
     UI["정적 UI(static): shop · index · video · mypage · facebench · admin"]
   end
   subgraph APP["Application 계층 · 프레임워크 무의존 (TEST-ARCH-001)"]
@@ -42,6 +42,7 @@ flowchart TB
     M3["sentiment(KoELECTRA) · intent · recommend"]
   end
   MCP["MCP 서버(FastMCP, stdio) · 10 tools · REST parity"]
+  A2A["A2A: 전문 에이전트 카드 발견 + 위임<br/>order · catalog · knowledge · recommend"]
 
   UI --> IF
   IF --> APP
@@ -50,7 +51,9 @@ flowchart TB
   AD --> INFRA
   IF --> ML
   IF --> MCP
+  IF --> A2A
   MCP -.같은 유스케이스/프리젠터 공유.-> APP
+  A2A -.기존 커머스/RAG/추천 서비스 재사용(중복 없음).-> AD
 ```
 
 핵심: **Application 계층은 FastAPI·SQLAlchemy·LangChain·openai를 import하지 않는다**(정적 스캔
@@ -127,6 +130,7 @@ sequenceDiagram
 | DB | SQLite(코어) + PostgreSQL/pgvector/pg_trgm(학습 트랙) | 무료 PG 한 곳에 벡터·그래프·렉시컬 통합 |
 | 에이전트 | ReAct 루프 + CoT SelfVerify | 미지지 초안 차단, 인젝션 경계 방어 |
 | MCP | FastMCP(stdio) 10 tools | REST와 유스케이스/프리젠터 공유(parity) |
+| A2A | 에이전트 카드 발견 + 전문 에이전트 위임(order/catalog/knowledge/recommend) | 능력의 공개 발견 + 위임 프로토콜, 기존 서비스 재사용(중복 없음), 미등록/빈입력 무폴백 |
 | 음성 | faster-whisper(STT, CPU int8) · pyttsx3(TTS, SAPI5) | 로컬·무API키 |
 | 얼굴 | insightface(검출/정렬) + AdaFace(인식, 기본) + Silent-Face(라이브니스) | 저품질 특화 AdaFace, DirectML 7× 가속(Iris Xe) |
 | 보고서 | reportlab(PDF, 한글 폰트 임베딩) | 관리자 요약 보고서 생성/저장/인쇄 |
@@ -151,7 +155,7 @@ flowchart LR
   AA --> DB
 ```
 
-- `customer_app`(8080): `/api/admin/*`뿐 아니라 **운영/내부 API 라우터(rag·nlp·lab·mcp·workflow)도
+- `customer_app`(8080): `/api/admin/*`뿐 아니라 **운영/내부 API 라우터(rag·nlp·lab·mcp·a2a·workflow)도
   물리적으로 404**(라우터를 싣지 않음) — 고객 웹이 호출하지 않는 분석·프로토콜·개발 엔드포인트를
   공개 포트에서 제거해 무인증 노출·모델연산 DoS 표면을 줄인다. 공개되는 건 상품·주문·결제·에이전트·
   음성·얼굴뿐. 운영 정적 페이지(admin/facebench/mcp/rag/orders)도 404. 실측: 8080에서
@@ -185,6 +189,10 @@ flowchart LR
 - 얼굴 매칭 임계값은 실 genuine/impostor 분포(FAR/FRR)로 튜닝되지 않은 시작값.
 - DirectML은 Windows 전용(비Windows는 plain onnxruntime로 CPU).
 - MCP stdio 임베딩 도구 지연은 우회책(근본원인 미특정).
+- A2A는 **인프로세스 함수 위임 façade**다(참조 구현과 동급) — 카드 발견 + 명시적 위임은 실제로
+  하지만, 원격 HTTP 에이전트 통신·작업 수명주기·표준 Agent Card(`/.well-known`) 상호운용까지
+  갖춘 완전한 A2A 프로토콜은 아니다. 운영 API(a2a/mcp/rag 등)는 고객 포트에서 404이며, 운영
+  포트는 VPN·사내망 뒤(내부)를 가정해 별도 인증을 두지 않는다(분리 모델).
 - 시연영상은 별도(본 문서 범위 밖).
 
 ---

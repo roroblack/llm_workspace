@@ -85,7 +85,7 @@ def test_customer_and_admin_apps_are_physically_separated():
     # 고객 앱: 운영/내부 API 라우터(rag/mcp/lab/nlp/workflow)도 물리적으로 없음 → 404.
     # (무인증 노출·모델연산 DoS 표면 축소 — 어떤 고객 페이지도 이들을 호출하지 않는다.)
     for ops_api in ("/api/rag/search", "/api/mcp/tools", "/api/nlp/sentiment",
-                    "/api/lab/token-compare", "/api/workflow/ticket"):
+                    "/api/lab/token-compare", "/api/workflow/ticket", "/api/a2a/message"):
         assert cust.post(ops_api, json={}).status_code == 404, f"고객 앱에 운영 API 노출: {ops_api}"
     # 고객 앱: 운영 정적 페이지 차단, 고객 페이지는 서빙
     assert cust.get("/static/admin.html").status_code == 404
