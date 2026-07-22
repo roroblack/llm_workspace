@@ -23,6 +23,14 @@ from app.mcp.server import mcp
 _TEST_NONCE = "test0nonce0abcdef"
 
 
+def test_mcp_server_name_follows_brand_not_old_residue():
+    """MCP 서버 이름은 브랜드 변수를 따르고, 구 브랜드 로마자 잔재('seungmall')가 없어야 한다."""
+    from app.core.config import get_settings
+
+    assert mcp.name == get_settings().BRAND_NAME
+    assert "seungmall" not in mcp.name.lower()
+
+
 def _run(coro):
     return asyncio.run(coro)
 

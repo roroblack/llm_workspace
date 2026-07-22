@@ -33,6 +33,7 @@ if sys.platform == "win32":  # pragma: no cover - 플랫폼 분기
 
 from mcp.server.fastmcp import FastMCP  # noqa: E402  (UTF-8 재설정 후 임포트)
 
+from app.core.config import get_settings  # noqa: E402
 from app.core.errors import AppError  # noqa: E402
 from app.db.database import SessionLocal  # noqa: E402
 from app.ml import intent as ml_intent  # noqa: E402
@@ -47,7 +48,8 @@ _T = TypeVar("_T")
 # 기본값(RAG_TOP_K 등 config)으로 위임 — 매직값 3을 여기서 중복 하드코딩하지 않는다.
 TopK = Annotated[int, Field(ge=1, le=10)]
 
-mcp = FastMCP("seungmall")
+# MCP 서버 이름은 브랜드 변수를 따른다(하드코딩·구 브랜드 잔재 금지 — 하나만 바꾸면 전파).
+mcp = FastMCP(get_settings().BRAND_NAME)
 
 
 # 클라이언트가 서브프로세스를 띄우며 넘겨준 1회용 nonce. 이게 있어야만 마커를 신뢰받는다.
