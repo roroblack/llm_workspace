@@ -90,7 +90,7 @@ def admin_index_status() -> dict:
 def admin_report(db: Session = Depends(get_db)) -> Response:
     """현재 대시보드 데이터(준비상태·주문·이벤트·지식갭)를 요약한 PDF 보고서.
 
-    서버에도 `generated_reports/`에 스냅샷을 저장하고, 같은 PDF를 다운로드로 반환한다.
+    서버에도 `docs/generated_reports/`에 스냅샷을 저장하고, 같은 PDF를 다운로드로 반환한다.
     라우터 전역 require_admin으로 보호됨.
     """
     from datetime import datetime

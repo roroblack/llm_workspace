@@ -176,7 +176,7 @@ flowchart LR
   얼굴 벤치마크는 **관리자 전용**으로 무인증 모델연산 DoS 표면을 줄인다.
 - **PII**: 지식갭·이벤트는 마스킹 후 저장, 출력 시 마스킹이 값을 바꾸면 조용히 덮지 않고 감사
   이벤트를 남긴다(무폴백).
-- **거버넌스**: plans/history/reports append-only, 각 Phase마다 Codex 교차검증.
+- **거버넌스**: docs/plans·history·reports append-only, 각 Phase마다 Codex 교차검증.
 
 ## 9. 한계 (정직 기록)
 

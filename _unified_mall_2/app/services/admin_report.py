@@ -160,7 +160,8 @@ def save_admin_report(db: Session, out_dir: Path | None = None) -> Path:
 
     now = datetime.now()
     pdf = build_admin_report_pdf(db, generated_at=now)
-    out_dir = out_dir or (ROOT_DIR / "generated_reports")
+    # 모든 문서·산출물은 docs/ 아래에 모은다(RULE.md 4장).
+    out_dir = out_dir or (ROOT_DIR / "docs" / "generated_reports")
     out_dir.mkdir(parents=True, exist_ok=True)
     path = out_dir / f"admin_report_{now.strftime('%Y%m%d_%H%M%S')}.pdf"
     path.write_bytes(pdf)

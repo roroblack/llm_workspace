@@ -5,4 +5,20 @@ data/vector_store/
 .env
 .venv/
 data/pgdata/
-generated_reports/
+
+# 생성물(실행 시 만들어지는 리포트 산출물) — docs/ 이동에 맞춘 경로
+docs/generated_reports/
+
+# 사용자 요구사항 원본 — 절대 커밋 금지
+# (이전엔 ignore 규칙 없이 add만 안 한 상태라 실수로 커밋될 위험이 있었다 → 명시적 보호)
+프로젝트설명.txt
+docs/프로젝트설명.txt
+
+# 작업 규칙 문서(로컬 전용)
+RULE.md
+
+# 워크스페이스 루트 .gitignore의 `**/plans/`·`**/reports/` 규칙이 이 프로젝트의
+# docs/ 하위까지 잡아가므로, 문서 폴더는 명시적으로 되살린다(추적 대상).
+!docs/plans/
+!docs/history/
+!docs/reports/
