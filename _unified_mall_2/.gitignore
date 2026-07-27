@@ -22,3 +22,6 @@ RULE.md
 !docs/plans/
 !docs/history/
 !docs/reports/
+
+# 파인튜닝 생성물(분할·평가 결과) — 재생성 가능
+data/finetune/
