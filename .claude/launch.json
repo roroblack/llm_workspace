@@ -6,6 +6,18 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["_unified_mall_2/scripts/run_dev_server.py"],
       "port": 8080
+    },
+    {
+      "name": "unified-mall-2-customer",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["_unified_mall_2/scripts/run_customer_server.py"],
+      "port": 8080
+    },
+    {
+      "name": "unified-mall-2-admin",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["_unified_mall_2/scripts/run_admin_server.py"],
+      "port": 8081
     }
   ]
 }
