@@ -31,6 +31,7 @@ from app.routers import (
     admin,
     agent,
     auth,
+    bounty,
     face,
     health,
     lab,
@@ -93,6 +94,7 @@ def create_app(role: str = "full") -> FastAPI:
         app.include_router(lab.router)
         app.include_router(mcp.router)
         app.include_router(a2a.router)
+        app.include_router(bounty.router)
         app.include_router(workflow.router)
         app.include_router(admin.router)
 

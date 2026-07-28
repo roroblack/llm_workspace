@@ -112,6 +112,14 @@ class Settings(BaseSettings):
     # 라이브니스 live 클래스 확률 임계(0~1). 라이브러리 기본 근사 — 실환경 검증 아님(문서화).
     FACE_LIVENESS_THRESHOLD: float = 0.50
     FACE_MAX_ATTEMPTS: int = 5  # 얼굴 2차인증 연속 실패 허용 횟수(초과 시 잠금, 데모: 인메모리)
+    # 지식 바운티 L1 기계 검증 임계값(docs/plans/2026-07-22_2100_지식바운티_검증모델_재설계.md).
+    # 인용 대조: 인용문이 색인 원문과 **문자 수준**으로 이만큼 일치해야 통과(의미 유사도 아님).
+    #   → 실제 문서명 + 원문과 의미만 비슷한 허위 문장이 통과하던 결함을 막기 위함(Codex 지적).
+    # 중복성: 기존 지식과 이 유사도 이상이면 중복으로 반려.
+    # ★ 두 값 모두 실 제출 데이터로 튜닝되지 않은 **시작값**이다(정직 기록).
+    BOUNTY_CITATION_MATCH_THRESHOLD: float = 0.85
+    BOUNTY_DUPLICATE_THRESHOLD: float = 0.95
+
     # 업로드 크기 상한(모델 연산 DoS 표면 축소, Codex 지적). 초과분은 무폴백으로 ValidationErr.
     FACE_MAX_UPLOAD_BYTES: int = 8 * 1024 * 1024    # 얼굴 이미지 1장 상한(8MB)
     VOICE_MAX_UPLOAD_BYTES: int = 16 * 1024 * 1024  # STT 오디오 상한(16MB)

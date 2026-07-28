@@ -62,6 +62,30 @@ def build_chat_commerce(db, chat_fn=None, max_steps: int = 3):
     return ChatCommerce(agent=agent, verify=SelfVerify(model, model_id=model_id))
 
 
+def build_verify_bounty_submission(retriever=None, support_check=None):
+    """지식 바운티 L1 기계 검증 조립.
+
+    재현성·중복성은 기존 리트리버를 재사용하고, 정합성은 SelfVerify를 주입한다
+    (새 인프라를 만들지 않는다). 임계값은 config에서 온다 — 하드코딩 금지.
+
+    **이 조립물은 사실성을 판정하지 않는다.** 근거성·재현성·중복성만 확인한다.
+    """
+    from app.application.bounty import VerifyBountySubmission
+    from app.application.self_verify import SelfVerify
+    from app.core.config import get_settings
+    from app.core.model_registry import get_active_profile
+
+    settings = get_settings()
+    if support_check is None:
+        support_check = SelfVerify(LlmGateway(), model_id=get_active_profile().provider_model_id)
+    return VerifyBountySubmission(
+        retriever=retriever if retriever is not None else FaissRetriever(),
+        support_check=support_check,
+        citation_match_threshold=settings.BOUNTY_CITATION_MATCH_THRESHOLD,
+        duplicate_threshold=settings.BOUNTY_DUPLICATE_THRESHOLD,
+    )
+
+
 def build_hybrid_answer_question(top_k: int | None = None, rerank: bool = False) -> AnswerQuestion:
     """Hybrid RAG: dense(pgvector) + lexical(pg_trgm)을 RRF로 결합(Phase 4).
 
