@@ -181,7 +181,8 @@ status: proposed
 | REQ-COM-03 | 사용자 승인 뒤에만 주문을 생성한다 | MUST | 승인 없는 주문 생성 0건 |
 | REQ-BNT-01 | 근거 부족 시 바운티를 생성한다 | MUST | 후보 상품과 필요 증거 연결 |
 | REQ-BNT-02 | Provider별 데이터 접근 범위를 격리한다 | MUST | 권한 밖 문서 조회 0건 |
-| REQ-BNT-03 | Validator가 근거·정합성·중복을 평가한다 | MUST | 정답셋 평가 결과 기록 |
+| REQ-BNT-03 | Validator가 **근거성·재현성·중복성**을 평가한다(사실성은 판정하지 않음 — 교정) | MUST | 각 검사 통과/반려 케이스 + 사실성 판정 코드 부재 확인 |
+| REQ-BNT-05~08 | 등급화·escrow/이의제기·제한적 slash·만족도 정산 제외 (신설) | MUST | `docs/plans/2026-07-22_2100_지식바운티_검증모델_재설계.md` §6 |
 | REQ-BNT-04 | 비현금 내부 포인트 원장을 제공한다 | MUST | 이중 지급·음수 잔액 방지 |
 | REQ-MCP-01 | 읽기/쓰기 도구를 MCP로 제공한다 | MUST | Inspector와 외부 클라이언트 smoke test |
 | REQ-VOICE-01 | 실시간 음성 상담을 제공한다 | MUST | 음성 입력·응답·중단·기록 시연 |
@@ -258,7 +259,8 @@ Requester Agent가 질문·필요 증거·보상 포인트 등록
 → Router가 capability와 평판으로 Provider 선택
 → Provider가 허용된 로컬 데이터만 검색
 → 답변 + 출처 + 증거 해시 제출
-→ Validator가 사실성·정합성·중복·재현성 평가
+→ Validator가 사실성·정합성·중복·재현성 평가   ⚠️ 교정됨: "사실성" 평가는 불가(오라클 문제).
+                                              → docs/plans/2026-07-22_2100_지식바운티_검증모델_재설계.md
 → 이의 제기 기간
 → Settlement Service가 포인트 원장 반영
 → 검증 결과를 상품 지식층에 연결
