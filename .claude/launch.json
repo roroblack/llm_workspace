@@ -18,6 +18,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["_unified_mall_2/scripts/run_admin_server.py"],
       "port": 8081
+    },
+    {
+      "name": "unified-mall-2-llm",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["_unified_mall_2/scripts/local_model_server.py"],
+      "port": 8000
     }
   ]
 }

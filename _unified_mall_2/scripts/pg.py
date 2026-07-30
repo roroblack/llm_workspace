@@ -67,9 +67,9 @@ def cmd_status() -> None:
 
     try:
         psycopg.connect(get_settings().PGVECTOR_DSN, connect_timeout=3).close()
-        print("[status] 연결 OK — PG 기동 중")
+        print("[status] 연결 OK: PG 기동 중")
     except Exception as exc:  # noqa: BLE001
-        print(f"[status] 연결 실패 — PG 미기동? {exc}")
+        print(f"[status] 연결 실패(PG 미기동?): {exc}")
         sys.exit(1)
 
 

@@ -24,7 +24,8 @@ def shot(page, name):
     print("saved", name)
 
 
-def clear_and_click(page, clear_sel, click_sel, wait_sel, timeout=15000):
+def clear_and_click(page, clear_sel, click_sel, wait_sel, timeout=180000):
+    """LLM 경유 동작이 섞여 있어 기본 대기를 넉넉히 둔다(로컬 CPU 추론은 수십 초)."""
     page.evaluate(f"document.querySelector('{clear_sel}').innerHTML = ''")
     page.click(click_sel)
     page.wait_for_selector(wait_sel, timeout=timeout)
@@ -38,8 +39,10 @@ def main():
         # --- 1. 에이전트 채팅 ---
         page.goto(f"{BASE}/static/index.html")
         page.fill("#question", "P0001 상품 가격 알려줘")
-        page.click("#chatForm button")
-        page.wait_for_selector("#transcript .msg.bot", timeout=60000)
+        # ★ #chatForm 안 첫 버튼은 마이크(#micBtn, Phase 11에 추가됨)다. 셀렉터를
+        # "#chatForm button"으로 두면 녹음이 눌려 질문이 전송되지 않는다 → submit을 명시.
+        page.click('#chatForm button[type="submit"]')
+        page.wait_for_selector("#transcript .msg.bot", timeout=300000)  # 실측 56초(로컬 CPU) — 여유 확보
         time.sleep(1)
         shot(page, "01_agent_chat")
 
@@ -50,7 +53,7 @@ def main():
 
         # --- 3. RAG QA (hybrid backend, 실 LLM) ---
         page.select_option("#qaBackend", "hybrid")
-        clear_and_click(page, "#qaResult", "#qaBtn", "#qaResult pre.result", 90000)
+        clear_and_click(page, "#qaResult", "#qaBtn", "#qaResult pre.result", 300000)  # hybrid=검색+LLM 생성, 로컬 CPU에선 분 단위
         time.sleep(1)
         shot(page, "03_rag_qa_hybrid")
 
