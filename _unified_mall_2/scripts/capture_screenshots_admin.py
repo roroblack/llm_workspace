@@ -64,7 +64,7 @@ def redact_token_and_status(page, status_text: str) -> None:
 
 def main() -> None:
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel="chrome")  # 설치된 Chrome 사용(playwright 브라우저 별도 다운로드 불필요)
         page = browser.new_page(viewport={"width": 1280, "height": 900})
         page.goto(f"{BASE}/static/admin.html")
 

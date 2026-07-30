@@ -49,14 +49,29 @@ def _all_collected_node_ids() -> frozenset[str]:
     항목마다(또는 파일마다) 서브프로세스를 새로 띄웠는데, 무거운 앱 임포트(torch·
     sentence-transformers 등)가 매번 재실행돼 파일 15개 기준 2분을 넘겨 비현실적이었다.
     전체 스위트를 **한 번만** collect해 20초 안팎으로 낮췄다(측정 확인).
+
+    타임아웃 값(240초)의 근거: 테스트 파일이 늘어나며 collect 시간이 증가했다. 유휴 상태
+    실측 **49초**이지만, 전체 스위트와 동시에 돌 때(무거운 ML 모델 로딩과 CPU 경합) 기존
+    90초 제한을 넘겨 **거짓 실패**가 났다. 이 검사의 목적은 "node가 수집 가능한가"이므로
+    타임아웃은 답이 아니라 측정 실패다 → 여유를 늘리고, 아래에서 타임아웃을 수집 실패와
+    **구분해** 보고한다(원인을 오해하지 않도록).
     """
-    proc = subprocess.run(
-        [sys.executable, "-m", "pytest", "--collect-only", "tests/"],
-        cwd=_REPO_ROOT,
-        capture_output=True,
-        text=True,
-        timeout=90,
-    )
+    try:
+        proc = subprocess.run(
+            [sys.executable, "-m", "pytest", "--collect-only", "tests/"],
+            cwd=_REPO_ROOT,
+            capture_output=True,
+            text=True,
+            timeout=240,
+        )
+    except subprocess.TimeoutExpired as exc:
+        # 수집 불가가 아니라 **측정 자체가 시간 안에 끝나지 않은 것**이다. 둘을 섞어
+        # 보고하면 "요구사항이 테스트에 연결되지 않았다"는 잘못된 결론으로 이어진다.
+        raise RuntimeError(
+            "전체 collect가 제한 시간(240초) 안에 끝나지 않았습니다 — 수집 실패가 아니라 "
+            "측정 타임아웃입니다(머신 부하 가능성). 단독 실행으로 재확인하세요: "
+            "pytest tests/test_requirements_matrix.py"
+        ) from exc
     if proc.returncode != 0:
         # 일부 파일만 수집 오류가 나도 나머지 파일의 정상 node는 여전히 출력에 섞여 나온다
         # (Codex 지적) — "결과가 비어있지 않음"만으로는 전체 성공을 보장 못 하므로 exit code로 확인.

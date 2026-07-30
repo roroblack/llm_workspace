@@ -32,7 +32,7 @@ def clear_and_click(page, clear_sel, click_sel, wait_sel, timeout=15000):
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel="chrome")  # 설치된 Chrome 사용(playwright 브라우저 별도 다운로드 불필요)
         page = browser.new_page(viewport={"width": 1200, "height": 800})
 
         # --- 1. 에이전트 채팅 ---

@@ -12,7 +12,7 @@ OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
 
 def main():
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel="chrome")  # 설치된 Chrome 사용(playwright 브라우저 별도 다운로드 불필요)
         page = browser.new_page(viewport={"width": 1200, "height": 800})
         page.goto(f"{BASE}/static/mcp.html")
 

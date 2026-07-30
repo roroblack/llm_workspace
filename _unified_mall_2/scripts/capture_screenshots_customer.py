@@ -16,7 +16,7 @@ OUT = Path(__file__).resolve().parents[1] / "docs" / "screenshots"
 
 def main() -> None:
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        browser = p.chromium.launch(channel="chrome")  # 설치된 Chrome 사용(playwright 브라우저 별도 다운로드 불필요)
         page = browser.new_page(viewport={"width": 1200, "height": 860})
 
         # 15. 고객 스토어프론트 — 상품 담긴 상태
