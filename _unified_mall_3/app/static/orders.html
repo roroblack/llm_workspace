@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>주문·승인 — {{BRAND}}</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🛒 커머스 승인 루프</h1>
+    <p class="sub">미리보기(읽기전용) → 명시 승인(Idempotency-Key) → 멱등 재생 · 거부 경로 포함</p>
+    <nav class="top-nav">
+      <a href="/static/admin.html">🛡️ 관리자</a>
+      <a href="/static/rag.html">🔎 RAG 검색</a>
+      <a href="/static/orders.html" class="active">🛒 주문·승인</a>
+      <a href="/static/facebench.html">🧪 인식 비교</a>
+      <a href="/static/mcp.html">🔌 MCP</a>
+      <a href="/static/shop.html" style="margin-left:auto">🏠 스토어(고객)</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="auth-status" id="authStatusBar"></p>
+
+    <div class="panel">
+      <h2>0. 계정 (회원가입 → 자동 로그인)</h2>
+      <div class="row">
+        <div class="field">아이디
+          <input id="username" type="text" placeholder="user_1234" />
+        </div>
+        <div class="field">비밀번호
+          <input id="password" type="password" value="pass1234" />
+        </div>
+        <button class="btn secondary" id="signupBtn" style="align-self:flex-end;">회원가입+로그인</button>
+      </div>
+      <div id="authResult"></div>
+    </div>
+
+    <div class="panel">
+      <h2>1. 상품 목록</h2>
+      <button class="btn secondary" id="loadProductsBtn">상품 불러오기</button>
+      <div id="productsTable"></div>
+    </div>
+
+    <div class="panel">
+      <h2>2. 주문 미리보기 (DB 변경 없음)</h2>
+      <div class="row">
+        <div class="field">상품코드
+          <input id="pvCode" type="text" value="P0001" />
+        </div>
+        <div class="field">수량
+          <input id="pvQty" type="number" min="1" value="2" style="min-width:70px" />
+        </div>
+        <button class="btn" id="previewBtn" style="align-self:flex-end;">미리보기</button>
+      </div>
+      <div id="previewResult"></div>
+    </div>
+
+    <div class="panel">
+      <h2>3. 승인 — 성공 · 거부 경로</h2>
+      <p class="hint">각 버튼이 실제 요청을 보냅니다. Idempotency-Key는 매 "정상 승인"마다 새로 생성됩니다.</p>
+      <div class="row">
+        <button class="btn" id="approveBtn">① 정상 승인</button>
+        <button class="btn secondary" id="replayBtn">② 같은 키 재요청(멱등 재생)</button>
+      </div>
+      <div class="row">
+        <button class="btn danger" id="noKeyBtn">③ 키 없이 승인 시도 → 422</button>
+        <button class="btn danger" id="conflictBtn">④ 같은 키·다른 수량 → 409</button>
+        <button class="btn danger" id="oversellBtn">⑤ 재고 초과 수량 → 422</button>
+      </div>
+      <div id="approveResult"></div>
+    </div>
+
+    <div class="panel">
+      <h2>4. 내 주문 목록</h2>
+      <button class="btn secondary" id="loadOrdersBtn">주문 목록 불러오기</button>
+      <div id="ordersTable"></div>
+    </div>
+  </main>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/orders.js"></script>
+</body>
+</html>

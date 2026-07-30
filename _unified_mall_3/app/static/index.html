@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{{BRAND}} AI 커머스 에이전트</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <header>
+    <h1>🛍️ <span data-brand></span> AI 커머스 에이전트</h1>
+    <p class="sub">가격·재고·주문·환율·정책 문서를 도구로 확인하는 ReAct 에이전트</p>
+    <nav class="top-nav">
+      <a href="/static/shop.html">🛍️ 쇼핑</a>
+      <a href="/static/index.html" class="active">💬 AI 상담</a>
+      <a href="/static/video.html">🎥 화상 상담</a>
+      <a href="/static/mypage.html">🙍 마이페이지</a>
+    </nav>
+  </header>
+
+  <main>
+    <p class="auth-status" id="authStatusBar"></p>
+    <section id="settings">
+      <label>max_steps
+        <input id="maxSteps" type="number" min="1" max="6" value="3" />
+      </label>
+      <label class="voice-toggle">
+        <input id="ttsToggle" type="checkbox" />
+        응답 음성으로 듣기(TTS)
+      </label>
+      <span class="hint">로컬 Gemma는 도구호출을 못하므로 실제 도구 사용은 OpenAI/Gemini 키 필요</span>
+    </section>
+
+    <section id="transcript" aria-live="polite"></section>
+    <p id="voiceStatus" class="voice-status" aria-live="polite"></p>
+
+    <form id="chatForm">
+      <button id="micBtn" type="button" title="음성으로 입력">🎤</button>
+      <input id="question" type="text" placeholder="예: P0001 재고와 반품 정책 알려줘" autocomplete="off" />
+      <button type="submit">전송</button>
+    </form>
+  </main>
+
+  <script src="/static/common.js"></script>
+  <script src="/static/app.js"></script>
+</body>
+</html>
