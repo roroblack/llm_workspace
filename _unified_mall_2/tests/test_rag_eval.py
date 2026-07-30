@@ -33,10 +33,13 @@ def test_scoring_functions():
 
 
 def test_dataset_composition():
+    # 구성 고정: 개발 참고 문서를 RAG 코퍼스에서 분리(data/dev_docs/)하면서 그 문서를 정답
+    # 출처로 하던 answerable 10문항을 dev_docs_v1.jsonl로 옮겼다 → 30문항에서 20문항으로 축소.
+    # 과거 리포트의 Hit@3 수치는 개발 문서가 포함된 코퍼스 기준이라 직접 비교할 수 없다.
     items = load_dataset(_DATA)
-    assert len(items) == 30
+    assert len(items) == 20
     c = Counter(i.kind for i in items)
-    assert c["answerable"] == 20
+    assert c["answerable"] == 10
     assert c["unanswerable"] == 5
     assert c["adversarial"] == 3
     assert c["paraphrase"] == 2

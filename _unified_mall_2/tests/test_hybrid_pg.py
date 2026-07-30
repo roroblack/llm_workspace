@@ -28,9 +28,11 @@ def test_pg_lexical_ranks_by_word_similarity():
     from app.adapters.pg_lexical_retriever import PgLexicalRetriever
 
     _ensure_trgm()
-    evs = PgLexicalRetriever().search("도구 설계 원칙", k=3)
+    # 개발 참고 문서(tool_design_rules 등)는 RAG 코퍼스에서 분리했으므로(dev_docs) 정책
+    # 문서를 대상으로 검증한다.
+    evs = PgLexicalRetriever().search("반품 배송비 부담", k=3)
     assert evs, "lexical 결과가 비어있음(ingest 필요)"
-    assert evs[0].source == "tool_design_rules.txt"  # 키워드 최적 출처
+    assert evs[0].source == "환불교환정책.pdf"  # 키워드 최적 출처
     assert all(0.0 <= e.score <= 1.0 for e in evs)
     assert evs[0].backend == "pg_lexical"
 

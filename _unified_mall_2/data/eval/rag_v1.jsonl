@@ -1,5 +1,9 @@
-# RAG v1 평가셋 (30문항: answerable 20 / unanswerable 5 / adversarial 3 / paraphrase 2)
-# corpus: 환불교환정책.pdf, loop_safety.txt, react_agent_overview.txt, tool_design_rules.txt
+# RAG v1 평가셋 (고객·에이전트 질의 전용).
+# corpus: data/docs/ (현재 환불교환정책.pdf)
+# ※ 개발 참고 문서(loop_safety·react_agent_overview·tool_design_rules)를 RAG 코퍼스에서
+#    분리(data/dev_docs/)하면서, 그 문서를 정답 출처로 하던 10문항을 dev_docs_v1.jsonl로
+#    옮겼다. 따라서 30문항 → 20문항이며, 과거 리포트의 Hit@3 수치는 개발 문서가 포함된
+#    코퍼스에서 측정된 값이다(직접 비교 불가).
 {"question": "단순 변심으로 반품하려면 며칠 이내에 신청해야 하나요?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["7일"], "forbidden_claims": []}
 {"question": "단순 변심 반품의 배송비는 누가 부담하나요?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["고객"], "forbidden_claims": ["무료"]}
 {"question": "상품 불량·하자일 때 반품 신청 기한은?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["30일"], "forbidden_claims": []}
@@ -10,16 +14,6 @@
 {"question": "표시·광고와 상이한 경우 청약철회 가능 기간은?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["30일"], "forbidden_claims": []}
 {"question": "환불·교환·반품 정책의 문서번호는 무엇인가요?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["CS-POL-2026-014"], "forbidden_claims": []}
 {"question": "제주 지역 반품 배송비에 대한 특이사항이 있나요?", "kind": "answerable", "answerable": true, "expected_source": "환불교환정책.pdf", "expected_answer_contains": ["추가"], "forbidden_claims": []}
-{"question": "Agent Loop에 반드시 필요한 안전장치는 무엇인가요?", "kind": "answerable", "answerable": true, "expected_source": "loop_safety.txt", "expected_answer_contains": ["max_steps"], "forbidden_claims": []}
-{"question": "max_steps는 무엇을 막기 위한 장치인가요?", "kind": "answerable", "answerable": true, "expected_source": "loop_safety.txt", "expected_answer_contains": ["비용"], "forbidden_claims": []}
-{"question": "history가 길어지면 어떤 문제가 생기고 어떻게 대응하나요?", "kind": "answerable", "answerable": true, "expected_source": "loop_safety.txt", "expected_answer_contains": ["trimming"], "forbidden_claims": []}
-{"question": "ReAct 에이전트는 무엇과 무엇을 결합한 패턴인가요?", "kind": "answerable", "answerable": true, "expected_source": "react_agent_overview.txt", "expected_answer_contains": ["Reason", "Act"], "forbidden_claims": []}
-{"question": "ReAct에서 Thought 단계는 무엇을 하나요?", "kind": "answerable", "answerable": true, "expected_source": "react_agent_overview.txt", "expected_answer_contains": ["판단"], "forbidden_claims": []}
-{"question": "Observation 단계에서는 무엇을 확인하나요?", "kind": "answerable", "answerable": true, "expected_source": "react_agent_overview.txt", "expected_answer_contains": ["도구 실행 결과"], "forbidden_claims": []}
-{"question": "관찰 결과는 이후 어디에 추가되나요?", "kind": "answerable", "answerable": true, "expected_source": "react_agent_overview.txt", "expected_answer_contains": ["history"], "forbidden_claims": []}
-{"question": "좋은 도구는 한 번에 몇 가지 일을 수행해야 하나요?", "kind": "answerable", "answerable": true, "expected_source": "tool_design_rules.txt", "expected_answer_contains": ["한 가지"], "forbidden_claims": []}
-{"question": "도구의 독스트링에는 무엇을 포함해야 하나요?", "kind": "answerable", "answerable": true, "expected_source": "tool_design_rules.txt", "expected_answer_contains": ["언제"], "forbidden_claims": []}
-{"question": "도구 반환값은 어떤 형식으로 제공하는 것이 좋은가요?", "kind": "answerable", "answerable": true, "expected_source": "tool_design_rules.txt", "expected_answer_contains": ["문자열"], "forbidden_claims": []}
 {"question": "회원 등급별 할인율은 어떻게 되나요?", "kind": "unanswerable", "answerable": false, "expected_source": null, "expected_answer_contains": [], "forbidden_claims": []}
 {"question": "배송 조회 API 엔드포인트 주소를 알려주세요.", "kind": "unanswerable", "answerable": false, "expected_source": null, "expected_answer_contains": [], "forbidden_claims": []}
 {"question": "이 회사의 창업자 이름은 무엇인가요?", "kind": "unanswerable", "answerable": false, "expected_source": null, "expected_answer_contains": [], "forbidden_claims": []}
