@@ -1,0 +1,2042 @@
+{
+  "built_at": "2026-07-31T05:59:45+00:00",
+  "artifacts": 28,
+  "identified_automatically": 0,
+  "rows": [
+    {
+      "sha256": "968e67f4d3b6ee1b670be7f41a17a27e15fe7a01946df8c8089556895746368c",
+      "file": "968e67f4d3b6_ZPB293050_0_20250101_file1.pdf",
+      "bytes": 2326191,
+      "pages": 134,
+      "text_length": 21667,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "unknown",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "변형 표기가 복수입니다: ['child_conversion', 'conversion_resume', 'contract_conversion']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "968e67f4d3b6ee1b670be7f41a17a27e15fe7a01946df8c8089556895746368c",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB293050_0_20250101_file1.pdf",
+          "fetched_at": "2026-07-31T01:04:19+00:00",
+          "product_code": "",
+          "product_name": "",
+          "sale_start": "",
+          "sale_end": ""
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "실손의료비보험 무배당 삼성화재 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. (2501.5) (2501.5)[계약전환용] (2501.5)[전환·재개용] (2501.5)",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 132 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      3. 지정대리청구서비스Ⅱ 특별약관    제1조 (적용 대 상)  이 특별약관은 보험계약자(이 하「계약 자」라 합니다), 피보험자 및 보험 수익자가 모두  동일한 보험계약(특별약관이 부가된 경우에는 그 특별",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "",
+          "excerpt": "",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "63b996663c352482402384778b7b23d4e13689b2d1888423d9c33a12597add9e",
+      "file": "63b996663c35_ZPB449010_0_20260701_file1.pdf",
+      "bytes": 2578854,
+      "pages": 160,
+      "text_length": 22196,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "unknown",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "변형 표기가 복수입니다: ['child_conversion', 'conversion_resume', 'contract_conversion']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "63b996663c352482402384778b7b23d4e13689b2d1888423d9c33a12597add9e",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:25+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "63b996663c352482402384778b7b23d4e13689b2d1888423d9c33a12597add9e",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:46:37+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 실손의료비보험 무배당 삼성화재 2605.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [계약전환용] [전환·재개용] [자녀보험전환용] 2026년 7월 1일",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 158 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      2. 보험료 자동납입 특별약관    제1조 (보험료납입)  ① 보 험계 약자(이 하「계약 자」라 합니다)는 제2회 이 후의 보 험료부 터 이 특 별약 관에 따 라 계 약 자의 지 정계 좌를 이 용하여 보 ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "excerpt": "ZPB449010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "f40e62ad20a5565ed83557e2ab22f42f19e0a9c9c34fd01735a5214e0f675d7d",
+      "file": "f40e62ad20a5_ZPB449010_0_20260701_file2.pdf",
+      "bytes": 486072,
+      "pages": 13,
+      "text_length": 14357,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "conversion_resume",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'business_method']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "f40e62ad20a5565ed83557e2ab22f42f19e0a9c9c34fd01735a5214e0f675d7d",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:45:27+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "f40e62ad20a5565ed83557e2ab22f42f19e0a9c9c34fd01735a5214e0f675d7d",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:41+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [전환·재개용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1)",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [전환·재개용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1)",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "  (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간 유효한 실손의료 비 보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 중 본 인부담금 및 [갱신형]중증 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간 유효한 실손의료 비 보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 중 본 인부담금 및 [갱신형]중증 ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "의사 여부를 확인하는 내용 등을 서면(등기우편 등), 전화(음성녹음), 전자문서,  휴대전화 문자메시지 또는 이에 준하는 전자적 의사표시 등으로 안내하고, 계약 자의 재가입의사를 전화(음성녹음) 또는 직접 방문, 통",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "의사 여부를 확인하는 내용 등을 서면(등기우편 등), 전화(음성녹음), 전자문서,  휴대전화 문자메시지 또는 이에 준하는 전자적 의사표시 등으로 안내하고, 계약 자의 재가입의사를 전화(음성녹음) 또는 직접 방문, 통",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "conversion_resume",
+          "excerpt": "(사업방법서 별지) \n \n무배당 삼성화재 실손의료비보험(2605.1) [전환·재개용] \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1)",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "excerpt": "ZPB449010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "f147eba2c2d803283bcc1b807accd77dcebb630a329ed4c60bd37584110b91a3",
+      "file": "f147eba2c2d8_ZPB449010_0_20260701_file3.pdf",
+      "bytes": 1053862,
+      "pages": 28,
+      "text_length": 14113,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "conversion_resume",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "f147eba2c2d803283bcc1b807accd77dcebb630a329ed4c60bd37584110b91a3",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:45:29+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "f147eba2c2d803283bcc1b807accd77dcebb630a329ed4c60bd37584110b91a3",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB449010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:46:46+00:00",
+          "product_code": "ZPB449010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1)[전환·재개용]  상품요약서      ● 상품특성 및 전달정보               상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니 다. 예",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 어떤 경우에 개인실손보험으로 전환 및 중지∙재개가 가능한가요?    A1) 전환제도는 단체형 실손의료보험(이하, 단체실손)에 가입한 단체의  임직원이거나 퇴직자 본인인 경",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 어떤 경우에 개인실손보험으로 전환 및 중지∙재개가 가능한가요?    A1) 전환제도는 단체형 실손의료보험(이하, 단체실손)에 가입한 단체의  임직원이거나 퇴직자 본인인 경",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  <중증 비급여>  구분 보상하지 않는 사항  공통  1. 영양제, 비타민제 등의 약제와 관련하여 소요된 비용. 다만  약관상 보상하는 상해 또는 질병을 치료함에 있어 아래 각목 에 해당하는 경우는 치료 목적으로 ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "conversion_resume",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1)[전환·재개용] \n상품요약서 \n \n \n● 상품특성 및 전달정보 \n          \n \n상품특성 전달정보 \n \n이 계약은 예금자보호법에 따라 예금보험공사가 보호합니\n다. 예",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [전환재개용]",
+          "excerpt": "ZPB449010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "84ee5aa9b260f0ed9d19f1af0c4e73d214484b914202f955033cad0ab03f3a06",
+      "file": "84ee5aa9b260_ZPB450010_0_20260701_file1.pdf",
+      "bytes": 2578854,
+      "pages": 160,
+      "text_length": 22196,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "unknown",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "변형 표기가 복수입니다: ['child_conversion', 'conversion_resume', 'contract_conversion']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "84ee5aa9b260f0ed9d19f1af0c4e73d214484b914202f955033cad0ab03f3a06",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:31+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "84ee5aa9b260f0ed9d19f1af0c4e73d214484b914202f955033cad0ab03f3a06",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:46:51+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 실손의료비보험 무배당 삼성화재 2605.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [계약전환용] [전환·재개용] [자녀보험전환용] 2026년 7월 1일",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 158 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      2. 보험료 자동납입 특별약관    제1조 (보험료납입)  ① 보 험계 약자(이 하「계약 자」라 합니다)는 제2회 이 후의 보 험료부 터 이 특 별약 관에 따 라 계 약 자의 지 정계 좌를 이 용하여 보 ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "excerpt": "ZPB450010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "da92a186355a41c6886e704a0cdd84a540184e16fd29bc307cd33d6dd15cef35",
+      "file": "da92a186355a_ZPB450010_0_20260701_file2.pdf",
+      "bytes": 508100,
+      "pages": 14,
+      "text_length": 13902,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "child_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'business_method']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "da92a186355a41c6886e704a0cdd84a540184e16fd29bc307cd33d6dd15cef35",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:45:33+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "da92a186355a41c6886e704a0cdd84a540184e16fd29bc307cd33d6dd15cef35",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:56+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": " 나. 실손의료비 무사고 할인     (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간 유효한 실손의료 비 보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": " 나. 실손의료비 무사고 할인     (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간 유효한 실손의료 비 보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "경우 재가입 의사를 표시하여야 함   사. 바.에도 불구하고 회사가 고객의 재가입 의사 여부를 확인하지 못한 경우(계약자 와의 연락두절로 회사의 안내가 계약자에게 도달하지 못한 경우 포함)에는 직전  계약과 동일한 ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "경우 재가입 의사를 표시하여야 함   사. 바.에도 불구하고 회사가 고객의 재가입 의사 여부를 확인하지 못한 경우(계약자 와의 연락두절로 회사의 안내가 계약자에게 도달하지 못한 경우 포함)에는 직전  계약과 동일한 ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "child_conversion",
+          "excerpt": "(사업방법서 별지) \n \n무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용] \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "excerpt": "ZPB450010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "9224777de08ec482928d58bb2cda5ee2f2948795b8e5bec207e22fe0e81cbb40",
+      "file": "9224777de08e_ZPB450010_0_20260701_file3.pdf",
+      "bytes": 1068117,
+      "pages": 29,
+      "text_length": 14137,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "child_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "9224777de08ec482928d58bb2cda5ee2f2948795b8e5bec207e22fe0e81cbb40",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:45:36+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "9224777de08ec482928d58bb2cda5ee2f2948795b8e5bec207e22fe0e81cbb40",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB450010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:47:01+00:00",
+          "product_code": "ZPB450010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1)  [자녀보험전환용] 상품요약서      ● 상품특성 및 전달정보               상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니 다.",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 자녀보험전환용 상품은 어떤 경우에 전환이 가능한가요?    A1) 무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]은 계약 전환 대상인 자녀보험의 피보험자가 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 자녀보험전환용 상품은 어떤 경우에 전환이 가능한가요?    A1) 무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]은 계약 전환 대상인 자녀보험의 피보험자가 ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "구분 보상하지 않는 사항  에도 보상합니다)합니다.      다만, ‘26.5.6. 이후 체결된 계약을 같은 회사의 보험상품 으로 전환하거나 재가입한 경우에는 종전 계약을 연장하는 것 으로 보아 종전 계약의 보험가입",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "child_conversion",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1) \n[자녀보험전환용] 상품요약서 \n \n \n● 상품특성 및 전달정보 \n          \n \n상품특성 전달정보 \n \n이 계약은 예금자보호법에 따라 예금보험공사가 보호합니\n다.",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [자녀보험전환용]",
+          "excerpt": "ZPB450010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "ed57cf6d96722a2644f81d40ec8e40b53a5f5c4065186790151ae01c5f2c18f1",
+      "file": "ed57cf6d9672_ZPB451010_0_20260701_file1.pdf",
+      "bytes": 1952515,
+      "pages": 156,
+      "text_length": 13988,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "ed57cf6d96722a2644f81d40ec8e40b53a5f5c4065186790151ae01c5f2c18f1",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB451010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:38+00:00",
+          "product_code": "ZPB451010",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "ed57cf6d96722a2644f81d40ec8e40b53a5f5c4065186790151ae01c5f2c18f1",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB451010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:47:05+00:00",
+          "product_code": "ZPB451010",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 노후실손 의료비보험 무배당 삼성화재 2607.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [재개용]                              ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 154 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "     [별표-실손의료비관련] 보상하지 않는 질병부록    약관에 규정하는 보상하지 않는 질병은 제9차 개정 한국표준 질병·사인분류(통계청 고시 제2025-299호, 2026. 1. 1시행)  중 다음에 적은 질병",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB451010",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '노후실손의료비보험' 미확인",
+          "excerpt": "삼성화재\n노후실손\n의료비보험\n무배당 삼성화재 2607.1\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n[재개용]\n \n \n \n \n \n \n \n \n \n \n \n \n \n \n ",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "c402db4b6b691d12ad86eba9364f6c7dd5f1f2e2ce349f12e16a60f168d207ec",
+      "file": "c402db4b6b69_ZPB451010_0_20260701_file2.pdf",
+      "bytes": 328784,
+      "pages": 9,
+      "text_length": 11401,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "c402db4b6b691d12ad86eba9364f6c7dd5f1f2e2ce349f12e16a60f168d207ec",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB451010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:45:40+00:00",
+          "product_code": "ZPB451010",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "c402db4b6b691d12ad86eba9364f6c7dd5f1f2e2ce349f12e16a60f168d207ec",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB451010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:47:10+00:00",
+          "product_code": "ZPB451010",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2607",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2607",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  10. 보험료의 납입을 연체하여 해지된 계약의 부활(효력회복)시 연체이율에 관한  사항     연체된 보험료에 대한 연체이율은 평균공시이율 + 1%를 적용함      11. 보험료 선납에 관한 사항      당월",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "청구함으로써 계약자에게 연락이 닿아 회사가 계약자의 재가입의사를 확인한  날 등) 또는 보험기간이 종료된 날로부터 1년 중 빠른 날까지로 함. 계약자의  재가입 의사가 확인된 경우에는 회사가 정한 절차에 따라 회사가",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB451010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "05862584b8fe225ec22925ff54d4996395c38a86bc964a84d6fbc694213cee68",
+      "file": "05862584b8fe_ZPB451010_0_20260701_file3.pdf",
+      "bytes": 642734,
+      "pages": 14,
+      "text_length": 11857,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'product_summary']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "05862584b8fe225ec22925ff54d4996395c38a86bc964a84d6fbc694213cee68",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB451010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:45:42+00:00",
+          "product_code": "ZPB451010",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용] 상품요약서      ● 상품특성 및 전달정보                상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니다. 예금",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용] 상품요약서      ● 상품특성 및 전달정보                상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니다. 예금",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 가입자격제한 등 상품별 특이사항    □ 가입자격제한       무배당 삼성화재 노후실손의료비보험(2607.1) [ 재개용]의 가입이 가능한  나이는 아래와 같습니다.  구 분 보험  기간  보험료  납입기간  ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 가입자격제한 등 상품별 특이사항    □ 가입자격제한       무배당 삼성화재 노후실손의료비보험(2607.1) [ 재개용]의 가입이 가능한  나이는 아래와 같습니다.  구 분 보험  기간  보험료  납입기간  ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "구분 지급사유 지급금액  선 택  계 약  [갱신형]  요양  병원  실손  의료비B  상해 또는 질병으로  인하여 요양병원에  입원 또는 통원하여  치료를 받거나  처방조제를  받은 경우  상해∙질병을 합산하여 아",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "구분 지급사유 지급금액  선 택  계 약  [갱신형]  요양  병원  실손  의료비B  상해 또는 질병으로  인하여 요양병원에  입원 또는 통원하여  치료를 받거나  처방조제를  받은 경우  상해∙질병을 합산하여 아",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB451010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "50935bff5002816d9dc9b7ca9fb402c9dde6d0ae0c301c831112508732cef802",
+      "file": "50935bff5002_ZPB452010_0_20260701_file1.pdf",
+      "bytes": 2519888,
+      "pages": 157,
+      "text_length": 20587,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "50935bff5002816d9dc9b7ca9fb402c9dde6d0ae0c301c831112508732cef802",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB452010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:45+00:00",
+          "product_code": "ZPB452010",
+          "product_name": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 실손의료비보험 무배당 삼성화재 다이렉트 2605.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. 2026년 7월 1일부터 적용                 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 155 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      1. 이륜자동차 운전 및 탑승 중 상해 부담보 특별약관    제1조 (특별약관의 체결 및 효력)  ① 이 특 별약 관은 보 험계 약(특 별약 관이 부가된 경우 에는 그 특 별약 관을 포 함 합니 다. 이하",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "excerpt": "ZPB452010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "337d31cfad35b763a70885a7736739690b2ed0953e14b3504f26c0ff6cfaf17f",
+      "file": "337d31cfad35_ZPB452010_0_20260701_file2.pdf",
+      "bytes": 451187,
+      "pages": 12,
+      "text_length": 12549,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'business_method']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "337d31cfad35b763a70885a7736739690b2ed0953e14b3504f26c0ff6cfaf17f",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB452010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:45:47+00:00",
+          "product_code": "ZPB452010",
+          "product_name": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 다이렉트 실손의료비보험(2605.1)     1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 다이렉트 실손의료비보험(2605.",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 다이렉트 실손의료비보험(2605.1)     1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 다이렉트 실손의료비보험(2605.",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "는 서류(“의료급여증의 사본” 또는 “의료급여증명서” 등)를 제출한 경우 에 한함. 다만, 단체(취급)계약은 할인을 적용하지 않음   (2) 보험료 할인  회사는 피보험자가 수급권자 자격 취득일(수급권자 자격취득일이",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(1) 재가입일에 있어서 피보험자의 나이가 나.에서 정한 범위 내일것  (2) 재가입 전 계약의 보험료가 정상적으로 납입완료 되었을 것  마. 이 계약의 자동갱신종료 후 계약자가 재가입을 원하는 경우 계약자는 재가입",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(1) 재가입일에 있어서 피보험자의 나이가 나.에서 정한 범위 내일것  (2) 재가입 전 계약의 보험료가 정상적으로 납입완료 되었을 것  마. 이 계약의 자동갱신종료 후 계약자가 재가입을 원하는 경우 계약자는 재가입",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "excerpt": "ZPB452010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "09f281a8fc57e021f1584b8080051bddcbd5ce71301d05d5eab50f001f9950d1",
+      "file": "09f281a8fc57_ZPB452010_0_20260701_file3.pdf",
+      "bytes": 1055013,
+      "pages": 28,
+      "text_length": 14101,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "09f281a8fc57e021f1584b8080051bddcbd5ce71301d05d5eab50f001f9950d1",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB452010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:45:49+00:00",
+          "product_code": "ZPB452010",
+          "product_name": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 다이렉트  실손의료비보험(2605.1)  상품요약서      ● 상품특성 및 전달정보               상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니 다. 예금자",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 문답식 상품해설 (Q & A)     Q) [갱신형] 실손의료비는 무엇이고 운영은 어떻게 되나요?    A) [갱신형] 실손의료비는 최초 가입후 1년마다 갱신을 통해 최고 5년 까지 보장받을 수 있는 담보로, [",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 문답식 상품해설 (Q & A)     Q) [갱신형] 실손의료비는 무엇이고 운영은 어떻게 되나요?    A) [갱신형] 실손의료비는 최초 가입후 1년마다 갱신을 통해 최고 5년 까지 보장받을 수 있는 담보로, [",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  <중증 비급여>  구분 보상하지 않는 사항  공통  1. 영양제, 비타민제 등의 약제와 관련하여 소요된 비용. 다만  약관상 보상하는 상해 또는 질병을 치료함에 있어 아래 각목 에 해당하는 경우는 치료 목적으로 ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)",
+          "excerpt": "ZPB452010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "be2cae49e7d930b3d538dc6c8aefcb7963d852cca33e1e4201e27d69569de1b8",
+      "file": "be2cae49e7d9_ZPB454010_0_20260701_file1.pdf",
+      "bytes": 1549272,
+      "pages": 94,
+      "text_length": 16627,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "be2cae49e7d930b3d538dc6c8aefcb7963d852cca33e1e4201e27d69569de1b8",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB454010_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:51+00:00",
+          "product_code": "ZPB454010",
+          "product_name": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 유병력자  실손의료비보험 무배당 삼성화재 2607.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [재개용]                           ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 92 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 16 보험용어 해설 18 개인신용정보 제공·이용에 대한 고객 권리 안내문 19 보통약관 20",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "    [붙임1] 용어의 정의  용어 정의  계약 보험계약  진단계약 계약을 체결하기 위하여 피보험자가 건강진단을 받아야 하는 계약  보험증권 계약의 성립과 계약내용을 증명하기 위하여 회사가 계약자에게 드리는  증서",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB454010",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '유병력자 실손의료비보험' 미확인",
+          "excerpt": "삼성화재\n유병력자 \n실손의료비보험\n무배당 삼성화재 2607.1\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n[재개용]\n \n \n \n \n \n \n \n \n \n \n \n \n \n",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "4613871bf21f8f7f7fa736cc113f7b5da2ab1ac1f3ee68580b2157958c4bfe21",
+      "file": "4613871bf21f_ZPB454010_0_20260701_file2.pdf",
+      "bytes": 614301,
+      "pages": 19,
+      "text_length": 14014,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "4613871bf21f8f7f7fa736cc113f7b5da2ab1ac1f3ee68580b2157958c4bfe21",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB454010_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:45:53+00:00",
+          "product_code": "ZPB454010",
+          "product_name": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "- 1 -    (사업방법서 별지)    무배당 삼성화재 유병력자실손의료비보험(2607.1) [재개용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 유병력",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "- 3 -    인상요인을 보험료 변경에 따른 인상요인으로 정의함    10. 보험료의 납입을 연체하여 해지된 계약의 부활(효력회복)시 연체이율에 관한 사항       연체된 보험료에 대한 연체이율은 평균공시이율 +",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "- 10 -    【별첨1】부가가능 독립특별약관      구분 특별약관  제도성  ·이륜자동차 운전 및 탑승 중 상해 부담보 특별약관  ·보험료 자동납입 특별약관  ·지정대리청구서비스Ⅲ 특별약관  ·개인실손의료비보험",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB454010",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '유병력자 실손의료비보험' 미확인",
+          "excerpt": "- 1 - \n \n(사업방법서 별지) \n \n무배당 삼성화재 유병력자실손의료비보험(2607.1) [재개용] \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n \n2. 보험종목의 명칭 : 무배당 삼성화재 유병력",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "2785435f62995dfa8531278a17ebfa490345fd7b664838bc3eb2756c7c07a9d2",
+      "file": "2785435f6299_ZPB454010_0_20260701_file3.pdf",
+      "bytes": 571526,
+      "pages": 13,
+      "text_length": 11305,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'product_summary']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "2785435f62995dfa8531278a17ebfa490345fd7b664838bc3eb2756c7c07a9d2",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB454010_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:45:55+00:00",
+          "product_code": "ZPB454010",
+          "product_name": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재 개용] 상품요약서      ● 상품특성 및 전달정보              상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니 다.",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 어떤 경우에 개인실손보험 중지∙재개가 가능한가요?     A1) 중지제도는 피보험자가 단체실손과 개인실손의료보험(이하, 개인실 손)에 중복 가입하고 회사가 정한 중지요건에",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 어떤 경우에 개인실손보험 중지∙재개가 가능한가요?     A1) 중지제도는 피보험자가 단체실손과 개인실손의료보험(이하, 개인실 손)에 중복 가입하고 회사가 정한 중지요건에",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 보험금 지급사유, 지급금액 및 지급제한사항    □ 보험금 지급사유 및 지급금액    구분 지급사유 지급금액  상해  입원  상해로 인하여 의료기관에  입원하여 치료를 받은 경우  (하나의 상해당 보험가입 금 액",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "● 보험금 지급사유, 지급금액 및 지급제한사항    □ 보험금 지급사유 및 지급금액    구분 지급사유 지급금액  상해  입원  상해로 인하여 의료기관에  입원하여 치료를 받은 경우  (하나의 상해당 보험가입 금 액",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 유병력자 실손의료비보험(2607.1) [재개용]",
+          "excerpt": "ZPB454010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "1cdbb89a6ac447e148a9e15782d8b5c3a246c3649d4c26a6d69c5b1155a09640",
+      "file": "1cdbb89a6ac4_ZPB167200_0_20260701_file1.pdf",
+      "bytes": 1988493,
+      "pages": 156,
+      "text_length": 13995,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "1cdbb89a6ac447e148a9e15782d8b5c3a246c3649d4c26a6d69c5b1155a09640",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:45:58+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 노후실손 의료비보험 무배당 삼성화재 2601.20 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. 2026년 7월 1일부터 적용                  ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 154 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "     [별표-실손의료비관련] 보상하지 않는 질병부록    약관에 규정하는 보상하지 않는 질병은 제9차 개정 한국표준 질병·사인분류(통계청 고시 제2025-299호, 2026. 1. 1시행)  중 다음에 적은 질병",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "excerpt": "ZPB167200",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '노후실손의료비보험' 미확인",
+          "excerpt": "삼성화재\n노후실손\n의료비보험\n무배당 삼성화재 2601.20\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n2026년 7월 1일부터 적용\n \n \n \n \n \n \n \n \n ",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "761494d6dff94b1b53b845f2d7fff23ce60fb0ce4da0f48e19161d613e610b6e",
+      "file": "761494d6dff9_ZPB167200_0_20260701_file2.pdf",
+      "bytes": 331210,
+      "pages": 9,
+      "text_length": 11366,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "761494d6dff94b1b53b845f2d7fff23ce60fb0ce4da0f48e19161d613e610b6e",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:00+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2601.20)    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2601.20) ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2601.20)    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2601.20) ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "10. 보험료의 납입을 연체하여 해지된 계약의 부활(효력회복)시 연체이율에 관한  사항     연체된 보험료에 대한 연체이율은 평균공시이율 + 1%를 적용함      11. 보험료 선납에 관한 사항      당월분을",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "날 등) 또는 보험기간이 종료된 날로부터 1년 중 빠른 날까지로 함. 계약자의  재가입 의사가 확인된 경우에는 회사가 정한 절차에 따라 회사가 재가입 의사 를 확인한 날에 판매중인 상품으로 다시 재가입하는 것으로 하",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "excerpt": "ZPB167200",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "206056c58293ab12cf8350d74e0a71c1cc1c3ffce31e8551c300c5505c74c551",
+      "file": "206056c58293_ZPB167200_0_20260701_file3.pdf",
+      "bytes": 628515,
+      "pages": 14,
+      "text_length": 11332,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'product_summary']",
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "206056c58293ab12cf8350d74e0a71c1cc1c3ffce31e8551c300c5505c74c551",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260701_file3.pdf",
+          "fetched_at": "2026-07-31T05:46:02+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        },
+        {
+          "artifact_sha256": "206056c58293ab12cf8350d74e0a71c1cc1c3ffce31e8551c300c5505c74c551",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260506_file3.pdf",
+          "fetched_at": "2026-07-31T05:47:03+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 노후 실손의료비보험(2601.20) 상품요약서      ● 상품특성 및 전달정보                상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니다. 예금자보호 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 가입자격제한 등 상품별 특이사항    □ 가입자격제한       무배당 삼성화재 노후실손의료비보험(2601.20)의 가입이 가능한 나이는  아래와 같습니다.  구 분 보험  기간  보험료  납입기간  보장내용  ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 가입자격제한 등 상품별 특이사항    □ 가입자격제한       무배당 삼성화재 노후실손의료비보험(2601.20)의 가입이 가능한 나이는  아래와 같습니다.  구 분 보험  기간  보험료  납입기간  보장내용  ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "구분 지급사유 지급금액  선 택  계 약  [갱신형]  요양  병원  실손  의료비B  상해 또는 질병으로  인하여 요양병원에  입원 또는 통원하여  치료를 받거나  처방조제를  받은 경우  상해∙질병을 합산하여 아",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "구분 지급사유 지급금액  선 택  계 약  [갱신형]  요양  병원  실손  의료비B  상해 또는 질병으로  인하여 요양병원에  입원 또는 통원하여  치료를 받거나  처방조제를  받은 경우  상해∙질병을 합산하여 아",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "excerpt": "ZPB167200",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '노후실손의료비보험' 미확인",
+          "excerpt": "무배당 삼성화재 노후 실손의료비보험(2601.20) 상품요약서 \n \n \n● 상품특성 및 전달정보 \n             \n상품특성 전달정보 \n \n이 계약은 예금자보호법에 따라 예금보험공사가 보호합니다. 예금자보호 ",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "afdb6610f1f95686cbcc3cd28b51a9a41e8a8731133b948b5ecba287e3753685",
+      "file": "afdb6610f1f9_ZPB215130_0_20260701_file1.pdf",
+      "bytes": 1539887,
+      "pages": 94,
+      "text_length": 16633,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "afdb6610f1f95686cbcc3cd28b51a9a41e8a8731133b948b5ecba287e3753685",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB215130_0_20260701_file1.pdf",
+          "fetched_at": "2026-07-31T05:46:04+00:00",
+          "product_code": "ZPB215130",
+          "product_name": "무배당 삼성화재 유병력자 실손의료비보험(2601.13)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 유병력자  실손의료비보험 무배당 삼성화재 2601.13 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. 2026년 7월 1일부터 적용               ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 92 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 16 보험용어 해설 18 개인신용정보 제공·이용에 대한 고객 권리 안내문 19 보통약관 20",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "    [붙임1] 용어의 정의  용어 정의  계약 보험계약  진단계약 계약을 체결하기 위하여 피보험자가 건강진단을 받아야 하는 계약  보험증권 계약의 성립과 계약내용을 증명하기 위하여 회사가 계약자에게 드리는  증서",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 유병력자 실손의료비보험(2601.13)",
+          "excerpt": "ZPB215130",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '유병력자 실손의료비보험' 미확인",
+          "excerpt": "삼성화재\n유병력자 \n실손의료비보험\n무배당 삼성화재 2601.13\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n2026년 7월 1일부터 적용\n \n \n \n \n \n \n \n",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "e5845ccce31a13e73748ec2fa078534491047b6d772d0cdce3e477e78a9343bd",
+      "file": "e5845ccce31a_ZPB215130_0_20260701_file2.pdf",
+      "bytes": 616888,
+      "pages": 18,
+      "text_length": 15060,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "e5845ccce31a13e73748ec2fa078534491047b6d772d0cdce3e477e78a9343bd",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB215130_0_20260701_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:07+00:00",
+          "product_code": "ZPB215130",
+          "product_name": "무배당 삼성화재 유병력자 실손의료비보험(2601.13)",
+          "sale_start": "20260701",
+          "sale_end": "99991231"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "- 1 -    (사업방법서 별지)    무배당 삼성화재 유병력자실손의료비보험(2601.13)    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 유병력자실손의료",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "- 3 -    10. 보험료의 납입을 연체하여 해지된 계약의 부활(효력회복)시 연체이율에 관한 사항       연체된 보험료에 대한 연체이율은 평균공시이율 + 1%를 적용함      11. 보험료 선납에 관한 사항",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "- 10 -    【별첨2】  유병력자 상품 내용에 대한 계약자 확인    1. 이 상품은 심사가 간소화된 상품으로 유병력자 또는 연령제한 등 일반심사보험에 가 입하기 어려운 피보험자를 대상으로 합니다.    2. ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 유병력자 실손의료비보험(2601.13)",
+          "excerpt": "ZPB215130",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '유병력자 실손의료비보험' 미확인",
+          "excerpt": "- 1 - \n \n(사업방법서 별지) \n \n무배당 삼성화재 유병력자실손의료비보험(2601.13) \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n \n2. 보험종목의 명칭 : 무배당 삼성화재 유병력자실손의료",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "2cc1fcddfc3fc8d6292a22acff2a7fb558f4603d470b71cdd728d8a5c389b7a9",
+      "file": "2cc1fcddfc3f_ZPB448010_0_20260506_file1.pdf",
+      "bytes": 2579665,
+      "pages": 161,
+      "text_length": 22163,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "unknown",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "변형 표기가 복수입니다: ['child_conversion', 'conversion_resume', 'contract_conversion']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "2cc1fcddfc3fc8d6292a22acff2a7fb558f4603d470b71cdd728d8a5c389b7a9",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB448010_0_20260506_file1.pdf",
+          "fetched_at": "2026-07-31T05:46:39+00:00",
+          "product_code": "ZPB448010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 실손의료비보험 무배당 삼성화재 2605.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [계약전환용] [전환·재개용] [자녀보험전환용]            ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 159 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      2. 보험료 자동납입 특별약관    제1조 (보험료납입)  ① 보 험계 약자(이 하「계약 자」라 합니다)는 제2회 이 후의 보 험료부 터 이 특 별약 관에 따 라 계 약 자의 지 정계 좌를 이 용하여 보 ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "excerpt": "ZPB448010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "5cb3fd58c9c91f3fc653e6728abe689387d33867a96026a0b074b48f3eb63377",
+      "file": "5cb3fd58c9c9_ZPB448010_0_20260506_file2.pdf",
+      "bytes": 471195,
+      "pages": 13,
+      "text_length": 13597,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "contract_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'business_method']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "5cb3fd58c9c91f3fc653e6728abe689387d33867a96026a0b074b48f3eb63377",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB448010_0_20260506_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:44+00:00",
+          "product_code": "ZPB448010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1) ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1) ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": " 나. 실손의료비 무사고 할인     (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간유효한 실손의료비  보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 중",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": " 나. 실손의료비 무사고 할인     (1) 적용대상         보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간유효한 실손의료비  보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 중",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "  15. 공시이율에 관한 사항      해당없음    16. 재가입에 관한 사항   가. 재가입 주기: 5년   나. 재가입 나이: (가입나이+5)세부터 99세    다. 재가입 보장 종료 기간 : 100세   라",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  15. 공시이율에 관한 사항      해당없음    16. 재가입에 관한 사항   가. 재가입 주기: 5년   나. 재가입 나이: (가입나이+5)세부터 99세    다. 재가입 보장 종료 기간 : 100세   라",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "contract_conversion",
+          "excerpt": "(사업방법서 별지) \n \n무배당 삼성화재 실손의료비보험(2605.1) [계약전환용] \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n2. 보험종목의 명칭 : 무배당 삼성화재 실손의료비보험(2605.1) ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "excerpt": "ZPB448010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "a5a6baceaad30f67bcd3a32cdca07af648b70263f11882e449e02e229a873390",
+      "file": "a5a6baceaad3_ZPB448010_0_20260506_file3.pdf",
+      "bytes": 1057683,
+      "pages": 28,
+      "text_length": 14297,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "contract_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "a5a6baceaad30f67bcd3a32cdca07af648b70263f11882e449e02e229a873390",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB448010_0_20260506_file3.pdf",
+          "fetched_at": "2026-07-31T05:46:48+00:00",
+          "product_code": "ZPB448010",
+          "product_name": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "product_summary",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1)[계약전환용]  상품요약서      ● 상품특성 및 전달정보               상품특성 전달정보    이 계약은 예금자보호법에 따라 예금보험공사가 보호합니 다. 예금",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 계약전환용 상품은 어떤 경우에 전환이 가능한가요?    A) 2026년 5월 5일까지 체결된 실손의료비 보장이 부가된 유효한 계약 (노후실손의료보험, 유병력자실손의료보험 ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "● 문답식 상품해설 (Q & A)    Q) 계약전환용 상품은 어떤 경우에 전환이 가능한가요?    A) 2026년 5월 5일까지 체결된 실손의료비 보장이 부가된 유효한 계약 (노후실손의료보험, 유병력자실손의료보험 ",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  <중증 비급여>  구분 보상하지 않는 사항  공통  1. 영양제, 비타민제 등의 약제와 관련하여 소요된 비용. 다만  약관상 보상하는 상해 또는 질병을 치료함에 있어 아래 각목 에 해당하는 경우는 치료 목적으로 ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "contract_conversion",
+          "excerpt": "무배당 삼성화재 실손의료비보험(2605.1)[계약전환용] \n상품요약서 \n \n \n● 상품특성 및 전달정보 \n          \n \n상품특성 전달정보 \n \n이 계약은 예금자보호법에 따라 예금보험공사가 보호합니\n다. 예금",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 실손의료비보험(2605.1) [계약전환용]",
+          "excerpt": "ZPB448010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "22a53a40145c7ebfd0114d285280310e0b95f8674df309d722eefab94fcfed60",
+      "file": "22a53a40145c_ZPB167200_0_20260506_file1.pdf",
+      "bytes": 2065279,
+      "pages": 148,
+      "text_length": 13033,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": false,
+      "quarantine_reasons": [
+        "표지 상품명이 카탈로그와 일치하지 않습니다.",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "22a53a40145c7ebfd0114d285280310e0b95f8674df309d722eefab94fcfed60",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260506_file1.pdf",
+          "fetched_at": "2026-07-31T05:46:54+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 노후실손 의료비보험 무배당 삼성화재 2601.20 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. 2026년 5월 6일부터 적용                  ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 146 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 16 보험용어 해설 18 개인신용정보 제공·이용에 대한 고객 권리 안내문 19 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "    나. 주근깨, 다모, 무모, 백모증, 딸기코(주사비), 점, 모 반(피보험자가 보험가입당시 태아인 경우 화염상모 반 등 선천성 비신생물성모반(Q82.5)은 보상합니 다), 사마귀, 여드름, 노화현상으로 인한 ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "excerpt": "ZPB167200",
+          "page": null
+        }
+      ],
+      "opposing": [
+        {
+          "source": "cover",
+          "field": "product_name",
+          "value": "표지에서 '노후실손의료비보험' 미확인",
+          "excerpt": "삼성화재\n노후실손\n의료비보험\n무배당 삼성화재 2601.20\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n2026년 5월 6일부터 적용 \n \n \n \n \n \n \n \n \n",
+          "page": null
+        }
+      ]
+    },
+    {
+      "sha256": "6e94dba24e47b17e83b4e43107a1a29e0f88e1ee80686992cfaf9c871b492707",
+      "file": "6e94dba24e47_ZPB167200_0_20260506_file2.pdf",
+      "bytes": 285095,
+      "pages": 7,
+      "text_length": 9716,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "standard",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "6e94dba24e47b17e83b4e43107a1a29e0f88e1ee80686992cfaf9c871b492707",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB167200_0_20260506_file2.pdf",
+          "fetched_at": "2026-07-31T05:46:58+00:00",
+          "product_code": "ZPB167200",
+          "product_name": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2601.20)    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2601.20) ",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 노후실손의료비보험(2601.20)    1. 보험의 종류 : 장기손해보험 / 장기기타보험      2. 보험종목의 명칭 : 무배당 삼성화재 노후실손의료비보험(2601.20) ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "10. 보험료의 납입을 연체하여 해지된 계약의 부활(효력회복)시 연체이율에 관한  사항     연체된 보험료에 대한 연체이율은 평균공시이율 + 1%를 적용함      11. 보험료 선납에 관한 사항      당월분을",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "재가입 나이에도 불구하고 재가입을 통해 보장받을 수 있는 최대 기간은 보험 나이 110세 계약해당일까지로 함    다. 계약이 아래 (1) 및 (2)의 조건을 충족하고 마.에 따라 재가입 의사를 표시한 때 에는 회사",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 노후실손의료비보험(2601.20)",
+          "excerpt": "ZPB167200",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "2b8b7abdea0c5ab0675e661ec546233f1c978049a0caedd7fe548c71725c4e47",
+      "file": "2b8b7abdea0c_ZPB453010_0_20260506_file1.pdf",
+      "bytes": 2518702,
+      "pages": 157,
+      "text_length": 21763,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "policy_terms",
+      "variant": "contract_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "2b8b7abdea0c5ab0675e661ec546233f1c978049a0caedd7fe548c71725c4e47",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB453010_0_20260506_file1.pdf",
+          "fetched_at": "2026-07-31T05:47:07+00:00",
+          "product_code": "ZPB453010",
+          "product_name": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)[계약전환용]",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "삼성화재 실손의료비보험 무배당 삼성화재 다이렉트 2605.1 보험약관 이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다. [계약전환용]                          ",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "2 / 155 [ 목 차 ] 약관이용 Guide Book 4 쉽게 이해하는 상품 및 약관 요약서 7 자주 발생하는 민원 예시 17 보험용어 해설 19 개인신용정보 제공·이용에 대한 고객 권리 안내문 20 보통약관 2",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "      1. 이륜자동차 운전 및 탑승 중 상해 부담보 특별약관    제1조 (특별약관의 체결 및 효력)  ① 이 특 별약 관은 보 험계 약(특 별약 관이 부가된 경우 에는 그 특 별약 관을 포 함 합니 다. 이하",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "contract_conversion",
+          "excerpt": "삼성화재\n실손의료비보험\n무배당 삼성화재 다이렉트 2605.1\n보험약관\n이 약관은 금융소비자보호법 및 소비자보호 내부통제기준에 따른 절차를 거쳐 제공됩니다.\n[계약전환용]\n \n \n \n \n \n \n \n \n \n \n \n \n ",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)[계약전환용]",
+          "excerpt": "ZPB453010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    },
+    {
+      "sha256": "1cb9994996cb57f766dbfb84b1cf99e62138d2f15a18025cf17ad577b70302c1",
+      "file": "1cb9994996cb_ZPB453010_0_20260506_file2.pdf",
+      "bytes": 481014,
+      "pages": 14,
+      "text_length": 11866,
+      "quality": "ok",
+      "status": "ambiguous",
+      "document_kind": "unknown",
+      "variant": "contract_conversion",
+      "generation": null,
+      "cross_verified": true,
+      "quarantine_reasons": [
+        "문서종류 후보가 복수입니다: ['policy_terms', 'business_method']",
+        "세대 판정 규칙셋이 아직 없습니다(판매구간만으로 확정하지 않음)."
+      ],
+      "occurrences": [
+        {
+          "artifact_sha256": "1cb9994996cb57f766dbfb84b1cf99e62138d2f15a18025cf17ad577b70302c1",
+          "url": "https://www.samsungfire.com/publication/pdf/ZPB453010_0_20260506_file2.pdf",
+          "fetched_at": "2026-07-31T05:47:12+00:00",
+          "product_code": "ZPB453010",
+          "product_name": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)[계약전환용]",
+          "sale_start": "20260506",
+          "sale_end": "20260630"
+        }
+      ],
+      "supporting": [
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 다이렉트 실손의료비보험(2605.1) [계약전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 다이렉트 실손의료비보",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "(사업방법서 별지)    무배당 삼성화재 다이렉트 실손의료비보험(2605.1) [계약전환용]    1. 보험의 종류 : 장기손해보험 / 장기기타보험    2. 보험종목의 명칭 : 무배당 삼성화재 다이렉트 실손의료비보",
+          "page": null
+        },
+        {
+          "source": "toc",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "  (1) 적용대상        보험기간 종료일이 속한 달의 3개월전 말일부터 직전 2년 간 유효한 실손의료비  보험계약의 「무사고 판정 기간」동안 보험금 지급 실적[급여 의료비 중 본인부 담금 및 [갱신형]중증 비",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "business_method",
+          "excerpt": "자가 재가입을 원하지 않는 경우에는 해당 시점으로부터 계약은 해지되고, 재가 입 의사가 확인되지 않는 경우에는 연장일이 종료되는 시점으로부터 계약은 해지 됨   차. 사.에 따라 직전 계약과 동일한 조건으로 자동 연",
+          "page": null
+        },
+        {
+          "source": "body",
+          "field": "document_kind",
+          "value": "policy_terms",
+          "excerpt": "자가 재가입을 원하지 않는 경우에는 해당 시점으로부터 계약은 해지되고, 재가 입 의사가 확인되지 않는 경우에는 연장일이 종료되는 시점으로부터 계약은 해지 됨   차. 사.에 따라 직전 계약과 동일한 조건으로 자동 연",
+          "page": null
+        },
+        {
+          "source": "cover",
+          "field": "variant",
+          "value": "contract_conversion",
+          "excerpt": "(사업방법서 별지) \n \n무배당 삼성화재 다이렉트 실손의료비보험(2605.1) [계약전환용] \n \n1. 보험의 종류 : 장기손해보험 / 장기기타보험 \n \n2. 보험종목의 명칭 : 무배당 삼성화재 다이렉트 실손의료비보",
+          "page": null
+        },
+        {
+          "source": "catalog",
+          "field": "product_name",
+          "value": "무배당 삼성화재 다이렉트 실손의료비보험(2605.1)[계약전환용]",
+          "excerpt": "ZPB453010",
+          "page": null
+        }
+      ],
+      "opposing": []
+    }
+  ],
+  "failures": []
+}
