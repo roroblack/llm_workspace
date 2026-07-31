@@ -15,7 +15,9 @@ LOG="/tmp/sv_${SITE}.log"
 : > "$LOG"
 for i in $(seq 1 "$MAX"); do
   echo "=== [$i/$MAX] $(date +%H:%M:%S) 시작 ===" >> "$LOG"
-  python -u -m scripts.crawl.browser_collector --site "$SITE" --batch-pages "$BATCH" >> "$LOG" 2>&1
+  # ★출력이 cp949 로 나가면 한글 상품명에서 UnicodeEncodeError 가 나고 프로세스가 죽는다.
+  #   (메리츠가 매 배치마다 그렇게 죽고 있었다 — 수집 로직이 아니라 **로그 출력**이 원인이었다)
+  PYTHONIOENCODING=utf-8 python -u -m scripts.crawl.browser_collector --site "$SITE" --batch-pages "$BATCH" >> "$LOG" 2>&1
   rc=$?
   n=$(grep -c '\[OK\]' "$LOG" 2>/dev/null || echo 0)
   echo "=== [$i] 종료 rc=$rc 누적OK=$n ===" >> "$LOG"
