@@ -31,6 +31,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import re
 import socket
 import urllib.error
 import urllib.request
@@ -86,7 +87,17 @@ class SiteConfig:
     submit_selector: str | None = None
     #: 판매중지 탭 등 추가로 눌러야 하는 것.
     pre_click_selectors: tuple[str, ...] = ()
+    #: ★접힌 메뉴 안의 링크는 클릭이 안 된다(Playwright 가 가시성을 기다리다 타임아웃).
+    #: 그럴 때 사이트가 제공하는 함수를 **그대로 호출**한다. 우리가 만든 요청이 아니라
+    #: 화면이 부르는 그 함수다 — 페이로드를 위조하지 않는다.
+    pre_eval_js: tuple[str, ...] = ()
     settle_ms: int = 4_000
+    #: ★계단식 선택 사이트용. 여기 링크를 하나씩 눌러 상품을 바꿔 가며 표를 읽는다.
+    #: (NH농협손보는 `상품군 → 상품구분 → 보험상품` 을 다 골라야 표가 채워진다.)
+    product_link_selector: str | None = None
+    #: ★브라우저 클릭으로 PDF 를 못 잡을 때, 링크의 인자를 읽어 **세션으로 직접 받는다.**
+    #: 목록 탐색은 브라우저가 하고 파일만 직접 받는 하이브리드다.
+    direct_download_url: str | None = None
     #: '다음 페이지' 버튼. 없으면 1페이지만 받는다.
     next_page_selector: str | None = None
     #: 페이지 상한. 무한 루프를 막는 안전장치이지 '여기까지만 받자'가 아니다.
@@ -118,16 +129,37 @@ SITES: dict[str, SiteConfig] = {
         slug="nhfire",
         host="www.nhfire.co.kr",
         entry_url="https://www.nhfire.co.kr/announce/productAnnounce/retrieveInsuranceProductsAnnounce.nhfire",
-        # ★이 화면은 `상품군 → 상품구분 → 보험상품` 3단계를 고른 뒤에야 표가 채워진다.
-        #   실손은 장기보험에 있으므로 먼저 그것을 누른다.
-        pre_click_selectors=("text=장기보험",),
-        # 상품명 검색으로 좁힌다(3단계를 전부 순회하지 않기 위해).
-        search_input_selector="input[name='searchWord'], input#searchWord",
-        search_terms=("실손",),
+        # ★이 화면은 `상품군 → 상품구분 → 보험상품` 3단계를 다 고른 뒤에야 표가 채워진다.
+        #   실측으로 확인한 연쇄:
+        #     1 상품군   fnRetrievePdtDcd('01')          = 장기보험
+        #     2 상품구분  fnRetrievePdtCd('Y','01','08')  = 단독실손의료보험
+        #     3 보험상품  fnRetrievePdtInfo("<코드>")      = 개별 상품 → 표가 채워진다
+        #
+        #   막다른 길로 간 시도들(같은 실수를 반복하지 않기 위해 남긴다):
+        #     - 폼을 직접 POST  -> 같은 기본 페이지만 돌아왔다(표가 AJAX 로 채워진다)
+        #     - `fnRetrieveProductInfo('D71071B')` -> **상품 소개 페이지**로 가는 다른 함수였다.
+        #                                            "잘못된 접근입니다"가 나왔다
+        #     - Playwright `text=장기보험` 클릭 -> 접힌 메뉴 안이라 가시성 대기 중 타임아웃
+        #     - 함수 직접 호출 -> 그 함수가 클릭 이벤트를 참조해 TypeError
+        #   -> 남은 방법은 **요소를 JS 로 클릭**하는 것이다.
+        #      CSS 안에 따옴표가 중첩돼 `querySelector` 가 깨지므로 onclick 문자열로 **필터**한다.
+        pre_eval_js=(
+            "[...document.querySelectorAll('a[onclick]')]"
+            ".find(a => a.getAttribute('onclick').includes(\"fnRetrievePdtDcd('01')\")).click()",
+            "[...document.querySelectorAll('a[onclick]')]"
+            ".find(a => a.getAttribute('onclick').includes(\"'01', '08'\")).click()",
+        ),
+        product_link_selector="a[onclick^='fnRetrievePdtInfo']",
         # 상품 목록 표는 '판매개시일 … 약관 …' 헤더를 가진 표다.
-        table_selector="table:has(th:text-is('약관'))",
+        table_selector="table:has-text('판매개시일')",
         row_selector="tbody tr",
-        terms_link_selector="td:nth-child(3) a, td:nth-child(3) button",
+        # ★약관 링크는 `fnFileDownload("<fileId>","<seq>")` 이고, 그 함수는
+        #   `POST /imageView/downloadFile.ajax` 로 폼을 보낸다.
+        #   브라우저 클릭으로는 PDF 를 못 잡았다(응답·다운로드 이벤트 모두 비었다).
+        #   그래서 **링크에서 인자만 읽어 세션으로 직접 받는다** — 하이브리드.
+        #   seq 는 표의 열 순서와 같다: 1=약관, 2=상품요약서, 4=사업방법서(실측).
+        terms_link_selector="table a[onclick^='fnFileDownload']",
+        direct_download_url="https://www.nhfire.co.kr/imageView/downloadFile.ajax",
         name_cell_selector="td:nth-child(1)",
         settle_ms=6_000,
     ),
@@ -206,6 +238,102 @@ def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Coll
     )
 
 
+def _direct_post(cfg: SiteConfig, page, file_id: str, seq: str) -> bytes:
+    """브라우저 세션(쿠키)을 그대로 써서 파일만 직접 받는다."""
+    resp = page.request.post(
+        cfg.direct_download_url,
+        form={"fileId": file_id, "afileSeqn": seq},
+        headers={"Referer": cfg.entry_url},
+        timeout=60_000,
+    )
+    if resp.status != 200:
+        raise InfraError(f"다운로드 실패 HTTP {resp.status}")
+    return resp.body()
+
+
+def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
+    """상품을 하나씩 골라야 표가 채워지는 사이트를 순회한다.
+
+    ★상품 링크를 **매번 다시 찾는다.** 상품을 클릭하면 화면이 다시 그려져
+      앞서 잡아둔 요소 핸들이 죽는다(stale). 인덱스로 다시 찾아야 한다.
+    """
+    n = page.locator(cfg.product_link_selector).count()
+    if n == 0:
+        raise InfraError(
+            f"상품 링크가 0건입니다: {cfg.product_link_selector!r}. "
+            "계단식 선택(pre_eval_js)이 제대로 수행되지 않았을 수 있습니다."
+        )
+    print(f"상품 {n}개 발견")
+
+    if probe:
+        for i in range(min(n, 5)):
+            print(f"  [{i + 1}] {page.locator(cfg.product_link_selector).nth(i).inner_text()[:44]!r}")
+        return []
+
+    for i in range(n):
+        if limit and len(out) >= limit:
+            break
+        link = page.locator(cfg.product_link_selector).nth(i)
+        try:
+            nm = link.inner_text(timeout=3_000).strip()
+            link.click(timeout=10_000)
+            page.wait_for_timeout(cfg.settle_ms)
+        except (PWTimeout, PWError) as e:
+            print(f"  [SKIP] 상품{i + 1}: {type(e).__name__}")
+            continue
+
+        terms = page.locator(cfg.terms_link_selector)
+        if terms.count() == 0:
+            print(f"  [없음] {nm[:34]}: 약관 링크 없음")
+            continue
+
+        if cfg.direct_download_url:
+            # ★첫 번째 링크가 '약관' 열이다(표 열 순서 = seq 순서).
+            oc = terms.first.get_attribute("onclick") or ""
+            m = re.search(r'fnFileDownload\(\s*"([^"]+)"\s*,\s*"([^"]+)"', oc)
+            if not m:
+                print(f"  [형식불일치] {nm[:34]}: onclick={oc[:50]!r}")
+                continue
+            file_id, seq = m.group(1), m.group(2)
+            url = f"{cfg.direct_download_url}?fileId={file_id}&afileSeqn={seq}"
+            if url in done:
+                continue
+            try:
+                blob = _direct_post(cfg, page, file_id, seq)
+                rec = _save(cfg, blob, url, nm, "application/pdf")
+                out.append(rec)
+                done.add(url)
+                print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
+            except (InfraError, ValidationErr) as e:
+                print(f"  [FAIL] {nm[:34]}: {e}")
+            page.wait_for_timeout(ROW_DELAY_MS)
+            continue
+
+        before = len(pdf_hits)
+        try:
+            terms.first.click(timeout=10_000)
+            page.wait_for_timeout(3_000)
+        except (PWTimeout, PWError) as e:
+            print(f"  [SKIP] {nm[:34]}: 약관 클릭 실패 {type(e).__name__}")
+            continue
+        got = pdf_hits[before:]
+        if not got:
+            # ★조용히 넘어가지 않는다. '약관이 없다'와 'PDF 를 못 잡았다'는 다르다.
+            print(f"  [미포착] {nm[:34]}: 약관을 눌렀으나 PDF 응답이 없다(다운로드/새창 가능성)")
+        for url, blob, ct in got:
+            if url in done:
+                continue
+            try:
+                rec = _save(cfg, blob, url, nm, ct)
+                out.append(rec)
+                done.add(url)
+                print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
+            except (InfraError, ValidationErr) as e:
+                print(f"  [FAIL] {nm[:34]}: {e}")
+        page.wait_for_timeout(ROW_DELAY_MS)
+    return out
+
+
 def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
     allowed, verdict = _robots_allows(cfg.host, cfg.entry_url)
     if not allowed:
@@ -234,11 +362,38 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                 pass
 
         ctx.on("response", _on_response)
+
+        def _on_download(dl):
+            """★PDF 가 응답이 아니라 **다운로드 이벤트**로 올 수 있다."""
+            try:
+                path = dl.path()
+                if path:
+                    blob = Path(path).read_bytes()
+                    pdf_hits.append((dl.url, blob, "application/pdf"))
+            except Exception:  # noqa: BLE001
+                pass
+
+        ctx.on("download", _on_download)
         page = ctx.new_page()
 
         try:
             page.goto(cfg.entry_url, wait_until="domcontentloaded")
             page.wait_for_timeout(cfg.settle_ms)
+
+            for js in cfg.pre_eval_js:
+                try:
+                    page.evaluate(js)
+                except PWError as e:
+                    # ★"Execution context was destroyed" 는 **페이지가 전이됐다는 뜻**이다.
+                    #   이 사이트의 함수는 폼을 submit 하므로 정상 동작이다.
+                    #   다른 오류는 그대로 실패시킨다 — 구분하지 않으면 실패를 성공으로 읽는다.
+                    if "destroyed" not in str(e) and "navigation" not in str(e).lower():
+                        raise InfraError(f"사전 스크립트 실패({js}): {e}") from e
+                try:
+                    page.wait_for_load_state("domcontentloaded", timeout=25_000)
+                except (PWTimeout, PWError):
+                    pass
+                page.wait_for_timeout(cfg.settle_ms)
 
             for sel in cfg.pre_click_selectors:
                 try:
@@ -261,6 +416,9 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
             table = page.locator(cfg.table_selector).first
             if table.count() == 0:
                 raise InfraError(f"표 셀렉터가 0건입니다: {cfg.table_selector!r}")
+            if cfg.product_link_selector:
+                return _run_cascade(cfg, page, pdf_hits, done, out, limit=limit, probe=probe)
+
             page_no = 0
             seen_first_cell = ""
             while page_no < cfg.max_pages:
