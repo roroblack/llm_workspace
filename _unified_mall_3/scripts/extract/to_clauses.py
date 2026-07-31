@@ -43,14 +43,31 @@ _OUT = _ROOT / "data" / "structured"
 
 SCHEMA_VERSION = "1"
 
-#: 조항 머리. `제12조(보험금의 지급사유)` / `제 12 조` 변형을 함께 잡는다.
-_ARTICLE = re.compile(r"제\s*(\d{1,3})\s*조(?:의\s*(\d{1,2}))?\s*(?:[（(]\s*([^)）\n]{1,60})\s*[)）])?")
+#: 조항 머리. ★**줄 시작**에 있는 것만 인정한다.
+#: 본문 속 상호참조("제4조에 따라…")를 머리로 오인하면 5~6자짜리 가짜 조항이 쏟아진다
+#: (실측: 그렇게 391개 중 112개(28%)가 100자 미만이었다).
+#: 조항 머리는 줄 첫머리에 오고, 상호참조는 문장 중간에 온다.
+_ARTICLE = re.compile(
+    r"^[ \t ]{0,6}제\s*(\d{1,3})\s*조(?:의\s*(\d{1,2}))?"
+    r"\s*(?:[（(]\s*([^)）\n]{1,60})\s*[)）])?",
+    re.MULTILINE,
+)
+#: 목차 판정용(줄 위치 무관). 목차는 조 번호가 촘촘히 나열되므로 전체 검색이 맞다.
+_ARTICLE_ANY = re.compile(r"제\s*\d{1,3}\s*조")
 #: 항 번호(①②③ 또는 1. 2. 3.)
 _PARA = re.compile(r"(?:^|\n)\s*([①-⑳]|\d{1,2}\.)\s")
-#: 부(部) 경계. 문서 구조 복원(5단계)에 쓴다.
-_SECTION = re.compile(
-    r"(보통약관|특별약관|무배당\s*특별약관|별\s*표\s*\d*|부\s*록|용어의\s*정의|약관\s*요약서)"
-)
+#: 부(部) 경계. ★**단독 줄로 나온 것만** 인정한다.
+#: 초안은 페이지 앞 400자에서 아무 데나 매칭해 '용어의정의'가 266개로 잡혔다 —
+#: 그건 부 제목이 아니라 **조항 제목**이었다. 실측으로 확인한 실제 부 제목은
+#: p23 '보통약관', p63 '별표' 처럼 **한 줄에 그것만** 있다.
+_SECTION_LINE = re.compile(r"^\s*(보통약관|특별약관|별\s*표\s*\d*|부\s*록|약관\s*요약서)\s*$")
+
+#: 목차 페이지 판정 임계값. 실측 근거:
+#:   목차 p3=조항머리 36개/머리당 41자, p4=19개/61자, p6=18개/77자
+#:   본문 p12=4개/258자, p13=5개/234자
+#: 조항머리가 촘촘하고 머리당 텍스트가 짧으면 목차다.
+TOC_MIN_HEADS = 6
+TOC_MAX_CHARS_PER_HEAD = 200
 
 
 def _norm(text: str) -> str:
@@ -68,19 +85,31 @@ def build(page_doc: dict) -> dict:
     if not pages:
         raise ValidationErr("페이지가 없습니다.")
 
-    # ── 5) 문서 구조 복원: 현재 페이지가 어느 부(部)에 속하는지 추적 ──
-    section_of_page: dict[int, str] = {}
-    current = "미상"
+    # ── 목차 페이지 식별 (6단계 정확도의 전제) ──
+    toc_pages: set[int] = set()
     for pg in pages:
-        m = _SECTION.search(pg["text"][:400])
-        if m:
-            current = re.sub(r"\s+", "", m.group(1))
+        n = len(_ARTICLE_ANY.findall(pg["text"]))
+        if n >= TOC_MIN_HEADS and len(pg["text"]) / n < TOC_MAX_CHARS_PER_HEAD:
+            toc_pages.add(pg["page"])
+
+    # ── 5) 문서 구조 복원: 단독 줄로 나온 부 제목만 인정 ──
+    section_of_page: dict[int, str] = {}
+    current = "머리말"
+    for pg in pages:
+        if pg["page"] not in toc_pages:  # ★목차 안의 부 제목은 경계가 아니다
+            for line in pg["text"].splitlines():
+                m = _SECTION_LINE.match(line)
+                if m:
+                    current = re.sub(r"\s+", "", m.group(1))
+                    break
         section_of_page[pg["page"]] = current
 
-    # ── 6) 조항 경계 찾기 ──
+    # ── 6) 조항 경계 찾기 (목차 페이지 제외) ──
     #: (페이지, 페이지내 오프셋, 조번호, 가지번호, 제목)
     heads: list[tuple[int, int, str, str, str]] = []
     for pg in pages:
+        if pg["page"] in toc_pages:
+            continue
         for m in _ARTICLE.finditer(pg["text"]):
             heads.append(
                 (pg["page"], m.start(), m.group(1), m.group(2) or "", (m.group(3) or "").strip())
@@ -113,11 +142,15 @@ def build(page_doc: dict) -> dict:
         # ── 9) 계층형 청킹: 긴 조항은 항 단위로 쪼갠다 ──
         paras = [x for x in _PARA.split(body) if x and x.strip()]
         label = f"제{no}조" + (f"의{sub}" if sub else "")
+        section_name = section_of_page.get(page, "미상")
         clauses.append(
             {
                 "clause_no": label,
                 "title": title,
-                "section": section_of_page.get(page, "미상"),
+                # ★특별약관이 여러 개면 조 번호가 1부터 다시 시작한다.
+                # 부 이름을 함께 들고 다녀야 유일해진다.
+                "section": section_name,
+                "qualified_no": f"{section_name}/{label}",
                 # ── 7) 메타데이터: locator ──
                 "locator": {"page_from": page, "page_to": end_page, "char_offset": off},
                 "text": body,
@@ -129,9 +162,7 @@ def build(page_doc: dict) -> dict:
                     if tables_of.get(p)
                 },
                 # ── 8) 중복 처리 준비 ──
-                "content_hash": _clause_hash(
-                    section_of_page.get(page, "미상"), title, body
-                ),
+                "content_hash": _clause_hash(section_name, title, body),
             }
         )
 
@@ -141,6 +172,7 @@ def build(page_doc: dict) -> dict:
 
     return {
         "schema_version": SCHEMA_VERSION,
+        "toc_pages": sorted(toc_pages),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": page_doc["source"],
         "identification": page_doc.get("identification", "unidentified"),
@@ -149,6 +181,7 @@ def build(page_doc: dict) -> dict:
             "pages": page_doc["stats"]["pages"],
             "clauses": len(clauses),
             "sections": len(set(section_of_page.values())),
+            "toc_pages_excluded": len(toc_pages),
             "unique_clause_hashes": len(dup),
             "duplicate_clauses": sum(v - 1 for v in dup.values() if v > 1),
         },
