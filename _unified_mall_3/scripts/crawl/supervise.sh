@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+# 브라우저 수집기 감시 루프 — 죽으면 다시 띄운다.
+#
+# ★왜 필요한가
+#   Playwright 드라이버가 장시간 실행에서 끊긴다. 배치 단위로 브라우저를 새로 띄우게
+#   고쳤지만 프로세스 자체가 죽는 경우가 남는다. 이미 받은 URL 은 건너뛰므로
+#   다시 띄우면 그 지점부터 이어간다 — 중복 수집이 없다.
+#
+# 사용: bash scripts/crawl/supervise.sh <site> <batch_pages> <max_loops>
+set -u
+SITE="${1:?site}"
+BATCH="${2:-10}"
+MAX="${3:-200}"
+LOG="/tmp/sv_${SITE}.log"
+: > "$LOG"
+for i in $(seq 1 "$MAX"); do
+  echo "=== [$i/$MAX] $(date +%H:%M:%S) 시작 ===" >> "$LOG"
+  python -u -m scripts.crawl.browser_collector --site "$SITE" --batch-pages "$BATCH" >> "$LOG" 2>&1
+  rc=$?
+  n=$(grep -c '\[OK\]' "$LOG" 2>/dev/null || echo 0)
+  echo "=== [$i] 종료 rc=$rc 누적OK=$n ===" >> "$LOG"
+  # 정상 종료(rc=0)이고 새로 받은 게 없으면 더 받을 게 없다는 뜻이다.
+  if [ "$rc" -eq 0 ]; then
+    last=$(tail -40 "$LOG" | grep -c '\[OK\]' || echo 0)
+    if [ "$last" -eq 0 ]; then
+      echo "=== 새로 받은 것이 없어 종료한다 ===" >> "$LOG"
+      break
+    fi
+  fi
+  sleep 3
+done
+echo "=== 감시 종료: 누적 OK $(grep -c '\[OK\]' "$LOG") ===" >> "$LOG"
