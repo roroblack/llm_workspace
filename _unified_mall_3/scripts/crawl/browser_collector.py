@@ -559,9 +559,19 @@ def run(
                         continue
                     before = len(pdf_hits)
                     try:
-                        link.click(timeout=10_000)
-                        page.wait_for_timeout(2_500)
-                    except (PWTimeout, PWError) as e:
+                        # ★폼 target 으로 시작되는 다운로드는 `ctx.on("download")` 로 안 잡힌다.
+                        #   `expect_download()` 로 감싸야 한다(메리츠가 그런 구조다).
+                        try:
+                            with page.expect_download(timeout=12_000) as dl_info:
+                                link.click(timeout=10_000)
+                            dl = dl_info.value
+                            path = dl.path()
+                            if path:
+                                pdf_hits.append((dl.url, Path(path).read_bytes(), "application/pdf"))
+                        except PWTimeout:
+                            # 다운로드가 아니라 응답으로 오는 사이트도 있다. 그건 위 핸들러가 잡는다.
+                            page.wait_for_timeout(2_500)
+                    except PWError as e:
                         print(f"    [SKIP] {nm[:28]}: 클릭 실패 {type(e).__name__}")
                         continue
                     for url, blob, ct in pdf_hits[before:]:
