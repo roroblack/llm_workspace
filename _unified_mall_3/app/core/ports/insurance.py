@@ -12,6 +12,7 @@ from __future__ import annotations
 from datetime import date
 from typing import Protocol, Sequence
 
+from app.core.domain.actor import ActorDeclaration, DeclarationChannel
 from app.core.domain.insurance import (
     Citation,
     CohortStats,
@@ -92,15 +93,29 @@ class AuditLogPort(Protocol):
     ) -> None: ...
 
 
-class AgentIdentityPort(Protocol):
-    """호출자가 사람인지 에이전트인지.
+class ActorDeclarationPort(Protocol):
+    """호출자가 스스로 밝힌 클라이언트 유형을 읽고 기록한다.
 
-    ★반환값에 ``unknown`` 이 있는 이유: 사람인 척하는 에이전트를 100% 판별하는 방법은 없다.
-    그래서 판별에 의존하는 설계를 하지 않는다 — 판별에 실패해도 안전하도록
+    ★초안은 ``classify() -> "declared"|"inferred"|"unknown"`` 이었는데, 이는
+    **'무엇이라 주장했나'와 '근거가 무엇인가'를 한 값에 섞은 것**이었다(Codex 지적).
+    `ActorDeclaration` 은 이를 네 축으로 분리한다.
+
+    이 포트는 **판별하지 않는다.** 사람인 척하는 에이전트를 100% 가려내는 방법은 없으므로
+    판별에 의존하는 설계를 하지 않는다 — 판별에 실패해도 안전하도록
     모든 응답에 불확실성 필드를 항상 싣는다.
 
-    Returns:
-        ``"declared"``(스스로 밝힘) / ``"inferred"``(행동으로 추정) / ``"unknown"``
+    선언은 갱신하지 않고 **사건으로 쌓는다**(append-only).
     """
 
-    def classify(self, *, api_key: str | None, user_agent: str | None) -> str: ...
+    def read(
+        self, *, channel: DeclarationChannel, raw: dict[str, object]
+    ) -> ActorDeclaration:
+        """채널에서 선언을 읽는다. 없으면 ``ActorDeclaration.unknown`` 을 돌려준다.
+
+        **사람이라고 가정하지 않는다.** 미선언은 미상이지 사람이 아니다.
+        """
+        ...
+
+    def record(self, *, principal_id: str | None, declaration: ActorDeclaration) -> None:
+        """선언 사건을 남긴다. 기존 값을 덮어쓰지 않는다."""
+        ...
