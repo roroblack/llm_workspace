@@ -251,6 +251,18 @@ def _fetched_urls() -> set[str]:
     return out
 
 
+def _append_manifest(cfg: SiteConfig, rec: Collected) -> None:
+    """★한 건 받을 때마다 **즉시** 기록한다.
+
+    배치 끝에 몰아 쓰면 중간에 죽었을 때 **파일은 남고 기록만 사라진다.**
+    실제로 삼성생명이 파일 563개 / 기록 44행이 됐다(브라우저가 배치 중간에 죽어서).
+    기록이 없으면 식별 파이프라인이 그 파일을 보지 못하고, 증분 수집도 다시 받는다.
+    """
+    _MANIFESTS.mkdir(parents=True, exist_ok=True)
+    with (_MANIFESTS / f"{cfg.slug}.jsonl").open("a", encoding="utf-8") as f:
+        f.write(json.dumps(asdict(rec), ensure_ascii=False) + "\n")
+
+
 def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Collected:
     if not blob.startswith(b"%PDF"):
         raise InfraError(f"PDF가 아닙니다(앞 8바이트={blob[:8]!r}): {name}")
@@ -338,6 +350,7 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
             try:
                 blob = _direct_post(cfg, page, file_id, seq)
                 rec = _save(cfg, blob, url, nm, "application/pdf")
+                _append_manifest(cfg, rec)   # ★즉시 기록
                 out.append(rec)
                 done.add(url)
                 print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
@@ -362,6 +375,7 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
                 continue
             try:
                 rec = _save(cfg, blob, url, nm, ct)
+                _append_manifest(cfg, rec)   # ★즉시 기록
                 out.append(rec)
                 done.add(url)
                 print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
@@ -579,6 +593,7 @@ def run(
                             continue
                         try:
                             rec = _save(cfg, blob, url, nm, ct)
+                            _append_manifest(cfg, rec)   # ★즉시 기록
                             out.append(rec)
                             done.add(url)
                             print(f"    [OK] {nm[:28]} {rec.bytes:,}B")
@@ -604,12 +619,7 @@ def run(
             ctx.close()
             browser.close()
 
-    if out:
-        _MANIFESTS.mkdir(parents=True, exist_ok=True)
-        path = _MANIFESTS / f"{cfg.slug}.jsonl"
-        with path.open("a", encoding="utf-8") as f:
-            for r in out:
-                f.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
+    # ★일괄 쓰기는 하지 않는다 — 이미 한 건씩 즉시 기록했다(중복 방지).
     return out
 
 
