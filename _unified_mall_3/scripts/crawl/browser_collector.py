@@ -163,6 +163,43 @@ SITES: dict[str, SiteConfig] = {
         name_cell_selector="td:nth-child(1)",
         settle_ms=6_000,
     ),
+    "meritzfire": SiteConfig(
+        insurer="메리츠화재",
+        slug="meritzfire",
+        host="www.meritzfire.com",
+        entry_url="https://www.meritzfire.com/disclosure/product-announcement/product-list.do",
+        # ★AngularJS SPA. 데이터는 스코프 `salPdLst` 에 있고 **DOM 에 토큰이 없다.**
+        #   각 항목: ttlNm(상품명) putupStDdTm/EdDdTm(판매기간)
+        #            file1(약관 경로) file1#[E](다운로드 토큰)
+        #
+        #   ★슬롯은 추측하지 않았다 — 화면의 `pdfDown(item, fileCnt, ttlNm)` 함수가
+        #     직접 알려준다: file1→약관 file2→사업방법서 file3→요약서 file4→상품설명서
+        #
+        #   막다른 길(기록):
+        #     - POST /hp/fileDownload.do 를 fetch 로 호출 -> {"resultMsg":""} 만 온다
+        #     - file1 정적 경로 직접 요청 -> SPA 의 HTML(38KB)이 돌아온다
+        #   -> 브라우저에서 **실제 클릭**해야 받아진다.
+        #   ★기본 화면은 **자동차보험 분류형**이라 실손이 없다(401건 전부 자동차).
+        #     `goSch()`(검색형)로 바꾸고 상품명으로 검색해야 실손이 나온다 -> 157건.
+        #     검색 입력창은 name 이 아니라 **id** 가 `i_keyword` 다(name 으로 찾으면 null).
+        pre_eval_js=(
+            "[...document.querySelectorAll('a,button')]"
+            ".find(e => e.getAttribute('data-ng-click') === 'goSch()').click()",
+            "(() => { const i = document.querySelector('#i_keyword');"
+            " const sc = angular.element(i).scope();"
+            " if (sc) { sc.searchKeyword = '실손'; try { sc.$apply() } catch (e) {} }"
+            " const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;"
+            " set.call(i, '실손'); i.dispatchEvent(new Event('input', {bubbles: true}));"
+            " [...document.querySelectorAll('a,button')]"
+            ".find(e => e.getAttribute('data-ng-click') === 'titleSearch()').click(); })()",
+        ),
+        table_selector="table:has-text('판매개시일')",
+        row_selector="tbody tr",
+        # 링크 텍스트가 '해당 상품 약관 PDF파일 다운로드' 다. 첫 번째 파일 열이 약관이다.
+        terms_link_selector="a:has-text('약관 PDF파일')",
+        name_cell_selector="td:nth-child(1)",
+        settle_ms=8_000,
+    ),
 }
 
 
@@ -334,7 +371,19 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
     return out
 
 
-def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
+def run(
+    cfg: SiteConfig, *, limit: int, probe: bool, start_page: int = 1, batch_pages: int = 0
+) -> tuple[list[Collected], int, bool]:
+    """한 배치를 수집한다.
+
+    반환: (수집분, **다음에 시작할 페이지**, 더 남았는지)
+
+    ★왜 배치로 나누나
+        6,557건짜리 사이트를 한 브라우저로 끝까지 돌리면 중간에 드라이버 연결이 끊긴다
+        (실측: `BrowserContext.close: Connection closed while reading from the driver`).
+        한 번 죽으면 처음부터라서 큰 사이트는 영영 못 끝낸다.
+        그래서 **배치마다 브라우저를 새로 띄우고**, 이미 받은 URL 은 건너뛴다.
+    """
     allowed, verdict = _robots_allows(cfg.host, cfg.entry_url)
     if not allowed:
         raise InfraError(f"robots가 허용하지 않습니다: {cfg.host} ({verdict})")
@@ -375,6 +424,8 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
 
         ctx.on("download", _on_download)
 
+        page = ctx.new_page()
+
         def _on_page(pg):
             """★약관 클릭이 **새 창**을 여는 사이트가 있다(삼성생명).
 
@@ -382,15 +433,19 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
             (실측: `TargetClosedError: Target page, context or browser has been closed`).
             응답은 컨텍스트 수준에서 이미 잡히므로 창은 닫아도 된다.
             """
+            #: ★메인 페이지는 절대 닫지 않는다. 핸들러를 `new_page()` **이전에**
+            #: 등록하면 메인 페이지 생성 이벤트에서 자기 자신을 닫아버린다
+            #: (실측: TargetClosedError 로 수집이 통째로 죽었다).
+            if pg is page:
+                return
             try:
                 pg.wait_for_timeout(2_500)
-                if pg != page:
-                    pg.close()
+                pg.close()
             except Exception:  # noqa: BLE001
                 pass
 
         ctx.on("page", _on_page)
-        page = ctx.new_page()
+
 
         try:
             page.goto(cfg.entry_url, wait_until="domcontentloaded")
@@ -433,10 +488,14 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
             if table.count() == 0:
                 raise InfraError(f"표 셀렉터가 0건입니다: {cfg.table_selector!r}")
             if cfg.product_link_selector:
-                return _run_cascade(cfg, page, pdf_hits, done, out, limit=limit, probe=probe)
+                _run_cascade(cfg, page, pdf_hits, done, out, limit=limit, probe=probe)
+                return out, 1, False
 
             page_no = 0
             seen_first_cell = ""
+            pages_done_in_batch = 0
+            #: 앞 배치에서 끝낸 지점까지는 **행을 처리하지 않고 페이지만 넘긴다.**
+            skipping = start_page > 1
             while page_no < cfg.max_pages:
                 page_no += 1
                 table = page.locator(cfg.table_selector).first
@@ -467,6 +526,14 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                     break
                 seen_first_cell = first
 
+                if skipping and page_no < start_page:
+                    nxt = page.locator(cfg.next_page_selector).first if cfg.next_page_selector else None
+                    if not nxt or nxt.count() == 0 or not nxt.is_enabled():
+                        return out, page_no, False
+                    nxt.click(timeout=8_000)
+                    page.wait_for_timeout(max(cfg.settle_ms // 3, 1_500))
+                    continue
+                skipping = False
                 print(f"  p{page_no}: 행 {n}개")
                 if probe:
                     for i in range(min(n, 5)):
@@ -477,11 +544,11 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                             nm = "(상품명 셀 못 읽음)"
                         links = row.locator(cfg.terms_link_selector).count()
                         print(f"    [{i + 1}] {nm.strip()[:40]!r} / 약관링크 {links}개")
-                    return []
+                    return out, page_no, False
 
                 for i in range(n):
                     if limit and len(out) >= limit:
-                        return out
+                        return out, page_no, True
                     row = rows.nth(i)
                     try:
                         nm = row.locator(cfg.name_cell_selector).first.inner_text(timeout=3_000).strip()
@@ -509,6 +576,7 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                             print(f"    [FAIL] {nm[:28]}: {e}")
                     page.wait_for_timeout(ROW_DELAY_MS)
 
+                pages_done_in_batch += 1
                 if not cfg.next_page_selector:
                     break
                 nxt = page.locator(cfg.next_page_selector).first
@@ -519,6 +587,9 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                     page.wait_for_timeout(cfg.settle_ms)
                 except (PWTimeout, PWError):
                     break
+                if batch_pages and pages_done_in_batch >= batch_pages:
+                    # 배치 끝. 브라우저를 닫고 다음 배치에서 새로 띄운다.
+                    return out, page_no + 1, True
         finally:
             ctx.close()
             browser.close()
@@ -532,18 +603,61 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
     return out
 
 
+def run_batched(cfg: SiteConfig, *, limit: int, batch_pages: int, max_restarts: int) -> list[Collected]:
+    """배치마다 브라우저를 새로 띄워 끝까지 간다.
+
+    ★한 번 죽으면 처음부터인 구조를 고친다. 이미 받은 URL 은 매 배치 시작 때 다시 읽으므로
+      중복 수집이 없고, 죽은 지점의 **페이지 번호부터** 다시 시작한다.
+    """
+    total: list[Collected] = []
+    page_from = 1
+    restarts = 0
+    while True:
+        try:
+            got, next_page, more = run(
+                cfg, limit=limit, probe=False, start_page=page_from, batch_pages=batch_pages
+            )
+        except (InfraError, ValidationErr):
+            raise
+        except Exception as e:  # noqa: BLE001
+            # 드라이버 연결 끊김 등. ★조용히 끝내지 않고 재시작하되 횟수를 보고한다.
+            restarts += 1
+            print(f"  [재시작 {restarts}/{max_restarts}] p{page_from} 에서 중단: {type(e).__name__}")
+            if restarts > max_restarts:
+                print("  ★재시작 한도 초과. 여기까지 수집한 것만 남긴다.")
+                break
+            continue
+        total.extend(got)
+        print(f"  [배치] p{page_from}~ 수집 {len(got)}건 (누적 {len(total)}) / 다음 p{next_page}")
+        if not more or next_page <= page_from:
+            break
+        if limit and len(total) >= limit:
+            break
+        page_from = next_page
+    return total
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--site", required=True, help=f"대상: {', '.join(SITES)}")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--probe", action="store_true", help="받지 않고 셀렉터가 맞는지만 확인")
+    ap.add_argument("--batch-pages", type=int, default=15,
+                    help="배치당 페이지 수. 배치마다 브라우저를 새로 띄운다(0=끝까지 한 번에)")
+    ap.add_argument("--max-restarts", type=int, default=40,
+                    help="드라이버가 끊겼을 때 재시작 허용 횟수")
     args = ap.parse_args()
 
     cfg = SITES.get(args.site)
     if not cfg:
         raise ConfigError(f"등록되지 않은 사이트입니다: {args.site} (가능: {', '.join(SITES)})")
 
-    got = run(cfg, limit=args.limit, probe=args.probe)
+    if args.probe:
+        run(cfg, limit=args.limit, probe=True)
+        return
+    got = run_batched(
+        cfg, limit=args.limit, batch_pages=args.batch_pages, max_restarts=args.max_restarts
+    )
     print(f"\n수집 {len(got)}건")
     if got:
         print(f"→ data/raw/insurance_terms/{cfg.slug}/  ·  기록: data/raw/manifests/{cfg.slug}.jsonl")
