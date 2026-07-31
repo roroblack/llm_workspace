@@ -251,6 +251,18 @@ def _fetched_urls() -> set[str]:
     return out
 
 
+def _recorded_shas(cfg: SiteConfig) -> set[str]:
+    """이미 기록된 sha. ★URL 이 매번 달라지는 사이트가 있어 URL 만으로는 중복을 못 막는다."""
+    path = _MANIFESTS / f"{cfg.slug}.jsonl"
+    if not path.exists():
+        return set()
+    return {
+        json.loads(line).get("sha256", "")
+        for line in path.read_text(encoding="utf-8").splitlines()
+        if line.strip()
+    }
+
+
 def _append_manifest(cfg: SiteConfig, rec: Collected) -> None:
     """★한 건 받을 때마다 **즉시** 기록한다.
 
@@ -263,9 +275,23 @@ def _append_manifest(cfg: SiteConfig, rec: Collected) -> None:
         f.write(json.dumps(asdict(rec), ensure_ascii=False) + "\n")
 
 
-def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Collected:
+def _check_pdf(blob: bytes, name: str) -> None:
+    """★매직바이트만 보면 **잘린 파일**을 못 잡는다.
+
+    실측: 브라우저 다운로드에서 정확히 65,536B(64KB)로 잘린 PDF 가 150개 저장됐다.
+    `%PDF` 로 시작해 검사를 통과했지만 열면 0쪽이거나 RuntimeError 였다.
+    → 꼬리의 `%%EOF` 까지 확인한다. 그게 있어야 파일이 끝까지 온 것이다.
+    """
     if not blob.startswith(b"%PDF"):
         raise InfraError(f"PDF가 아닙니다(앞 8바이트={blob[:8]!r}): {name}")
+    if b"%%EOF" not in blob[-2048:]:
+        raise InfraError(
+            f"PDF 가 잘렸습니다({len(blob):,}B, 꼬리에 %%EOF 없음): {name}"
+        )
+
+
+def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Collected:
+    _check_pdf(blob, name)
     if len(blob) > MAX_BYTES:
         raise ValidationErr(f"상한 초과: {name}")
     digest = hashlib.sha256(blob).hexdigest()
@@ -417,11 +443,25 @@ def run(
         pdf_hits: list[tuple[str, bytes, str]] = []
 
         def _on_response(resp):
+            """★응답이 **끝난 뒤에** 본문을 읽는다.
+
+            스트리밍 중에 `body()` 를 부르면 앞부분만 온다. 실측으로
+            정확히 65,536B(64KB 버퍼 하나)짜리 잘린 PDF 가 쌓였다.
+            `finished()` 로 완료를 기다린 뒤 읽고, 그래도 잘렸으면
+            `_check_pdf` 가 `%%EOF` 없음으로 잡아낸다(이중 방어가 아니라
+            서로 다른 실패를 막는 것이다 — 하나는 조기 읽기, 하나는 전송 중단).
+            """
             try:
                 ct = resp.headers.get("content-type", "")
-                if "pdf" in ct.lower():
-                    pdf_hits.append((resp.url, resp.body(), ct))
+                if "pdf" not in ct.lower():
+                    return
+                resp.finished()
+                body = resp.body()
+                if body:
+                    pdf_hits.append((resp.url, body, ct))
             except Exception:  # noqa: BLE001
+                #: 창이 먼저 닫히는 등으로 못 읽는 경우가 있다.
+                #: 여기서 죽이지 않는다 — 그 건은 [미포착]으로 남고 다음에 다시 받는다.
                 pass
 
         ctx.on("response", _on_response)
@@ -453,7 +493,10 @@ def run(
             if pg is page:
                 return
             try:
-                pg.wait_for_timeout(2_500)
+                #: ★PDF 응답이 이 창에서 온다. `resp.finished()` 가 끝나기 전에 닫으면
+                #: "Target closed" 로 수집이 통째로 죽는다(실측).
+                #: 큰 약관은 수 MB 라 넉넉히 기다린다.
+                pg.wait_for_timeout(9_000)
                 pg.close()
             except Exception:  # noqa: BLE001
                 pass
@@ -579,9 +622,17 @@ def run(
                             with page.expect_download(timeout=12_000) as dl_info:
                                 link.click(timeout=10_000)
                             dl = dl_info.value
-                            path = dl.path()
-                            if path:
-                                pdf_hits.append((dl.url, Path(path).read_bytes(), "application/pdf"))
+                            #: ★다운로드가 실패했는지 먼저 묻는다. `path()` 는 실패해도
+                            #: 경로를 주는 경우가 있어 **잘린 파일**을 그대로 읽게 된다.
+                            failure = dl.failure()
+                            if failure:
+                                print(f"    [다운로드실패] {nm[:26]}: {failure}")
+                            else:
+                                path = dl.path()
+                                if path:
+                                    pdf_hits.append(
+                                        (dl.url, Path(path).read_bytes(), "application/pdf")
+                                    )
                         except PWTimeout:
                             # 다운로드가 아니라 응답으로 오는 사이트도 있다. 그건 위 핸들러가 잡는다.
                             page.wait_for_timeout(2_500)
