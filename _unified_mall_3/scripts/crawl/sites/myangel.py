@@ -62,7 +62,9 @@ _RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
 _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _CATALOG_DIR = _ROOT / "data" / "catalog"
 
-SEARCH_KEYWORD = "실손"
+#: 검색어 하나로는 놓친다 — '실손'만 던지면 10건인데 여러 어휘를 합치면 43건이었다(실측).
+SEARCH_KEYWORDS = ("실손", "의료비", "노후", "간편", "입원")
+SEARCH_KEYWORD = SEARCH_KEYWORDS[0]
 _TRAVEL_HINTS = ("해외여행", "국내여행", "여행")
 
 #: 표 열 순서. **상수로 박되 헤더로 검증**한다 — 개편되면 조용히 틀린 열을 읽으면 안 된다.
@@ -240,18 +242,36 @@ def fetch_catalog() -> list[CatalogItem]:
         raise InfraError(f"robots가 허용하지 않습니다: {BASE} ({verdict})")
 
     out: dict[str, CatalogItem] = {}
-    for url, on_sale in ((LIST_ON_SALE, True), (LIST_STOPPED, False)):
+    for keyword in SEARCH_KEYWORDS:
+      for url, on_sale in ((LIST_ON_SALE, True), (LIST_STOPPED, False)):
         for page in range(1, MAX_PAGES + 1):
-            html = _get(
-                url,
-                {
-                    "pagenum": str(page),
-                    "sale_kind": "ALL",
-                    "goods_kind": "ALL",
-                    "nameStr": SEARCH_KEYWORD,
-                    "tableKind": "1",
-                },
-            ).decode("utf-8", errors="replace")
+            # ★페이지 1과 2+ 의 파라미터가 다르다.
+            #   1페이지: 단순 조회. 2페이지부터: 화면의 `PP_Query(form,'dw_99',N)` 가
+            #   세팅하는 프레임워크 필드가 필요하다. `pagenum` 은 먹지 않는다
+            #   (실측: 1·2·3페이지가 동일한 내용으로 왔다).
+            fields = {
+                "sale_kind": "ALL",
+                "goods_kind": "ALL",
+                "nameStr": keyword,
+                "tableKind": "1",
+            }
+            if page > 1:
+                fields |= {
+                    "_biz_op_code": "_Q",
+                    "_paging_action": "PP",
+                    "_paging_dw_name": "dw_99",
+                    "_paging_dw_list": "dw_99",
+                    "_paging_row_idx": "0",
+                    "_paging_page_idx": str(page),
+                }
+            try:
+                html = _get(url, fields).decode("utf-8", errors="replace")
+            except InfraError as e:
+                # 페이지를 더 못 넘기는 것과 조회 실패를 구분해 **기록**한다.
+                if page > 1:
+                    print(f"    [페이징 중단] {keyword!r} p{page}: {e}")
+                    break
+                raise
             if page == 1:
                 _check_headers(html)
             rows = _parse(html, on_sale=on_sale)
