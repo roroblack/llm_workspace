@@ -61,12 +61,17 @@ MAX_BYTES = 60 * 1024 * 1024
 OPEN_ENDED = "99991231"
 
 _ROOT = Path(__file__).resolve().parents[3]
-_RAW = _ROOT / "data" / "raw" / "insurance_terms"
+#: 보험사별로 나눈다 — 13곳으로 늘면 한 폴더에 수천 개가 쌓여 사람이 못 찾는다.
+#: 폴더명은 영문 슬러그를 쓴다(한글 경로는 Windows/git 에서 인코딩이 깨진다).
+INSURER_SLUG = "samsungfire"
+_RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
 _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _CATALOG_DIR = _ROOT / "data" / "catalog"
 
 #: 실손 후보 판별. 넓게 잡고 **확정은 하지 않는다**(식별 단계의 일).
 _SILSON_HINTS = ("실손", "실손의료비", "실손의료보험")
+#: 여행 실손은 세대 구분 대상이 아니고 우리 코호트와 성격이 다르다 — 전량 수집에서 제외한다.
+_TRAVEL_HINTS = ("해외여행", "국내여행", "글로벌케어", "여행카드")
 
 
 @dataclass(frozen=True)
@@ -87,6 +92,10 @@ class CatalogItem:
     @property
     def looks_like_silson(self) -> bool:
         return any(h in self.product_name for h in _SILSON_HINTS)
+
+    @property
+    def is_travel(self) -> bool:
+        return any(h in self.product_name for h in _TRAVEL_HINTS)
 
 
 @dataclass(frozen=True)
@@ -226,6 +235,27 @@ def download(item: CatalogItem, path: str) -> FetchRecord:
     )
 
 
+def already_fetched_urls() -> set[str]:
+    """이미 받은 URL. 다시 받지 않는다(남의 서버에 같은 요청을 반복하지 않는다)."""
+    if not _MANIFEST.exists():
+        return set()
+    seen: set[str] = set()
+    for line in _MANIFEST.read_text(encoding="utf-8").splitlines():
+        if line.strip():
+            seen.add(json.loads(line)["url"])
+    return seen
+
+
+def select_all_silson(items: list[CatalogItem]) -> list[tuple[CatalogItem, str]]:
+    """실손 전량. 여행 실손은 제외하고, 판매중지 상품도 **전부** 포함한다.
+
+    판매중지가 곧 1~3세대 후보이므로 빼면 안 된다.
+    """
+    pool = [i for i in items if i.looks_like_silson and not i.is_travel and i.pdf_paths]
+    pool.sort(key=lambda i: (i.sale_start or "", i.product_code))
+    return [(i, p) for i in pool for p in i.pdf_paths]
+
+
 def select_silson(items: list[CatalogItem], limit: int) -> list[tuple[CatalogItem, str]]:
     """실손 후보를 고른다.
 
@@ -261,6 +291,8 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--catalog-only", action="store_true", help="목록만 저장하고 받지 않는다")
     ap.add_argument("--limit", type=int, default=0, help="내려받을 PDF 최대 수")
+    ap.add_argument("--all", action="store_true", help="실손 전량 수집(여행 실손 제외)")
+    ap.add_argument("--delay", type=float, default=DELAY_SEC, help="요청 간 지연(초)")
     args = ap.parse_args()
 
     items = fetch_catalog()
@@ -271,22 +303,33 @@ def main() -> None:
           f"실손후보={len(silson):,}  판매중지={sum(1 for i in items if i.is_discontinued):,}")
     print(f"  실손후보 중 판매중지={sum(1 for i in silson if i.is_discontinued):,}")
 
-    if args.catalog_only or args.limit <= 0:
+    if args.catalog_only or (args.limit <= 0 and not args.all):
         print("\n(카탈로그만 저장. PDF는 받지 않았다.)")
         return
 
-    jobs = select_silson(items, args.limit)
-    print(f"\n내려받을 파일 {len(jobs)}건 (판매중/판매중지 혼합)")
+    if args.all:
+        jobs = select_all_silson(items)
+        mode = "실손 전량(여행 제외)"
+    else:
+        jobs = select_silson(items, args.limit)
+        mode = "판매중/판매중지 혼합 표본"
+
+    done = already_fetched_urls()
+    before = len(jobs)
+    jobs = [(i, p) for i, p in jobs if PDF_BASE + p not in done]
+    print(f"\n대상 {before}건 중 이미 받은 {before - len(jobs)}건 제외 → {len(jobs)}건 수집 [{mode}]")
     records: list[FetchRecord] = []
     failures: list[tuple[str, str]] = []
     for n, (item, path) in enumerate(jobs):
         if n:
-            time.sleep(DELAY_SEC)
+            time.sleep(args.delay)
         try:
             rec = download(item, path)
             records.append(rec)
             flag = "중지" if item.is_discontinued else "판매중"
-            print(f"  [OK] {flag} {item.product_name[:22]} {rec.bytes:,}B {rec.sha256[:10]}")
+            if n % 25 == 0 or not args.all:
+                print(f"  [{n + 1}/{len(jobs)}] {flag} {item.product_name[:20]} "
+                      f"{rec.bytes:,}B {rec.sha256[:10]}")
         except (InfraError, ValidationErr) as e:
             failures.append((path, str(e)))
             print(f"  [FAIL] {path}: {e}")
