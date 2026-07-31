@@ -62,9 +62,13 @@ _RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
 _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _CATALOG_DIR = _ROOT / "data" / "catalog"
 
-#: 검색어 하나로는 놓친다 — '실손'만 던지면 10건인데 여러 어휘를 합치면 43건이었다(실측).
-SEARCH_KEYWORDS = ("실손", "의료비", "노후", "간편", "입원")
-SEARCH_KEYWORD = SEARCH_KEYWORDS[0]
+#: ★검색어를 추측하지 않는다. 빈 검색어로 **전체를 받아 로컬에서 거른다.**
+#: '실손'만 던지면 10건, 어휘를 늘리면 38건이었다 — 어휘 목록이 맞는지 확인할 방법이 없다.
+#: 전체를 받으면 "무엇을 놓쳤나"를 걱정하지 않아도 된다.
+SEARCH_KEYWORDS = ("",)
+SEARCH_KEYWORD = ""
+#: 실손 후보 판별(로컬 필터). 넓게 잡고 확정은 식별 단계에서 한다.
+_SILSON_HINTS = ("실손", "의료비", "노후실손", "유병력자")
 _TRAVEL_HINTS = ("해외여행", "국내여행", "여행")
 
 #: 표 열 순서. **상수로 박되 헤더로 검증**한다 — 개편되면 조용히 틀린 열을 읽으면 안 된다.
@@ -117,6 +121,10 @@ class CatalogItem:
     @property
     def is_travel(self) -> bool:
         return any(h in self.product_name for h in _TRAVEL_HINTS)
+
+    @property
+    def looks_like_silson(self) -> bool:
+        return any(h in self.product_name for h in _SILSON_HINTS)
 
 
 @dataclass(frozen=True)
@@ -245,33 +253,34 @@ def fetch_catalog() -> list[CatalogItem]:
     for keyword in SEARCH_KEYWORDS:
       for url, on_sale in ((LIST_ON_SALE, True), (LIST_STOPPED, False)):
         for page in range(1, MAX_PAGES + 1):
-            # ★페이지 1과 2+ 의 파라미터가 다르다.
-            #   1페이지: 단순 조회. 2페이지부터: 화면의 `PP_Query(form,'dw_99',N)` 가
-            #   세팅하는 프레임워크 필드가 필요하다. `pagenum` 은 먹지 않는다
-            #   (실측: 1·2·3페이지가 동일한 내용으로 왔다).
+            # ★페이징은 GET 이 아니라 **POST** 다. 화면의 `PP_Query(form,'dw_99',N)` 가
+            #   폼을 채워 submit 하는 것을 그대로 가로채 확인했다.
+            #   `_paging_dw_99_*` 는 **-1** 이어야 한다(0 을 넣으면 HTTP 500).
+            #   `pagenum` 은 1로 고정이고 페이지는 `_paging_page_idx` 로만 넘어간다.
             fields = {
+                "_biz_op_code": "_Q",
+                "_biz_dw_00": "",
+                "seq_id": "",
+                "pagenum": "1",
+                "totalrc": "null",
                 "sale_kind": "ALL",
                 "goods_kind": "ALL",
                 "nameStr": keyword,
                 "tableKind": "1",
+                "_paging_action": "PP",
+                "_paging_dw_name": "dw_99",
+                "_paging_row_idx": "0",
+                "_paging_page_idx": str(page),
+                "_paging_dw_99_row_idx": "-1",
+                "_paging_dw_99_page_idx": "-1",
+                "_paging_dw_99_total_row_count": "-1",
+                "_paging_dw_list": "dw_99",
+                "saleCode": "ALL",
+                "goodsCode": "ALL",
+                "searchWord": keyword,
+                "_paging_dw_99_ds_fetch_count": "10",
             }
-            if page > 1:
-                fields |= {
-                    "_biz_op_code": "_Q",
-                    "_paging_action": "PP",
-                    "_paging_dw_name": "dw_99",
-                    "_paging_dw_list": "dw_99",
-                    "_paging_row_idx": "0",
-                    "_paging_page_idx": str(page),
-                }
-            try:
-                html = _get(url, fields).decode("utf-8", errors="replace")
-            except InfraError as e:
-                # 페이지를 더 못 넘기는 것과 조회 실패를 구분해 **기록**한다.
-                if page > 1:
-                    print(f"    [페이징 중단] {keyword!r} p{page}: {e}")
-                    break
-                raise
+            html = _post_form(url, fields).decode("utf-8", errors="replace")
             if page == 1:
                 _check_headers(html)
             rows = _parse(html, on_sale=on_sale)
@@ -356,8 +365,8 @@ def main() -> None:
     with out.open("w", encoding="utf-8") as f:
         for it in items:
             f.write(json.dumps(asdict(it), ensure_ascii=False) + "\n")
-    target = [i for i in items if not i.is_travel]
-    print(f"카탈로그 {len(items)}건 → {out.relative_to(_ROOT)}")
+    target = [i for i in items if i.looks_like_silson and not i.is_travel]
+    print(f"카탈로그 {len(items)}건(전체) → {out.relative_to(_ROOT)}")
     print(f"  여행 제외 {len(target)}건 / 판매중지 {sum(1 for i in target if i.is_discontinued)}건")
 
     if args.catalog_only or (args.limit <= 0 and not args.all):

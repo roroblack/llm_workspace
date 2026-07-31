@@ -60,13 +60,13 @@ def _version_tag() -> str:
 
 
 def _load_manifest() -> list[dict]:
-    if not _MANIFEST.exists():
-        raise InfraError(f"매니페스트가 없습니다: {_MANIFEST}")
-    return [
-        json.loads(line)
-        for line in _MANIFEST.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    """★매니페스트는 보험사별로 나뉘어 있다. `glob` 으로 전부 읽어 빠뜨리지 않는다."""
+    from scripts.crawl.split_manifest import load_all
+
+    records = load_all()
+    if not records:
+        raise InfraError("수집 기록이 없습니다(data/raw/manifests/*.jsonl).")
+    return records
 
 
 def extract(pdf: Path, meta: dict) -> dict:
