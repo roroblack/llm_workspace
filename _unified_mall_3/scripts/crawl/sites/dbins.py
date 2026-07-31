@@ -64,6 +64,8 @@ USER_AGENT = (
 TIMEOUT = 40
 DELAY_SEC = 1.0
 MAX_BYTES = 60 * 1024 * 1024
+#: 보험약관 파일명이 담긴 필드. 나머지(요약서·사업방법서)는 수집 대상이 아니다.
+TERMS_FIELD = "INPL_FINM"
 
 _ROOT = Path(__file__).resolve().parents[3]
 _RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
@@ -183,11 +185,10 @@ def fetch_catalog(keyword: str) -> list[CatalogItem]:
 
     items: list[CatalogItem] = []
     for r in rows:
-        files = tuple(
-            (_kind_hint(r[k]), r[k])
-            for k in ("INPL_FINM", "CNSL_SMAR_FINM", "BIZ_MDDC_FINM")
-            if r.get(k)
-        )
+        # ★INPL_FINM 이 보험약관이다. 상품요약서(CNSL_SMAR_FINM)·사업방법서(BIZ_MDDC_FINM)는
+        #   판정 근거가 될 수 없으므로 받지 않는다. DB손보는 파일명에 종류가 박혀 있어
+        #   **받기 전에** 고를 수 있다(삼성화재는 그게 안 돼서 받은 뒤 정리해야 했다).
+        files = tuple((_kind_hint(r[k]), r[k]) for k in (TERMS_FIELD,) if r.get(k))
         if not files:
             continue
         items.append(

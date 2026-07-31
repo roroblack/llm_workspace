@@ -59,6 +59,8 @@ DELAY_SEC = 2.0
 MAX_BYTES = 60 * 1024 * 1024
 #: 판매중을 뜻하는 종료일 센티널.
 OPEN_ENDED = "99991231"
+#: 보험약관이 실려 오는 슬롯. 실측으로 확인했다(§ fetch_catalog 주석).
+TERMS_FILE_KEY = "prdfilename1"
 
 _ROOT = Path(__file__).resolve().parents[3]
 #: 보험사별로 나눈다 — 13곳으로 늘면 한 폴더에 수천 개가 쌓여 사람이 못 찾는다.
@@ -164,9 +166,12 @@ def fetch_catalog() -> list[CatalogItem]:
 
     items: list[CatalogItem] = []
     for row in rows:
-        paths = tuple(
-            row[k] for k in ("prdfilename1", "prdfilename2", "prdfilename3") if row.get(k)
-        )
+        # ★file1 = 보험약관 (실측 확인). file2 = 사업방법서, file3 = 상품요약서.
+        #   같은 상품의 3개 파일 표지를 열어 대조했다:
+        #     file1 118~242쪽 "보험약관" / file2 8~14쪽 "(사업방법서 별지)" / file3 19~26쪽 "상품요약서"
+        #   우리가 판정 근거로 쓸 수 있는 것은 약관뿐이므로 나머지는 받지 않는다.
+        #   ※그래도 이 판정을 '확정'으로 쓰지 않는다 — 식별 단계에서 표지를 다시 교차검증한다.
+        paths = tuple(row[k] for k in (TERMS_FILE_KEY,) if row.get(k))
         items.append(
             CatalogItem(
                 insurer=INSURER,
