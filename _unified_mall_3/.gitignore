@@ -30,3 +30,7 @@ data/finetune/
 # 대화 사이드바에 다른 프로젝트명 등 무관한 개인정보가 함께 담기므로 추적 제외한다.
 docs/my_idea*.mhtml
 *.mhtml
+
+# 수집한 보험약관 원문 — 저작물이므로 저장소에 커밋하지 않는다(권리 확인 없는 재배포 금지).
+# 커밋되는 것은 메타데이터(fetch_manifest.jsonl)뿐이며, 원문은 각자 재수집한다.
+data/raw/insurance_terms/

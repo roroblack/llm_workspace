@@ -15,13 +15,14 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import socket
 import time
 import urllib.error
 import urllib.request
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime, timezone
 from pathlib import Path
 from urllib.robotparser import RobotFileParser
 
@@ -32,6 +33,9 @@ DELAY_SEC = 2.0  # 호스트 간 예의 지연
 
 _ROOT = Path(__file__).resolve().parents[2]
 _OUT = _ROOT / "docs" / "reports" / f"{date.today().isoformat()}_robots_점검.md"
+#: ★판정의 **근거 원문**을 보관한다. 판정만 남기면 "왜 허용인가"를 나중에 증명할 수 없다.
+#: (Codex 원칙: 원본·해시·URL·수집시각·응답상태를 불변 저장)
+_RAW_DIR = _ROOT / "docs" / "reports" / f"{date.today().isoformat()}_robots_raw"
 
 #: 점검 대상. (구분, 회사명, 호스트, 확인해볼 대표 경로)
 TARGETS: list[tuple[str, str, str, str]] = [
@@ -124,6 +128,19 @@ def check(group: str, name: str, host: str, path: str) -> Result:
         return Result(group, name, host, UNKNOWN_BLOCKED, status,
                       "robots.txt를 가져오지 못함 → 자동수집 금지로 취급(허용 아님). 다른 망에서 재점검 필요")
 
+    # 판정 근거(robots.txt 원문)를 해시·수집시각과 함께 보관한다.
+    _RAW_DIR.mkdir(parents=True, exist_ok=True)
+    digest = hashlib.sha256(body.encode("utf-8")).hexdigest()
+    header = "\n".join([
+        f"# source: https://{host}/robots.txt",
+        f"# fetched_at: {datetime.now(timezone.utc).isoformat(timespec='seconds')}",
+        f"# http: {status}",
+        f"# sha256: {digest}",
+        "# ---- 이하 원문(수정 없음) ----",
+        "",
+    ])
+    (_RAW_DIR / f"{host}.txt").write_text(header + body, encoding="utf-8")
+
     rp = RobotFileParser()
     rp.parse(body.splitlines())
     can = rp.can_fetch(USER_AGENT, f"https://{host}{path}")
@@ -161,6 +178,12 @@ def main() -> None:
         f"- User-Agent: `{USER_AGENT}`",
         "- ★**접속 실패는 '허용'이 아니라 '금지'로 취급**한다(RFC 9309). 응답이 없으니 일단 긁는 것은 폴백이다.",
         "- ★**robots 통과 = 수집 허가 아님.** 사이트 이용약관·저작권·재배포 조건은 별도 확인이 필요하다.",
+        "",
+        f"### 판정 근거 원문",
+        "",
+        f"각 호스트의 **robots.txt 원문**을 `{_RAW_DIR.name}/<호스트>.txt`에 보관한다"
+        " (출처 URL·수집시각·HTTP 상태·sha256 헤더 포함). 판정만 남기면 나중에 근거를 제시할 수 없다.",
+        f"기계 판독용 판정 요약은 `{_OUT.with_suffix('.json').name}`.",
         "",
         "| 구분 | 회사 | 호스트 | 판정 | 응답 | crawl-delay | 규칙 有 | 비고 |",
         "|---|---|---|---|---|---|---|---|",
