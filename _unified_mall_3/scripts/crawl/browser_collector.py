@@ -374,6 +374,22 @@ def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
                 pass
 
         ctx.on("download", _on_download)
+
+        def _on_page(pg):
+            """★약관 클릭이 **새 창**을 여는 사이트가 있다(삼성생명).
+
+            새 창을 방치하면 창이 쌓이다 브라우저가 죽는다
+            (실측: `TargetClosedError: Target page, context or browser has been closed`).
+            응답은 컨텍스트 수준에서 이미 잡히므로 창은 닫아도 된다.
+            """
+            try:
+                pg.wait_for_timeout(2_500)
+                if pg != page:
+                    pg.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+        ctx.on("page", _on_page)
         page = ctx.new_page()
 
         try:
