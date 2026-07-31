@@ -97,7 +97,7 @@ def main() -> None:
     known = {p.name for p in moves}
     orphans = [p for p in _RAW.glob("*.pdf") if p.name not in known]
     if orphans:
-        print(f"★매니페스트에 없는 파일 {len(orphans)}개 — 옮기지 않고 그대로 둡니다.")
+        print(f"[!] 매니페스트에 없는 파일 {len(orphans)}개 - 옮기지 않고 그대로 둡니다.")
         for p in orphans[:5]:
             print(f"   {p.name}")
 
@@ -108,12 +108,16 @@ def main() -> None:
         return
 
     moved = skipped = 0
+    #: 원본도 대상도 없는 기록. 비약관이라 의도적으로 지운 파일이 여기 해당한다.
+    #: 조용히 넘기지 않고 개수를 보고한다 — '지웠다'와 '유실됐다'는 다르다.
+    gone: list[str] = []
     for old, new in moves.items():
         if not old.exists():
             if new.exists():
                 skipped += 1
                 continue
-            raise InfraError(f"원본도 대상도 없습니다: {old}")
+            gone.append(old.name)
+            continue
         new.parent.mkdir(parents=True, exist_ok=True)
         if new.exists():
             old.unlink()  # 같은 sha 파일이 이미 있으면 중복이다
