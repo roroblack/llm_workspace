@@ -41,7 +41,7 @@ _ROOT = Path(__file__).resolve().parents[2]
 _IN = _ROOT / "data" / "extracted"
 _OUT = _ROOT / "data" / "structured"
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "4"
 
 #: 조항 머리. ★**줄 시작**에 있는 것만 인정한다.
 #: 본문 속 상호참조("제4조에 따라…")를 머리로 오인하면 5~6자짜리 가짜 조항이 쏟아진다
@@ -75,6 +75,11 @@ _NUMBERED = re.compile(
 #: `N. (제목)` 을 조항으로 인정하려면 **번호열이 형성**돼야 한다.
 #: 단독으로 하나만 있으면 본문 인용일 수 있다.
 NUMBERED_MIN_HEADS = 3
+
+#: 조항 하나가 이보다 길면 경계를 못 찾은 것이다.
+#: 실측: 정상 문서의 p95 는 4,216자였고 최대도 11,194자였다.
+#: 반면 깨진 문서는 90,385 / 197,589 자가 나왔다.
+CLAUSE_MAX_CHARS = 30_000
 
 #: 목차 판정용(줄 위치 무관). 목차는 조 번호가 촘촘히 나열되므로 전체 검색이 맞다.
 _ARTICLE_ANY = re.compile(r"제\s*\d{1,3}\s*조")
@@ -221,23 +226,37 @@ def build(page_doc: dict) -> dict:
                 (pg["page"], m.start(), m.group(1), m.group(2) or "", (m.group(3) or "").strip())
             )
 
-    #: ★`제N조` 가 하나도 없으면 **특별약관 번호 형식**을 시도한다.
-    #:   두 형식을 **섞지 않는다** — 섞으면 본문의 번호 목록이 조항으로 끼어든다.
-    #:   `제N조` 가 있는 문서는 그것이 정답이고, `N.` 은 그 안의 호(號)다.
+    #: ★번호 체계를 **점수로 고른다.** "제N조가 하나라도 있으면 그것" 은 틀렸다.
+    #:
+    #:   실측(DB손보 96쪽): 줄머리 `제N조` 8개는 **전부 법령 인용**이었다.
+    #:     "「의료법」 제3조(의료기관)에서 규정한 …"
+    #:   긴 문장이 줄바꿈되며 `제3조` 가 줄머리로 왔다. 진짜 조항은
+    #:   `1. (보장종목)` 꼴로 **93개**였는데, `제N조` 가 0이 아니라서
+    #:   `article` 로 판정했고 **조항 3개 / 최대 90,385자**가 나왔다.
+    #:   그런 문서가 v3 산출물의 **35%(268/761)** 였다.
+    #:
+    #:   그래서 두 후보를 다 모아 **제목 있는 머리 수**로 비교한다.
+    #:   제목 없는 `제N조` 는 인용일 가능성이 높다(코덱스 지적).
+    numbered_cand: list[tuple[int, int, str, str, str]] = []
+    for pg in pages:
+        if pg["page"] in toc_pages:
+            continue
+        for m in _NUMBERED.finditer(pg["text"]):
+            numbered_cand.append(
+                (pg["page"], m.start(), m.group(1), m.group(2) or "", m.group(3).strip())
+            )
+
+    #: 제목이 붙은 것만 센다 — 조항 머리는 제목을 달고 나온다.
+    titled_articles = sum(1 for h in heads if h[4])
     numbering = "article"
-    if not heads:
-        cand: list[tuple[int, int, str, str, str]] = []
-        for pg in pages:
-            if pg["page"] in toc_pages:
-                continue
-            for m in _NUMBERED.finditer(pg["text"]):
-                cand.append(
-                    (pg["page"], m.start(), m.group(1), m.group(2) or "", m.group(3).strip())
-                )
-        #: 번호열이 형성돼야 조항으로 본다. 하나뿐이면 본문 인용일 수 있다.
-        if len(cand) >= NUMBERED_MIN_HEADS:
-            heads = cand
-            numbering = "numbered"
+    ambiguous = False
+    if len(numbered_cand) >= NUMBERED_MIN_HEADS and len(numbered_cand) > titled_articles:
+        heads = numbered_cand
+        numbering = "numbered"
+        #: 점수 차가 작으면 확신할 수 없다 — 자동 판정에서 빼도록 표시한다.
+        ambiguous = len(numbered_cand) < titled_articles * 2
+    elif titled_articles and numbered_cand:
+        ambiguous = titled_articles < len(numbered_cand) * 2
 
     if not heads:
         #: ★가짜 조항 1개를 만들지 않는다.
@@ -311,10 +330,31 @@ def build(page_doc: dict) -> dict:
     for c in clauses:
         dup[c["content_hash"]] = dup.get(c["content_hash"], 0) + 1
 
+    #: ★사후 검증 — 결과가 말이 되는지 스스로 확인한다.
+    #:
+    #:   "조항을 만들었다"가 "제대로 만들었다"는 뜻이 아니다.
+    #:   96쪽에서 조항 3개, 그중 하나가 90,385자인 결과를 **성공으로 내보냈다.**
+    #:   그런 산출물이 판정 근거로 쓰이면 "제N조에 따르면" 이 통째로 무의미해진다.
+    warnings: list[str] = []
+    if clauses:
+        longest = max(c["char_length"] for c in clauses)
+        if longest > CLAUSE_MAX_CHARS:
+            warnings.append(f"조항 하나가 {longest:,}자 — 경계를 못 찾은 것으로 보인다")
+    n_pages = page_doc["stats"]["pages"]
+    body_pages = n_pages - len(toc_pages)
+    if body_pages >= 30 and len(clauses) < body_pages / 10:
+        warnings.append(f"본문 {body_pages}쪽인데 조항 {len(clauses)}개 — 너무 적다")
+    if ambiguous:
+        warnings.append("번호 체계를 확신할 수 없다(두 형식의 머리 수가 비슷하다)")
+
+    parse_status = "ok" if not warnings else "suspect"
+
     return {
         "schema_version": SCHEMA_VERSION,
         #: ★이 문서가 어떻게 파싱됐는지. 판정에 쓸 수 있는지 여기서 갈린다.
-        "parse_status": "ok",
+        #:   `suspect` 는 "만들긴 했는데 믿지 말라"는 뜻이다.
+        "parse_status": parse_status,
+        "parse_warnings": warnings,
         #: 어떤 번호 체계로 쪼갰나. `제N조` 인지 특별약관의 `N.` 인지.
         "numbering": numbering,
         "toc_pages": sorted(toc_pages),

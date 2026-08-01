@@ -51,8 +51,9 @@ _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _OUT = _ROOT / "data" / "extracted"
 
 #: v2 — 텍스트 정규화(제어문자·사용자영역 글리프 제거). §_clean_text
-#: v3 — 짝 없는 서로게이트 제거 + 원자적 쓰기. 조항 파서의 목차·부 경계 수정과 짝을 이룬다.
-SCHEMA_VERSION = "3"
+#: v3 — 서로게이트 제거 + 원자적 쓰기 + 목차·부 경계 수정
+#: v4 — 보조 PUA 원문자 복구(①~⑨) + 번호체계 점수 선택 + 사후 검증
+SCHEMA_VERSION = "4"
 #: 이 값이 바뀌면 같은 PDF 라도 결과가 달라진다. 산출물에 함께 기록한다.
 EXTRACTOR = f"pymupdf/{fitz.__doc__.split()[1] if fitz.__doc__ else 'unknown'}"
 
@@ -86,6 +87,26 @@ _PUA = re.compile(r"[-]")
 #:     (이 수정을 하던 중 내 편집 스크립트도 같은 방식으로 이 파일을 날렸다. git 으로 복구했다.)
 _SURROGATE = re.compile("[\ud800-\udfff]")
 
+#: ★항 번호 ①②③ 이 **보조 사용자영역**(U+F0000~) 문자로 들어와 있다.
+#:
+#:   실측: `U+F02B1` 221회 · `U+F02B2` 104회 … `U+F02B9` 까지 순서대로.
+#:   표본 250문서 중 **144개(58%)** 에 있다.
+#:   BMP 사용자영역(U+E000~U+F8FF)만 지우던 규칙에 안 걸려 본문에 깨진 채 남았다.
+#:   그래서 항 번호 정규식 `[①-⑳]` 이 매칭되지 않아 "제N항"을 특정할 수 없었다.
+#:
+#: ★지우지 않고 되살린다. 다만 **검증된 범위만.**
+#:
+#:   코덱스가 해당 PDF 를 직접 렌더링해 대조했다.
+#:     · `U+F02B1~U+F02B9` 는 화면상 `①~⑨` 로 표시된다
+#:     · 같은 문서에 정상 `①~⑨` 도 섞여 있다
+#:     · ★`⑩` 은 `U+F02BA` + `U+F02C3` **두 문자가 같은 자리에 겹쳐** 나온다
+#:       → `U+F02B0+n` 산술식을 10 이상으로 늘리면 **틀린다**
+#:
+#:   그래서 1~9 만 매핑하고, 나머지 보조 PUA 는 **지우지 않고 세어 남긴다**
+#:   (`stats.unmapped_glyphs`). 지우면 뭘 잃었는지 알 수 없게 된다.
+_PUA_CIRCLED = {chr(0xF02B0 + n): chr(0x245F + n) for n in range(1, 10)}
+_PUA_SUP = re.compile(r"[\U000F0000-\U000FFFFD\U00100000-\U0010FFFD]")
+
 
 def _clean_text(s: str) -> tuple[str, int, int]:
     """텍스트 정규화. `(정리된 문자열, 지운 제어문자 수, 지운 PUA 수)`.
@@ -118,6 +139,10 @@ def _clean_text(s: str) -> tuple[str, int, int]:
     #: 서로게이트를 먼저 지운다 — 남겨 두면 JSON 직렬화 자체가 실패한다.
     if _SURROGATE.search(s):
         s = _SURROGATE.sub("", s)
+    #: 검증된 원문자만 되살린다. 나머지 보조 PUA 는 남겨 두고 세기만 한다.
+    for src, dst in _PUA_CIRCLED.items():
+        if src in s:
+            s = s.replace(src, dst)
     n_ctl = len(_CONTROL.findall(s))
     n_pua = len(_PUA.findall(s))
     if n_ctl:
@@ -133,8 +158,13 @@ def extract(pdf: Path, meta: dict) -> dict:
     pages: list[dict] = []
     total_tables = 0
     n_ctl_all = n_pua_all = 0
+    #: 되살리지 못한 보조 PUA — **지우지 않고 세어 남긴다.** 뭘 잃었는지 알아야 한다.
+    unmapped: dict[str, int] = {}
     for i, page in enumerate(doc):
         text, n_ctl, n_pua = _clean_text(page.get_text())
+        for ch in _PUA_SUP.findall(text):
+            key = f"U+{ord(ch):05X}"
+            unmapped[key] = unmapped.get(key, 0) + 1
         n_ctl_all += n_ctl
         n_pua_all += n_pua
         tables: list[list[list[str]]] = []
@@ -187,7 +217,13 @@ def extract(pdf: Path, meta: dict) -> dict:
             "text_length": text_len,
             "tables": total_tables,
             #: ★무엇을 지웠는지 남긴다. 조용한 변환은 나중에 원인을 못 찾게 한다.
-            "normalized": {"control_removed": n_ctl_all, "pua_removed": n_pua_all},
+            "normalized": {
+                "control_removed": n_ctl_all,
+                "pua_removed": n_pua_all,
+                #: 되살린 원문자는 본문에 이미 반영됐다. 못 되살린 것만 여기 남는다.
+                #: ★비어 있지 않으면 그 문서는 항 번호가 온전하지 않다는 뜻이다.
+                "unmapped_glyphs": dict(sorted(unmapped.items())),
+            },
         },
         "pages": pages,
     }
