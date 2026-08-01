@@ -12,6 +12,16 @@ SITE="${1:?site}"
 BATCH="${2:-10}"
 MAX="${3:-200}"
 LOG="/tmp/sv_${SITE}.log"
+LOCK="/tmp/sv_${SITE}.lock"
+
+# ★중복 실행 방지. 이게 없어서 같은 사이트를 12개 프로세스가 동시에 긁었고,
+#   기록이 9,574행까지 부풀고(실제 파일 2,260개) 서로 파일을 덮어 잘린 PDF 가 생겼다.
+if ! mkdir "$LOCK" 2>/dev/null; then
+  echo "이미 실행 중입니다: $SITE (락: $LOCK)" >&2
+  exit 1
+fi
+trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
+
 : > "$LOG"
 for i in $(seq 1 "$MAX"); do
   echo "=== [$i/$MAX] $(date +%H:%M:%S) 시작 ===" >> "$LOG"
