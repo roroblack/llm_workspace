@@ -78,6 +78,27 @@ def _info(r: dict) -> tuple[int, int, int]:
     )
 
 
+def _write_atomic(path: Path, doc: dict) -> None:
+    """임시 파일에 다 쓴 뒤 바꿔 넣는다.
+
+    ★왜 — 실패가 **0바이트 파일**을 남겼다.
+
+        `path.write_text(...)` 는 파일을 먼저 비우고 쓴다. 직렬화 중에 예외가 나면
+        **빈 파일이 남는다.** 실제로 현대해상 1건이 서로게이트 때문에 죽으면서
+        0바이트를 남겼고, 다음 단계가 그걸 읽어 `JSONDecodeError` 로 또 죽었다.
+        한 건의 실패가 두 건이 된 것이다.
+
+        더 나쁜 건, 다음 실행 때 그 0바이트 파일이 **"이미 있음"으로 판정돼
+        영원히 건너뛰어진다**는 것이다. 조용히 빠진다.
+    """
+    #: 직렬화를 먼저 끝낸다 — 여기서 실패하면 파일에 손도 대지 않는다.
+    body = json.dumps(doc, ensure_ascii=False, indent=1)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(path.suffix + ".tmp")
+    tmp.write_text(body, encoding="utf-8")
+    tmp.replace(path)
+
+
 def _bar(done: int, total: int, width: int = 30) -> str:
     filled = int(done / total * width) if total else 0
     return "█" * filled + "·" * (width - filled)
@@ -131,10 +152,7 @@ def main() -> None:
             else:
                 try:
                     doc = to_page_json.extract(pdf, meta)
-                    page_out.parent.mkdir(parents=True, exist_ok=True)
-                    page_out.write_text(
-                        json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8"
-                    )
+                    _write_atomic(page_out, doc)
                     n_pages += 1
                 except Exception as e:  # noqa: BLE001
                     failures.append({"sha": sha12, "slug": slug, "stage": "pages",
@@ -152,10 +170,7 @@ def main() -> None:
                     built = to_clauses.build(
                         json.loads(page_out.read_text(encoding="utf-8"))
                     )
-                    clause_out.parent.mkdir(parents=True, exist_ok=True)
-                    clause_out.write_text(
-                        json.dumps(built, ensure_ascii=False, indent=1), encoding="utf-8"
-                    )
+                    _write_atomic(clause_out, built)
                     n_clauses += 1
                 except Exception as e:  # noqa: BLE001
                     failures.append({"sha": sha12, "slug": slug, "stage": "clauses",

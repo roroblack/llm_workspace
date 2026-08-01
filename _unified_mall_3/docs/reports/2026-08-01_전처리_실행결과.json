@@ -1,39 +1,25 @@
 {
- "extractor_tag": "s1_pymupdf-1.28.0",
- "targets": 10,
- "pages_built": 9,
- "pages_skipped": 1,
- "clauses_built": 6,
+ "extractor_tag": "s2_pymupdf-1.28.0",
+ "targets": 1703,
+ "pages_built": 1702,
+ "pages_skipped": 0,
+ "clauses_built": 1702,
  "clauses_skipped": 0,
- "elapsed_sec": 82.7,
+ "elapsed_sec": 16274.3,
  "failures": [
   {
-   "sha": "050d86caf7e8",
-   "slug": "dbins",
-   "stage": "clauses",
-   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
-   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+   "sha": "d3a70c7693fd",
+   "slug": "hyundaimarine",
+   "stage": "pages",
+   "why": "UnicodeEncodeError: 'utf-8' codec can't encode character '\\udfb3' in position 15992: surrogates not allowed",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 135, in main\n    page_out.write_text(\n  File \"C:\\Users\\playdata2\\anaconda3\\Lib\\pathlib.py\", line 1048, in write_text\n    return f.write(data)\n           ^^^^^^^^^^^^^\nUnicodeEncodeError: 'utf-8' codec can't encode character '\\udfb3' in position 15992: surrogates not allowed\n"
   },
   {
-   "sha": "074065284125",
-   "slug": "dbins",
+   "sha": "d3a70c7693fd",
+   "slug": "hyundaimarine",
    "stage": "clauses",
-   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
-   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
-  },
-  {
-   "sha": "082993f95d42",
-   "slug": "dbins",
-   "stage": "clauses",
-   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
-   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
-  },
-  {
-   "sha": "0aa22f4f0bd1",
-   "slug": "dbins",
-   "stage": "clauses",
-   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
-   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+   "why": "JSONDecodeError: Expecting value: line 1 column 1 (char 0)",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 153, in main\n    json.loads(page_out.read_text(encoding=\"utf-8\"))\n  File \"C:\\Users\\playdata2\\anaconda3\\Lib\\json\\__init__.py\", line 346, in loads\n    return _default_decoder.decode(s)\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\anaconda3\\Lib\\json\\decoder.py\", line 337, in decode\n    obj, end = self.raw_decode(s, idx=_w(s, 0).end())\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\njson.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)\n"
   }
  ]
 }

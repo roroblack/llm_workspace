@@ -80,11 +80,72 @@ NUMBERED_MIN_HEADS = 3
 _ARTICLE_ANY = re.compile(r"제\s*\d{1,3}\s*조")
 #: 항 번호(①②③ 또는 1. 2. 3.)
 _PARA = re.compile(r"(?:^|\n)\s*([①-⑳]|\d{1,2}\.)\s")
+#: ★목차 신호 1 — **점선(dot leader)**.
+#: 목차 줄은 `제1 조 【보장종목】 ......................... 1` 꼴이다.
+#: 이 점선이 글자수를 부풀려 목차 판정을 무력화했다(실측: p25 비율 202 로
+#: 임계 200 을 간발로 넘겨 본문으로 오판 → 점선 제거 후 33).
+_DOTS = re.compile(r"[.·․‥…]{5,}")
+
+#: ★목차 신호 2 — 페이지에 찍힌 **`목 차`** 표시. 비율 추정보다 확실하다.
+#: 실측: 25,000자짜리 '조항'의 꼬리가 `251 / 401              목 차` 였다.
+_TOC_MARK = re.compile(r"^\s*목\s*차\s*$", re.MULTILINE)
+
+#: ★목차 신호 3 — 줄 끝의 페이지 번호. `… 121` 처럼 끝난다.
+_TOC_LINE = re.compile(r"[.·․‥…]{5,}\s*\d{1,4}\s*$", re.MULTILINE)
+
 #: 부(部) 경계. ★**단독 줄로 나온 것만** 인정한다.
 #: 초안은 페이지 앞 400자에서 아무 데나 매칭해 '용어의정의'가 266개로 잡혔다 —
 #: 그건 부 제목이 아니라 **조항 제목**이었다. 실측으로 확인한 실제 부 제목은
 #: p23 '보통약관', p63 '별표' 처럼 **한 줄에 그것만** 있다.
 _SECTION_LINE = re.compile(r"^\s*(보통약관|특별약관|별\s*표\s*\d*|부\s*록|약관\s*요약서)\s*$")
+
+#: ★부 경계를 넓힌다 — 위 규칙만으로는 403쪽 약관의 부가 2개뿐이었고,
+#:   그래서 조 번호가 **52종 충돌**했다(제2조가 51회). 특별약관마다 조 번호가
+#:   1부터 다시 시작하는데 구분이 안 돼 섞인 것이다.
+#:
+#:   코덱스 교차검증으로 얻은 목록. **제목이 `약관`/`특약`으로 끝나는 줄**이 경계다.
+#:     `○○ 보통약관` `○○ 특별약관` `○○ 특약` `제도성특약`
+#:     `단체취급특약` `지정대리청구서비스특약` `1-1. [건강] ○○ 특별약관`
+#:
+#:   ★`제N편` `제N장` `제N절` `제N관` 은 **경계가 아니다.**
+#:     `특별약관 → 제1관 일반사항 → 제1조` 구조가 실재하므로,
+#:     이걸 경계로 삼으면 **과분할**된다(코덱스 지적).
+_SECTION_TITLE = re.compile(
+    r"^[ \t]{0,8}(?:\d{1,2}(?:-\d{1,2})?\.?\s*)?"      # 앞의 번호 접두어(선택)
+    r"(?:\[[^\]\n]{1,12}\]\s*)?"                        # `[건강]` 같은 분류(선택)
+    r"([^\n]{2,40}?(?:특별약관|특약|보통약관|주계약\s*약관))\s*$",
+    re.MULTILINE,
+)
+
+#: ★제목처럼 생겼지만 제목이 아닌 줄을 걸러 낸다.
+#:
+#:   처음엔 길이 제한만 뒀더니 이런 본문이 부 제목으로 잡혔다(실측).
+#:     "② 해당계약에 단체취급특약이 부가되어 있는 경우에는 이 특약에 대하여도 단체취급특약"
+#:     "‘특약 색인(索引)’을 활용하시면 본인이 실제 가입한 특약"
+#:
+#:   제목은 **문장이 아니다** — 항 번호로 시작하지 않고, 쉼표·마침표가 없고,
+#:   조사로 끝나지 않는다.
+_PARA_START = re.compile(r"^[ \t]*[①-⑳]")            # 항 번호로 시작하면 본문이다
+_SENTENCE_MARK = re.compile(r"[,，.。;；]")            # 문장부호가 있으면 본문이다
+_NOT_SECTION_TAIL = re.compile(
+    r"(?:은|는|이|가|을|를|의|에|로|와|과|및|한다|합니다|따라|경우|하시면)$"
+)
+
+
+def _looks_like_section(line: str, title: str) -> bool:
+    """부 경계 제목인가. 하나라도 걸리면 아니다."""
+    if _PARA_START.match(line):
+        return False
+    if _SENTENCE_MARK.search(title):
+        return False
+    if _NOT_SECTION_TAIL.search(title):
+        return False
+    if _DOTS.search(line):          # 목차 줄
+        return False
+    #: 따옴표·괄호 인용으로 시작하면 본문 안의 언급이다.
+    if title.lstrip()[:1] in "‘’“”\"'":
+        return False
+    return True
 
 #: 목차 페이지 판정 임계값. 실측 근거:
 #:   목차 p3=조항머리 36개/머리당 41자, p4=19개/61자, p6=18개/77자
@@ -110,10 +171,22 @@ def build(page_doc: dict) -> dict:
         raise ValidationErr("페이지가 없습니다.")
 
     # ── 목차 페이지 식별 (6단계 정확도의 전제) ──
+    #: ★신호를 셋 쓴다. 비율 하나만 보다가 목차를 본문으로 오판했다.
     toc_pages: set[int] = set()
     for pg in pages:
-        n = len(_ARTICLE_ANY.findall(pg["text"]))
-        if n >= TOC_MIN_HEADS and len(pg["text"]) / n < TOC_MAX_CHARS_PER_HEAD:
+        text = pg["text"]
+        # (1) 페이지에 `목 차` 가 찍혀 있으면 그것으로 끝이다.
+        if _TOC_MARK.search(text):
+            toc_pages.add(pg["page"])
+            continue
+        # (2) 점선+페이지번호로 끝나는 줄이 여럿이면 목차다.
+        if len(_TOC_LINE.findall(text)) >= TOC_MIN_HEADS:
+            toc_pages.add(pg["page"])
+            continue
+        # (3) 비율. ★점선을 지우고 잰다 — 점선이 글자수를 부풀린다.
+        stripped = _DOTS.sub(" ", text)
+        n = len(_ARTICLE_ANY.findall(stripped))
+        if n >= TOC_MIN_HEADS and len(stripped) / n < TOC_MAX_CHARS_PER_HEAD:
             toc_pages.add(pg["page"])
 
     # ── 5) 문서 구조 복원: 단독 줄로 나온 부 제목만 인정 ──
@@ -122,9 +195,18 @@ def build(page_doc: dict) -> dict:
     for pg in pages:
         if pg["page"] not in toc_pages:  # ★목차 안의 부 제목은 경계가 아니다
             for line in pg["text"].splitlines():
+                #: 옛 규칙 — `보통약관` 처럼 그 단어만 있는 줄.
                 m = _SECTION_LINE.match(line)
                 if m:
                     current = re.sub(r"\s+", "", m.group(1))
+                    break
+                #: 넓힌 규칙 — `○○ 특별약관` 처럼 제목형 줄.
+                m2 = _SECTION_TITLE.match(line)
+                if m2:
+                    title = re.sub(r"\s+", " ", m2.group(1)).strip()
+                    if not _looks_like_section(line, title):
+                        continue
+                    current = title
                     break
         section_of_page[pg["page"]] = current
 
@@ -182,6 +264,12 @@ def build(page_doc: dict) -> dict:
 
         parts: list[str] = []
         for p in range(page, end_page + 1):
+            #: ★목차 페이지는 본문에 넣지 않는다.
+            #:   조항 **머리**는 목차에서 안 찾으면서 **본문**은 목차째로 담고 있었다.
+            #:   그래서 조항 하나가 42,632자가 됐고 그 안에 조 머리 194개·점선줄 253개가
+            #:   들어 있었다. 조 사이에 목차가 끼면 그 조가 목차를 통째로 삼킨다.
+            if p in toc_pages:
+                continue
             t = text_of.get(p, "")
             a = off if p == page else 0
             b = end_off if p == end_page else len(t)

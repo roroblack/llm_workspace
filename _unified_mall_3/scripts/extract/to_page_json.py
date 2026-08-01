@@ -50,8 +50,9 @@ _RAW = _ROOT / "data" / "raw" / "insurance_terms"
 _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _OUT = _ROOT / "data" / "extracted"
 
-#: v2 — 텍스트 정규화 추가(제어문자·사용자영역 글리프 제거). §_clean_text
-SCHEMA_VERSION = "2"
+#: v2 — 텍스트 정규화(제어문자·사용자영역 글리프 제거). §_clean_text
+#: v3 — 짝 없는 서로게이트 제거 + 원자적 쓰기. 조항 파서의 목차·부 경계 수정과 짝을 이룬다.
+SCHEMA_VERSION = "3"
 #: 이 값이 바뀌면 같은 PDF 라도 결과가 달라진다. 산출물에 함께 기록한다.
 EXTRACTOR = f"pymupdf/{fitz.__doc__.split()[1] if fitz.__doc__ else 'unknown'}"
 
@@ -75,6 +76,15 @@ def _load_manifest() -> list[dict]:
 #: 지워야 할 것 2 — 사용자 정의 영역(PUA) 글리프.
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _PUA = re.compile(r"[-]")
+
+
+#: 지워야 할 것 3 — **짝 없는 서로게이트**.
+#: ★현대해상 1건이 이것 때문에 `UnicodeEncodeError` 로 죽었다.
+#:   PDF 폰트 매핑이 깨져 유니코드로 옮기지 못한 자리다. JSON 으로 쓸 수 없으므로 지운다.
+#:   ★더 나쁜 건 그 실패가 **0바이트 파일을 남겨** 다음 단계(조항 구조화)까지
+#:     `JSONDecodeError` 로 무너뜨린 것이다. 그래서 쓰기를 원자적으로 바꿨다.
+#:     (이 수정을 하던 중 내 편집 스크립트도 같은 방식으로 이 파일을 날렸다. git 으로 복구했다.)
+_SURROGATE = re.compile("[\ud800-\udfff]")
 
 
 def _clean_text(s: str) -> tuple[str, int, int]:
@@ -105,6 +115,9 @@ def _clean_text(s: str) -> tuple[str, int, int]:
         몇 자를 지웠는지 산출물 `stats.normalized` 에 남긴다.
         나중에 "이 문서 왜 이러지" 할 때 근거가 된다.
     """
+    #: 서로게이트를 먼저 지운다 — 남겨 두면 JSON 직렬화 자체가 실패한다.
+    if _SURROGATE.search(s):
+        s = _SURROGATE.sub("", s)
     n_ctl = len(_CONTROL.findall(s))
     n_pua = len(_PUA.findall(s))
     if n_ctl:
