@@ -136,21 +136,46 @@ def _ensure_session() -> None:
     _SESSION_READY = True
 
 
+#: robots.txt 조회 재시도. **우회가 아니라 확인을 확실히 하기 위한 것**이다.
+_ROBOTS_TRIES = 3
+_ROBOTS_BACKOFF_SEC = 2.0
+
+
 def _robots_allows(url: str) -> tuple[bool, str]:
-    req = urllib.request.Request(f"{BASE}/robots.txt", headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
-            body = resp.read(512_000).decode("utf-8", errors="replace")
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return True, "robots 없음(규칙 부재)"
-        return False, f"robots HTTP {e.code}"
-    except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
-        return False, f"robots 확인 불가({type(e).__name__})"
-    rp = RobotFileParser()
-    rp.parse(body.splitlines())
-    ok = rp.can_fetch(USER_AGENT, url)
-    return ok, f"200 → {'allow' if ok else 'disallow'}"
+    """robots 판정. 확인이 끝내 안 되면 **거부로 본다**(fail-closed).
+
+    ★왜 재시도하나
+
+        연달아 요청하면 robots.txt 조회가 간헐적으로 `URLError` 로 떨어진다.
+        그때마다 "robots 가 허용하지 않습니다"로 보고돼서, 사이트가 우리를 막은 줄
+        알았다. 직접 불러 보면 `200 → allow` 였다(실측).
+
+        **일시적 통신 실패와 실제 거부는 다르다.** 몇 번 더 물어보고 판정한다.
+        그래도 안 되면 **거부로 둔다** — 확인 못 한 채 받으러 가지 않는다.
+    """
+    last = ""
+    for attempt in range(_ROBOTS_TRIES):
+        req = urllib.request.Request(
+            f"{BASE}/robots.txt", headers={"User-Agent": USER_AGENT}
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT) as resp:
+                body = resp.read(512_000).decode("utf-8", errors="replace")
+        except urllib.error.HTTPError as e:
+            if e.code == 404:
+                return True, "robots 없음(규칙 부재)"
+            #: HTTP 상태가 온 것은 서버의 **답**이다. 재시도하지 않는다.
+            return False, f"robots HTTP {e.code}"
+        except (urllib.error.URLError, socket.timeout, TimeoutError) as e:
+            last = f"{type(e).__name__}"
+            if attempt < _ROBOTS_TRIES - 1:
+                time.sleep(_ROBOTS_BACKOFF_SEC * (attempt + 1))
+            continue
+        rp = RobotFileParser()
+        rp.parse(body.splitlines())
+        ok = rp.can_fetch(USER_AGENT, url)
+        return ok, f"200 → {'allow' if ok else 'disallow'}"
+    return False, f"robots 확인 불가({last}, {_ROBOTS_TRIES}회 시도)"
 
 
 def _api(tran: str, request: dict) -> dict:
