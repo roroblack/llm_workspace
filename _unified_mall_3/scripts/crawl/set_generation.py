@@ -1,39 +1,38 @@
 """실손의료보험 **세대**를 판매개시일로 판정해 매니페스트에 넣는다.
 
-★왜 세대가 필요한가
+★경계는 코드에 박지 않는다 — `config/generation_profiles.json` 을 읽는다
 
-    세대마다 **자기부담금과 보장범위가 다르다.** 같은 질병·같은 병원비라도
-    1세대는 전액, 4세대는 급여 20%·비급여 30%를 본인이 낸다.
-    "보장받을 수 있나"에 답하려면 **가입 시점의 세대**를 먼저 정해야 한다.
+    처음에 이 스크립트를 만들 때 설정 파일이 있는 줄 모르고 경계를 코드에 박았다.
+    그래서 **틀렸다**(코덱스가 잡아냈다).
 
-★경계는 어디서 왔나 — 감독규정이지 약관이 아니다
+      · 5세대(2026-05-06~)를 아예 몰라서 139건을 4세대로 판정했다
+      · 노후실손·유병력자실손을 일반 실손과 **같은 축**으로 판정했다.
+        설정에는 `applies_to: ["standard"]` 로 **별도 라인**임이 명시돼 있다.
 
-    조항 1,702개를 뒤졌으나 세대 경계를 정의한 문구는 **없다**(`4세대` 언급 7회뿐).
-    세대 구분은 금융감독원 표준약관 개정 시점으로 정해지는 것이라 약관 본문에
-    적히지 않는다. 그래서 경계는 **공개된 개정 이력**을 따른다.
+    같은 사실을 두 곳에 두면 반드시 갈라진다. 설정이 단일 출처다.
 
-        1세대 (구실손)        ~ 2009-09-30
-        2세대 (표준화실손)     2009-10-01 ~ 2017-03-31
-        3세대 (착한실손)      2017-04-01 ~ 2021-06-30
-        4세대                2021-07-01 ~
+★상품 라인이 먼저다 — 세대는 일반 실손에만 있다
 
-★5세대는 **단정하지 않는다**
+    노후실손(2014-08~)·유병력자실손(2018-04-02~)은 **별개 상품**이지
+    일반 실손의 세대가 아니다. 여행 실손은 세대 구분 대상이 아니다.
+    이들에게 "3세대"라고 붙이면 자기부담금을 잘못 안내하게 된다.
 
-    기획서에는 "1~5세대"로 적혀 있다. 그런데 수집물에서 근거를 못 찾았다.
-      · 상품명·약관 어디에도 `5세대` 표기가 없다
-      · 2026-07-01 에 76건이 몰려 있고 흥국화재 상품명에 `_20260701이후` 가 붙지만,
-        그것이 세대 교체인지 통상 개정인지 **이 데이터로는 구분되지 않는다**
+★`review_status` 를 존중한다
 
-    그래서 2026-07-01 이후는 `generation=4` 로 두되
-    `generation_note="2026-07 개정 — 세대 교체 여부 미확인"` 을 남긴다.
-    확인되면 경계를 추가한다. **모르는 것을 아는 척하지 않는다.**
+    설정에 이렇게 적혀 있다.
 
-★등급을 그대로 물려받는다
+        "출처는 2차 자료(보도자료·보험사 뉴스룸)다. 금융위/협회 원문으로 재확인이 필요하다."
+        "review_status 가 'unreviewed' 인 동안에는 어떤 문서도 CONFIRMED 로 확정할 수 없다."
 
-    `date_confidence="month"` 인 문서는 날짜가 월까지만 정확하다.
-    다행히 **세대 경계가 모두 월 초·월 말**이라 월 단위로도 세대는 갈린다.
-    다만 경계월(2009-09/10, 2017-03/04, 2021-06/07)에 걸치면 흔들릴 수 있어
-    `generation_confidence` 를 따로 남긴다.
+    그래서 `unreviewed` 면 판정 결과에 `generation_review="unreviewed"` 를 박아
+    **자동 판정에서 그대로 믿지 않도록** 표시한다.
+
+★신뢰도
+
+    exact     날짜를 일자까지 안다
+    month     월까지만 안다(상품코드에서 유도). 경계달이 아니면 세대는 갈린다
+    ambiguous 월까지만 아는데 **경계달에 걸린다** — 세대가 흔들릴 수 있다
+    unknown   날짜를 모른다. 판정하지 않는다
 
 실행:
     python -m scripts.crawl.set_generation --dry-run
@@ -51,31 +50,64 @@ from app.core.errors import InfraError
 
 _ROOT = Path(__file__).resolve().parents[2]
 _MANIFESTS = _ROOT / "data" / "raw" / "manifests"
-
-#: (시작일 포함, 세대, 통칭). 마지막 구간은 끝이 없다.
-GENERATIONS: list[tuple[str, int, str]] = [
-    ("00000000", 1, "구실손"),
-    ("20091001", 2, "표준화실손"),
-    ("20170401", 3, "착한실손"),
-    ("20210701", 4, "4세대"),
-]
-
-#: 경계가 걸린 달 — 여기 해당하면 월 단위 날짜로는 세대가 흔들린다.
-_BOUNDARY_MONTHS = {"200909", "200910", "201703", "201704", "202106", "202107"}
-
-#: 세대 교체 여부가 확인되지 않은 개정 시점.
-_UNVERIFIED_FROM = "20260701"
+_PROFILES = _ROOT / "config" / "generation_profiles.json"
 
 
-def generation_of(sale_start: str) -> tuple[int, str]:
-    """`(세대, 통칭)`."""
-    gen, name = GENERATIONS[0][1], GENERATIONS[0][2]
-    for start, g, label in GENERATIONS:
-        if sale_start >= start:
-            gen, name = g, label
-        else:
-            break
-    return gen, name
+def _load_profiles() -> dict:
+    if not _PROFILES.exists():
+        raise InfraError(
+            f"세대 설정이 없습니다: {_PROFILES}\n"
+            "경계를 코드에 박지 않는다 — 설정이 단일 출처다."
+        )
+    return json.loads(_PROFILES.read_text(encoding="utf-8"))
+
+
+def _ymd(s: str | None) -> str:
+    """`2021-07-01` → `20210701`. None 이면 열린 구간."""
+    return s.replace("-", "") if s else ""
+
+
+def product_line(name: str, profiles: dict) -> str:
+    """상품 라인(standard / senior / simplified_issue / travel)."""
+    types = profiles["product_types"]
+    #: ★일반 실손보다 **특수 라인을 먼저** 본다.
+    #:   `노후실손의료비보험` 은 `실손의료비` 도 포함하므로 순서가 중요하다.
+    for key in ("travel", "senior", "simplified_issue"):
+        spec = types.get(key, {})
+        if any(mk in name for mk in spec.get("name_markers", [])):
+            return key
+    spec = types.get("standard", {})
+    if any(mk in name for mk in spec.get("name_markers", [])):
+        if any(x in name for x in spec.get("exclude_markers", [])):
+            return "unknown"
+        return "standard"
+    return "unknown"
+
+
+def generation_of(sale_start: str, line: str, profiles: dict) -> dict | None:
+    """해당 라인·날짜의 세대 항목. 없으면 None."""
+    for g in profiles["generations"]:
+        if line not in g.get("applies_to", []):
+            continue
+        lo = _ymd(g.get("effective_from"))
+        hi = _ymd(g.get("effective_to"))
+        if lo and sale_start < lo:
+            continue
+        if hi and sale_start > hi:
+            continue
+        return g
+    return None
+
+
+def _boundary_months(profiles: dict) -> set[str]:
+    """경계가 걸린 달 — 월까지만 아는 날짜로는 세대가 흔들린다."""
+    out: set[str] = set()
+    for g in profiles["generations"]:
+        for k in ("effective_from", "effective_to"):
+            v = _ymd(g.get(k))
+            if v:
+                out.add(v[:6])
+    return out
 
 
 def main() -> None:
@@ -83,66 +115,83 @@ def main() -> None:
     ap.add_argument("--dry-run", action="store_true")
     args = ap.parse_args()
 
-    if not _MANIFESTS.exists():
-        raise InfraError(f"매니페스트 폴더가 없습니다: {_MANIFESTS}")
+    profiles = _load_profiles()
+    review = profiles.get("review_status", "unreviewed")
+    boundary = _boundary_months(profiles)
+    print(f"설정 {_PROFILES.name} (작성 {profiles.get('compiled_at')}, 검수 {review})")
+    print(f"  세대 구간: {[(g['generation'], g.get('effective_from'), g.get('effective_to')) for g in profiles['generations']]}")
+    if review != "reviewed":
+        print("  ★검수 전이다 — 판정 결과에 generation_review 를 남긴다(그대로 믿지 않는다).")
 
     dist = collections.Counter()
+    lines = collections.Counter()
     conf = collections.Counter()
-    skipped = 0
     for m in sorted(_MANIFESTS.glob("*.jsonl")):
         rows = [
             json.loads(line)
             for line in m.read_text(encoding="utf-8").splitlines()
             if line.strip()
         ]
-        changed = False
         for r in rows:
+            #: ★격리된 문서(사업방법서·여행실손·비의료실손)는 판정 대상이 아니다.
+            #:   세지도 않는다 — 세면 분모가 부풀어 통계가 거짓말을 한다.
+            if (r.get("excluded_reason") or "").strip():
+                continue
+            name = r.get("product_name") or r.get("original_name") or ""
+            line = product_line(name, profiles)
+            r["product_line"] = line
+            lines[line] += 1
+
+            #: 이전 판정을 지우고 다시 넣는다(잘못 박힌 값이 남지 않게).
+            for k in ("generation", "generation_label", "generation_note"):
+                r.pop(k, None)
+
             start = (r.get("sale_start") or "").strip()
             if not start or len(start) < 8 or start == "00000000":
-                #: ★날짜를 모르면 세대도 모른다. 비워 둔다.
-                if r.get("generation") is not None:
-                    r.pop("generation", None)
-                    r.pop("generation_label", None)
-                    changed = True
                 r["generation_confidence"] = "unknown"
-                skipped += 1
+                dist["날짜모름"] += 1
+                continue
+            if line != "standard":
+                #: ★특수 라인은 일반 실손의 세대 축이 아니다.
+                r["generation_confidence"] = "not_applicable"
+                dist[f"{line}(세대축 아님)"] += 1
                 continue
 
-            gen, label = generation_of(start)
-            r["generation"] = gen
-            r["generation_label"] = label
+            g = generation_of(start, line, profiles)
+            if g is None:
+                r["generation_confidence"] = "unknown"
+                dist["구간없음"] += 1
+                continue
 
-            #: 신뢰도 — 날짜 등급과 경계 근접 여부를 함께 본다.
+            r["generation"] = g["generation"]
+            r["generation_label"] = g["label"]
             date_conf = r.get("date_confidence", "exact")
-            if date_conf == "month" and start[:6] in _BOUNDARY_MONTHS:
-                #: 경계달인데 일자를 모른다 → 세대가 갈릴 수 있다.
+            if date_conf == "month" and start[:6] in boundary:
                 gc = "ambiguous"
             elif date_conf == "month":
                 gc = "month"
             else:
                 gc = "exact"
             r["generation_confidence"] = gc
-
-            if start >= _UNVERIFIED_FROM:
-                r["generation_note"] = "2026-07 개정 — 세대 교체 여부 미확인"
-
-            dist[f"{gen}세대({label})"] += 1
+            r["generation_review"] = review
+            dist[f"{g['generation']}세대"] += 1
             conf[gc] += 1
-            changed = True
 
-        if changed and not args.dry_run:
+        if not args.dry_run:
             tmp = m.with_suffix(".jsonl.tmp")
             tmp.write_text(
-                "".join(json.dumps(r, ensure_ascii=False) + "\n" for r in rows),
+                "".join(json.dumps(x, ensure_ascii=False) + "\n" for x in rows),
                 encoding="utf-8",
             )
             tmp.replace(m)
 
-    print("세대 분포(행 기준):")
+    print("\n상품 라인(행 기준):")
+    for k, v in lines.most_common():
+        print(f"  {k:<20}{v:>5}")
+    print("\n판정 결과:")
     for k in sorted(dist):
-        print(f"  {k:<16}{dist[k]:>5}행")
+        print(f"  {k:<22}{dist[k]:>5}")
     print(f"\n세대 판정 신뢰도: {dict(conf)}")
-    print(f"날짜를 몰라 판정 못 한 행 {skipped}")
     if args.dry_run:
         print("(dry-run: 아무것도 쓰지 않았습니다.)")
 

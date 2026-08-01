@@ -60,6 +60,11 @@ def _targets(insurer: str | None, limit: int) -> list[dict]:
         sha = r.get("sha256", "")
         if not sha:
             continue
+        #: ★판정 대상이 아닌 문서는 전처리하지 않는다.
+        #:   사업방법서·여행실손 180건을 `data/raw/excluded/` 로 옮겨 놨다.
+        #:   여기서 걸러야 산출물에 섞이지 않는다(`classify_documents.py`).
+        if (r.get("excluded_reason") or "").strip():
+            continue
         if insurer and f"/{insurer}/" not in r.get("saved_as", "").replace("\\", "/"):
             continue
         #: 같은 sha 가 여러 행이면 **정보가 많은 행**을 대표로 쓴다.
