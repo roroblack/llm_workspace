@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -49,7 +50,8 @@ _RAW = _ROOT / "data" / "raw" / "insurance_terms"
 _MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
 _OUT = _ROOT / "data" / "extracted"
 
-SCHEMA_VERSION = "1"
+#: v2 — 텍스트 정규화 추가(제어문자·사용자영역 글리프 제거). §_clean_text
+SCHEMA_VERSION = "2"
 #: 이 값이 바뀌면 같은 PDF 라도 결과가 달라진다. 산출물에 함께 기록한다.
 EXTRACTOR = f"pymupdf/{fitz.__doc__.split()[1] if fitz.__doc__ else 'unknown'}"
 
@@ -69,17 +71,67 @@ def _load_manifest() -> list[dict]:
     return records
 
 
+#: 지워야 할 것 1 — C0 제어문자(줄바꿈·탭은 남긴다).
+#: 지워야 할 것 2 — 사용자 정의 영역(PUA) 글리프.
+_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_PUA = re.compile(r"[-]")
+
+
+def _clean_text(s: str) -> tuple[str, int, int]:
+    """텍스트 정규화. `(정리된 문자열, 지운 제어문자 수, 지운 PUA 수)`.
+
+    ★왜 필요한가 — **검색이 깨진다**
+
+        추출본을 열어 보니 이랬다(실측).
+
+            '회사는\\x01 다음\\x01 중\\x01 어느\\x01 한\\x01 가지의\\x01 경우에...'
+
+        `\\x01` 이 낱말마다 끼어 있다. 이 상태로는
+        `"보험금을 지급하지 않습니다"` 로 검색해도 **안 걸린다.**
+        보장 판정에서 면책 조항을 못 찾는다는 뜻이다.
+
+        표본 64건 중 **27건(42%)** 이 오염돼 있었고 `\\x01` 이 279,623회 나왔다.
+
+    ★지워도 되는지 확인했다
+
+        `\\x01` 은 **항상 공백 바로 앞**에 온다(상위 조합 전부 `앞=글자 뒤=' '`).
+        즉 공백의 잉여 마커이고, 지우면 원문이 그대로 남는다.
+        `\\uf000` 은 줄머리에 오는 **장식 글리프**다(`앞='\\n' 뒤='회'`).
+
+        ★①②③ 같은 원문자는 **PUA 가 아니다**(U+2460~). 지워지지 않는다.
+
+    ★조용히 지우지 않는다
+
+        몇 자를 지웠는지 산출물 `stats.normalized` 에 남긴다.
+        나중에 "이 문서 왜 이러지" 할 때 근거가 된다.
+    """
+    n_ctl = len(_CONTROL.findall(s))
+    n_pua = len(_PUA.findall(s))
+    if n_ctl:
+        s = _CONTROL.sub("", s)
+    if n_pua:
+        s = _PUA.sub("", s)
+    return s, n_ctl, n_pua
+
+
 def extract(pdf: Path, meta: dict) -> dict:
     """한 건을 페이지별 JSON 구조로 만든다."""
     doc = fitz.open(str(pdf))
     pages: list[dict] = []
     total_tables = 0
+    n_ctl_all = n_pua_all = 0
     for i, page in enumerate(doc):
-        text = page.get_text()
+        text, n_ctl, n_pua = _clean_text(page.get_text())
+        n_ctl_all += n_ctl
+        n_pua_all += n_pua
         tables: list[list[list[str]]] = []
         try:
             for t in page.find_tables().tables:
-                cells = [[("" if c is None else str(c)).strip() for c in row] for row in t.extract()]
+                #: ★표 안의 글자도 같은 오염을 겪는다. 같이 정리한다.
+                cells = [
+                    [_clean_text("" if c is None else str(c))[0].strip() for c in row]
+                    for row in t.extract()
+                ]
                 if cells:
                     tables.append(cells)
         except Exception:  # noqa: BLE001
@@ -117,7 +169,13 @@ def extract(pdf: Path, meta: dict) -> dict:
         },
         #: ★받았다는 이유로 무엇인지 안다고 하지 않는다. 식별은 별도 단계다.
         "identification": meta.get("identification", "unidentified"),
-        "stats": {"pages": n, "text_length": text_len, "tables": total_tables},
+        "stats": {
+            "pages": n,
+            "text_length": text_len,
+            "tables": total_tables,
+            #: ★무엇을 지웠는지 남긴다. 조용한 변환은 나중에 원인을 못 찾게 한다.
+            "normalized": {"control_removed": n_ctl_all, "pua_removed": n_pua_all},
+        },
         "pages": pages,
     }
 

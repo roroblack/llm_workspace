@@ -49,9 +49,33 @@ SCHEMA_VERSION = "1"
 #: 조항 머리는 줄 첫머리에 오고, 상호참조는 문장 중간에 온다.
 _ARTICLE = re.compile(
     r"^[ \t ]{0,6}제\s*(\d{1,3})\s*조(?:의\s*(\d{1,2}))?"
-    r"\s*(?:[（(]\s*([^)）\n]{1,60})\s*[)）])?",
+    #: 제목 괄호는 `()` 말고 `【】` `[]` 도 쓴다(NH 문서 실측).
+    r"\s*(?:[（(\[【]\s*([^)）\]】\n]{1,60})\s*[)）\]】])?",
     re.MULTILINE,
 )
+#: ★특별약관은 `제N조` 대신 **`N. (제목)`** 을 쓴다.
+#:
+#:   자동차사고 변호사선임비용(...)(실손) 특별약관
+#:   1. (특별약관의 적용범위 및 효력)
+#:   2. (보험금의 지급사유)
+#:
+#: 이걸 몰라서 표본 10건 중 4건이 "조항 머리를 하나도 못 찾음"으로 실패했다.
+#:
+#: ★오탐이 무섭다. 본문에는 `1.` 로 시작하는 번호 목록이 널려 있다.
+#:   그래서 **줄 전체가 `N. (제목)` 인 것만** 인정한다.
+#:   실측(실패 문서 13쪽): 넓은 `^\d+\.` 후보는 258행인데
+#:   줄 전체가 `N. (제목)` 인 것은 **6행**뿐이었다(코덱스 교차검증).
+#:
+#: `N-M.` 도 받는다(조항의 세분화. 실측 21/37 문서에서 발견).
+_NUMBERED = re.compile(
+    r"^[ \t ]{0,6}(\d{1,3})(?:-(\d{1,2}))?\s*[.．]\s*"
+    r"[（(\[【]\s*([^)）\]】\n]{2,60})\s*[)）\]】]\s*$",
+    re.MULTILINE,
+)
+#: `N. (제목)` 을 조항으로 인정하려면 **번호열이 형성**돼야 한다.
+#: 단독으로 하나만 있으면 본문 인용일 수 있다.
+NUMBERED_MIN_HEADS = 3
+
 #: 목차 판정용(줄 위치 무관). 목차는 조 번호가 촘촘히 나열되므로 전체 검색이 맞다.
 _ARTICLE_ANY = re.compile(r"제\s*\d{1,3}\s*조")
 #: 항 번호(①②③ 또는 1. 2. 3.)
@@ -114,11 +138,36 @@ def build(page_doc: dict) -> dict:
             heads.append(
                 (pg["page"], m.start(), m.group(1), m.group(2) or "", (m.group(3) or "").strip())
             )
+
+    #: ★`제N조` 가 하나도 없으면 **특별약관 번호 형식**을 시도한다.
+    #:   두 형식을 **섞지 않는다** — 섞으면 본문의 번호 목록이 조항으로 끼어든다.
+    #:   `제N조` 가 있는 문서는 그것이 정답이고, `N.` 은 그 안의 호(號)다.
+    numbering = "article"
     if not heads:
-        raise InfraError(
-            "조항 머리(`제○조`)를 하나도 찾지 못했습니다. "
-            "약관이 아니거나 텍스트 추출이 실패했을 수 있습니다."
-        )
+        cand: list[tuple[int, int, str, str, str]] = []
+        for pg in pages:
+            if pg["page"] in toc_pages:
+                continue
+            for m in _NUMBERED.finditer(pg["text"]):
+                cand.append(
+                    (pg["page"], m.start(), m.group(1), m.group(2) or "", m.group(3).strip())
+                )
+        #: 번호열이 형성돼야 조항으로 본다. 하나뿐이면 본문 인용일 수 있다.
+        if len(cand) >= NUMBERED_MIN_HEADS:
+            heads = cand
+            numbering = "numbered"
+
+    if not heads:
+        #: ★가짜 조항 1개를 만들지 않는다.
+        #:
+        #:   문서 전체를 "조항 1개"로 가장하면 파싱이 성공한 것처럼 보이고,
+        #:   근거 조항·페이지 추적이 망가진다. 보장 판정에 그대로 쓰이면
+        #:   "약관 어디에 근거했나"를 댈 수 없게 된다.
+        #:
+        #:   대신 **성격이 다른 산출물**임을 명시한 fallback 을 만든다.
+        #:   RAG 검색에는 쓰되(문서를 버릴 이유는 없다), 자동 판정에는
+        #:   `parse_status` 를 보고 걸러야 한다.
+        return _fallback(page_doc, pages, toc_pages, section_of_page)
 
     text_of = {pg["page"]: pg["text"] for pg in pages}
     tables_of = {pg["page"]: pg.get("tables", []) for pg in pages}
@@ -141,7 +190,11 @@ def build(page_doc: dict) -> dict:
 
         # ── 9) 계층형 청킹: 긴 조항은 항 단위로 쪼갠다 ──
         paras = [x for x in _PARA.split(body) if x and x.strip()]
-        label = f"제{no}조" + (f"의{sub}" if sub else "")
+        if numbering == "numbered":
+            #: 특별약관 번호 형식. `제N조` 가 아니므로 그렇게 부르지 않는다.
+            label = f"{no}." + (f"{sub}" if sub else "")
+        else:
+            label = f"제{no}조" + (f"의{sub}" if sub else "")
         section_name = section_of_page.get(page, "미상")
         clauses.append(
             {
@@ -172,6 +225,10 @@ def build(page_doc: dict) -> dict:
 
     return {
         "schema_version": SCHEMA_VERSION,
+        #: ★이 문서가 어떻게 파싱됐는지. 판정에 쓸 수 있는지 여기서 갈린다.
+        "parse_status": "ok",
+        #: 어떤 번호 체계로 쪼갰나. `제N조` 인지 특별약관의 `N.` 인지.
+        "numbering": numbering,
         "toc_pages": sorted(toc_pages),
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": page_doc["source"],
@@ -187,6 +244,75 @@ def build(page_doc: dict) -> dict:
         },
         "sections": sorted(set(section_of_page.values())),
         "clauses": clauses,
+    }
+
+
+def _fallback(page_doc: dict, pages: list[dict], toc_pages: set[int],
+              section_of_page: dict[int, str]) -> dict:
+    """조항 머리를 못 찾은 문서 — **페이지 단위 청크**로 남긴다.
+
+    ★왜 실패로 버리지 않나
+
+        문서를 버리면 검색에서 아예 사라진다. 약관 원문은 있는데
+        "그런 문서 없다"고 답하게 되는 것이 더 나쁘다.
+
+    ★왜 조항 1개로 만들지 않나
+
+        파싱이 성공한 것처럼 보이기 때문이다. 그러면 통계에서 정상 문서와
+        섞이고, 보장 판정이 "근거 조항"을 대야 할 때 문서 전체를 들이대게 된다.
+
+        그래서 `parse_status="no_clause_heads"` / `chunk_type="page_fallback"`
+        을 **명시**한다. 자동 판정은 이 값을 보고 걸러야 한다.
+    """
+    chunks: list[dict] = []
+    for pg in pages:
+        if pg["page"] in toc_pages:
+            continue
+        body = pg["text"]
+        if not body.strip():
+            continue
+        section_name = section_of_page.get(pg["page"], "미상")
+        chunks.append(
+            {
+                "clause_no": f"p{pg['page']}",
+                "title": "",
+                "section": section_name,
+                "qualified_no": f"{section_name}/p{pg['page']}",
+                #: ★조항이 아니다. 이름을 다르게 붙여 섞이지 않게 한다.
+                "chunk_type": "page_fallback",
+                "locator": {"page_from": pg["page"], "page_to": pg["page"], "char_offset": 0},
+                "text": body,
+                "char_length": len(body),
+                "paragraph_count": 0,
+                "tables_on_pages": (
+                    {str(pg["page"]): len(pg.get("tables", []))} if pg.get("tables") else {}
+                ),
+                "content_hash": _clause_hash(section_name, "", body),
+            }
+        )
+
+    return {
+        "schema_version": SCHEMA_VERSION,
+        #: ★"성공"이 아니다. 판정에 쓰려면 이 값을 확인해야 한다.
+        "parse_status": "no_clause_heads",
+        "numbering": "none",
+        "toc_pages": sorted(toc_pages),
+        "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "source": page_doc["source"],
+        "identification": page_doc.get("identification", "unidentified"),
+        "extractor": page_doc.get("extractor", ""),
+        "stats": {
+            "pages": page_doc["stats"]["pages"],
+            #: ★조항이 아니므로 `clauses` 를 0 으로 둔다. 청크 수는 따로 센다.
+            "clauses": 0,
+            "fallback_chunks": len(chunks),
+            "sections": len(set(section_of_page.values())),
+            "toc_pages_excluded": len(toc_pages),
+            "unique_clause_hashes": len({c["content_hash"] for c in chunks}),
+            "duplicate_clauses": 0,
+        },
+        "sections": sorted(set(section_of_page.values())),
+        "clauses": chunks,
     }
 
 
