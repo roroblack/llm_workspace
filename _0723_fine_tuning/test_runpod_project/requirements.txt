@@ -1,0 +1,32 @@
+# PyTorch 딥러닝 프레임워크입니다.
+torch
+
+# Hugging Face 사전 학습 모델과 Tokenizer를 사용합니다.
+transformers
+
+# JSON, CSV, Hugging Face 데이터셋을 처리합니다.
+datasets
+
+# Supervised Fine-Tuning을 위한 SFTTrainer를 제공합니다.
+trl
+
+# LoRA, QLoRA 등 PEFT 학습 기능을 제공합니다.
+peft
+
+# 다중 GPU 및 혼합 정밀도 학습을 지원합니다.
+accelerate
+
+# 모델을 8bit 또는 4bit로 양자화하여 GPU 메모리를 절약합니다.
+bitsandbytes
+
+# 환경변수 파일인 .env를 읽을 때 사용합니다.
+python-dotenv
+
+# 학습 진행 상황과 손실값을 시각화할 때 사용할 수 있습니다.
+tensorboard
+
+# 모델 및 데이터셋 다운로드 기능을 제공합니다.
+huggingface-hub
+
+# SentencePiece 기반 Tokenizer가 필요한 모델을 지원합니다.
+sentencepiece

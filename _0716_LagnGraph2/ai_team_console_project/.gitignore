@@ -1,0 +1,11 @@
+.venv/
+venv/
+.idea/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.env
+reports/*
+!reports/.gitkeep
+output/*
+!output/.gitkeep

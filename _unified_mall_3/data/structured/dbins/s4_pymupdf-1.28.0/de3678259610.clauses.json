@@ -1,0 +1,113 @@
+{
+ "schema_version": "4",
+ "parse_status": "ok",
+ "parse_warnings": [],
+ "numbering": "numbered",
+ "toc_pages": [],
+ "built_at": "2026-08-01T17:02:55+00:00",
+ "source": {
+  "insurer": "DB손해보험",
+  "product_name": "요양실손 보장한도 변경 제도성 특별약관",
+  "product_code": "7584",
+  "sale_start": "20231201",
+  "sale_end": "",
+  "url": "https://www.idbins.com/cYakgwanDown.do?FilePath=InsProduct/%EC%95%BD%EA%B4%80_%EC%9A%94%EC%96%91%EC%8B%A4%EC%86%90%20%EB%B3%B4%EC%9E%A5%ED%95%9C%EB%8F%84%20%EB%B3%80%EA%B2%BD%20%EC%A0%9C%EB%8F%84%EC%84%B1%20%ED%8A%B9%EB%B3%84%EC%95%BD%EA%B4%80_20231201.pdf",
+  "sha256": "de36782596109faa2947623b09d8b680cb3fa610f6c2de0e17e02541fc1a71eb",
+  "bytes": 79999
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 2,
+  "clauses": 5,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 5,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "요양실손 보장한도 변경 특별약관"
+ ],
+ "clauses": [
+  {
+   "clause_no": "1.",
+   "title": "특약의 적용범위",
+   "section": "요양실손 보장한도 변경 특별약관",
+   "qualified_no": "요양실손 보장한도 변경 특별약관/1.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 38
+   },
+   "text": "1. (특약의 적용범위)\n이 특약은 2023년 7월 1일 이후에 DB손해보험(주)의 장기보험(이하 “당사”라 합\n니다)의 아래 열거한 보장(이하 “해당 보장”이라 합니다) 중 한가지 이상을 가입\n한 계약 중 아래 ① 내지 ②의 조건을 모두 충족한 경우에 적용합니다. 추후 해\n당 보장의 대상이 추가될 수 있습니다.\n   \n장기요양(1~5등급) 요양원 및 재가급여보장(실손)(비갱신형/갱신형)\n장기요양(1~5등급) 요양원 상급침실이용보장(실손)(비갱신형/갱신형)\n장기요양(1~5등급) 요양원 식사재료비보장(실손)(비갱신형/갱신형)\n    ① 보장한도 변경신청 시 해당 보장이 유효한 경우\n    ② 해당 보장의 보장개시일로부터 보장한도 변경일까지 국민건강보험공단 등급 \n    판정위원회에 의해 1~5등급의 장기요양등급을 판정받지 않은 경우\n위 .①에서 유효한 경우란 보험료 미납으로 인한 실효, 해지, 기타 사유로 인하\n여 효력이 없어지지 않은 것을 말합니다.\n위 .②에서 보장한도 변경일이란 최초 보험계약 시작일부터 그날을 포함하여\n매10년(갱신형의 경우 매갱신주기) 단위로 도래하는 날을 말하며 최초 보험계약\n시작일과 동일한 월,일을 말합니다. 다만, 해당연도의 계약해당일이 없는 경우에\n는 해당 월의 마지막 날을 보장한도 변경일로 합니다.\n",
+   "char_length": 641,
+   "paragraph_count": 5,
+   "tables_on_pages": {},
+   "content_hash": "fc16ac71072722b14a4194e5d9a7f20e27c525d02669f05c9a7d7e1c38a00dd9"
+  },
+  {
+   "clause_no": "2.",
+   "title": "보장한도 변경의 안내 및 신청",
+   "section": "요양실손 보장한도 변경 특별약관",
+   "qualified_no": "요양실손 보장한도 변경 특별약관/2.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 679
+   },
+   "text": "2. (보장한도 변경의 안내 및 신청)\n회사는 계약자에게 보장한도 변경일 이전까지 2회 이상 변경 의사 여부를 확인하\n는 내용 등을 서면(등기우편 등), 전화(음성녹음), 전자문서, 휴대전화 문자메세지\n또는 이에 준하는 전자적 의사표시 등으로 알려드리고, 회사는 계약자의 변경의\n사를 전화(음성녹음), 직접 방문 또는 전자적 의사표시, 통신판매계약의 경우 통\n신수단을 통해 확인합니다.\n보장한도 변경일까지 회사가 계약자의 보장한도 변경 의사를 확인하지 못한 경우\n(계약자의 연락두절로 회사의 안내가 계약자에게 도달하지 못한 경우 포함)에는\n보장한도 변경 의사가 없는 것으로 봅니다.\n",
+   "char_length": 326,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "9ad4495fb1b9c2d5a860545a2e5351b90a0bcc38d2b891238a0e0e8a0b56adc8"
+  },
+  {
+   "clause_no": "3.",
+   "title": "보장한도 변경의 정의 및 적용",
+   "section": "요양실손 보장한도 변경 특별약관",
+   "qualified_no": "요양실손 보장한도 변경 특별약관/3.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 1005
+   },
+   "text": "3. (보장한도 변경의 정의 및 적용)\n이 특별약관에 있어서 보장한도 변경이라 함은 해당 보장과 동일하거나 유사한\n보장에 대하여 변경 시점 회사가 판매하는 보장한도 또는 자기부담금으로 변경하\n는 것을 말합니다.\n보장한도 변경 적용일은 회사의 보장한도 변경 신청 승낙 후 최초 도래하는 보장\n한도 변경일로 합니다.\n",
+   "char_length": 175,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "72fde51e75f05a565b87cf4d4c5d706a16e5069e80b358b9ef24866897da5a09"
+  },
+  {
+   "clause_no": "4.",
+   "title": "보장한도 변경에 관한 세부규정",
+   "section": "요양실손 보장한도 변경 특별약관",
+   "qualified_no": "요양실손 보장한도 변경 특별약관/4.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 1180
+   },
+   "text": "4. (보장한도 변경에 관한 세부규정)\n해당 보장이 변경된 경우 보장한도 변경 적용일부터 납입하는 보험료가 변경되며,\n‘보험료 및 해약환급금 산출방법서’에서 정하는 방법에 따라 이후 기간 보장을 위한\n재원인 계약자적립액 및 미경과보험료의 정산으로 계약자가 추가납입하여야 할(또는\n반환받을) 금액이 발생할 수 있습니다.\n",
+   "char_length": 178,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "da93dba5fe30e5d94a5133df09b9d19075319ee87cf5c69789a71928f6aea024"
+  },
+  {
+   "clause_no": "5.",
+   "title": "준용규정",
+   "section": "요양실손 보장한도 변경 특별약관",
+   "qualified_no": "요양실손 보장한도 변경 특별약관/5.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 1358
+   },
+   "text": "5. (준용규정)\n이 특별약관에서 정하지 않은 사항에 대하여는 보통약관 및 해당 특별약관의 규정을\n따릅니다.\n",
+   "char_length": 61,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "dae445d9ac48e21dcd44c52c9363abf03bda494eb15563b41b828d0d160828f1"
+  }
+ ]
+}

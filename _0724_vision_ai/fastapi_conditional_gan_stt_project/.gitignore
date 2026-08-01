@@ -1,0 +1,10 @@
+.idea/
+.venv/
+__pycache__/
+*.pyc
+.env
+data/
+storage/audio/
+storage/transcripts/
+storage/generations/
+storage/models/

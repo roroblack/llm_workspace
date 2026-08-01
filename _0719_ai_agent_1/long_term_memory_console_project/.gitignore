@@ -1,0 +1,10 @@
+.venv/
+venv/
+.idea/
+__pycache__/
+*.py[cod]
+.env
+*.log
+data/user_profiles_rw.json
+data/*.tmp
+data/profiles.db

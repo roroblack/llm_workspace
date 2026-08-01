@@ -1,0 +1,115 @@
+{
+ "schema_version": "4",
+ "parse_status": "ok",
+ "parse_warnings": [],
+ "numbering": "article",
+ "toc_pages": [
+  4
+ ],
+ "built_at": "2026-08-01T18:56:35+00:00",
+ "source": {
+  "insurer": "NH농협생명",
+  "product_name": "[제도성특약]실손의료비보험 안정화할인특약_2201",
+  "product_code": "FILE_000000000018250",
+  "sale_start": "20220101",
+  "sale_end": "",
+  "url": "https://www.nhlife.co.kr/pdfViewer.nhl?apdFlid=FILE_000000000018250&fileSeqn=2",
+  "sha256": "8f08e793e7f82a147a5b1543c2ff175de68568cd6c4564fbe3b8f0eb91838e33",
+  "bytes": 95999
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 6,
+  "clauses": 5,
+  "sections": 1,
+  "toc_pages_excluded": 1,
+  "unique_clause_hashes": 5,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": [
+  {
+   "clause_no": "제1조",
+   "title": "목적",
+   "section": "머리말",
+   "qualified_no": "머리말/제1조",
+   "locator": {
+    "page_from": 5,
+    "page_to": 5,
+    "char_offset": 47
+   },
+   "text": "제1조【목적】\n이 특약은 보험회사(이하 ‘회사’라 합니다)에서 별도로 정한 보험료 할인제도를 적용하\n기 위하여 보험계약에 부가됩니다.\n",
+   "char_length": 75,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "030b8d52ff7374919ca4dfd4e4937842d34eb47ac874a82edb08f4b9da1c7e76"
+  },
+  {
+   "clause_no": "제2조",
+   "title": "용어의 정의",
+   "section": "머리말",
+   "qualified_no": "머리말/제2조",
+   "locator": {
+    "page_from": 5,
+    "page_to": 5,
+    "char_offset": 122
+   },
+   "text": "제2조【용어의 정의】\n이 특약에서 사용되는 용어의 정의는, 이 특약의 다른 조항에서 달리 정의되지 않는 한 \n다음과 같습니다.\n  1. 계약자 : 회사와 계약을 체결하고 보험료를 납입할 의무를 지는 사람을 말합니다.\n  2. 보험기간 : 계약에 따라 보장을 받는 기간을 말합니다.\n  3. 최초계약 : 계약자의 청약과 회사의 승낙으로 최초로 체결되는 계약을 말합니다.\n  4. 갱신계약 : 보험기간 만료 후 계약의 약관에 의해 갱신된 계약을 말합니다. \n  5. 실손의료비보험계약 : 보험업감독업무시행세칙 제5-13조(표준사업방법서 및 표\n준약관) 별표14 및 별표15에서 정한 실손의료비 보장을 말합니다. 단, 보험업감\n독규정 제7-63조(제3보험의 보험상품설계 등)에서 정한 노후실손의료보험 및 \n유병력자실손의료보험(간편실손의료비보험)은 제외합니다.\n  6. 표준화 실손의료비보험계약 : 2009년 10월 30일부터 2017년 3월 31일까지 최\n초계약이 체결된 실손의료비보험계약으로 대상상품은 사업방법서에서 정하는 바\n에 따릅니다.\n  7. 신 실손의료비보험계약 : 2017년 4월 1일부터 2021년 6월 30일까지 최초계약이 \n체결된 실손의료비보험계약으로 대상상품은 사업방법서에서 정하는 바에 따릅니\n다.\n  8. 4세대 실손의료비보험계약 : 2021년 7월 1일 이후에 최초계약이 체결된 실손의\n료비보험계약으로 대상상품은 사업방법서에서 정하는 바에 따릅니다.\n",
+   "char_length": 711,
+   "paragraph_count": 16,
+   "tables_on_pages": {},
+   "content_hash": "17b397e10326ab8cb640800c4430a3642535946ef482a5bb6f850965c3faa617"
+  },
+  {
+   "clause_no": "제3조",
+   "title": "특약의 적용대상 및 적용기간",
+   "section": "머리말",
+   "qualified_no": "머리말/제3조",
+   "locator": {
+    "page_from": 5,
+    "page_to": 6,
+    "char_offset": 833
+   },
+   "text": "제3조【특약의 적용대상 및 적용기간】\n① 이 특약의 적용대상은 아래의 조건에 해당하는 실손의료비보험계약(이하 ‘해당계약’\n이라 합니다)으로 합니다.\n  1. 표준화 실손의료비보험계약\n: 2022년 2월 1일부터 2022년 12월 31일까지 갱신이 도래하는 갱신계약\n\n실손의료비보험 안정화할인특약_2201\n5\n  2. 신 실손의료비보험계약\n: 2022년 1월 1일부터 2022년 12월 31일까지 갱신이 도래하는 갱신계약\n  3 4세대 실손의료비보험계약\n: 2022년 1월 1일부터 2022년 12월 31일까지 체결된 최초계약 및 갱신이 도래\n하는 갱신계약\n② 이 특약의 적용기간은 해당계약의 계약일(최초계약의 경우 계약체결일이며, 갱신계\n약의 경우 갱신일)부터 1년으로 합니다. 단, 차회 이후 갱신 시에는 이 특약을 적용\n하지 않습니다.\n",
+   "char_length": 414,
+   "paragraph_count": 8,
+   "tables_on_pages": {},
+   "content_hash": "074437cddad06892a23d3528739e258894afce2a6dbf9603c412929244e8604b"
+  },
+  {
+   "clause_no": "제4조",
+   "title": "보험요율의 적용방법",
+   "section": "머리말",
+   "qualified_no": "머리말/제4조",
+   "locator": {
+    "page_from": 6,
+    "page_to": 6,
+    "char_offset": 265
+   },
+   "text": "제4조【보험요율의 적용방법】\n① 회사는 이 특약의 적용기간 동안 계약자가 납입하는 영업보험료에 사업방법서에서 \n정하는 바에 따라 할인을 적용합니다.\n② 제1항에도 불구하고 해당계약에 실손의료비보험 안정화할인 외에 추가적인 할인을 \n적용하는 경우에는 해당 할인율을 중복하여 적용하며, 할인금액의 합계액은 해당계\n약의 예정사업비를 한도로 적용합니다. \n③ 제2항의 예정사업비란, 해당계약의 ‘보험료 및 책임준비금 산출방법서’에서 정한 \n「신계약비, 유지비, 수금비」또는「계약체결비용, 계약관리비용」을 말합니다. \n",
+   "char_length": 285,
+   "paragraph_count": 6,
+   "tables_on_pages": {},
+   "content_hash": "1046e301f952522915a6d72dc35f473a1db234ea71a28e6359c007f46ccee0e8"
+  },
+  {
+   "clause_no": "제5조",
+   "title": "해당계약 약관 규정의 준용",
+   "section": "머리말",
+   "qualified_no": "머리말/제5조",
+   "locator": {
+    "page_from": 6,
+    "page_to": 6,
+    "char_offset": 550
+   },
+   "text": "제5조【해당계약 약관 규정의 준용】\n이 특약에 정하지 않은 사항에 대하여는 해당계약 약관의 규정을 따릅니다.\n",
+   "char_length": 61,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "858bae72f1b6689918f32d9b0bbb0116003c72b39ad6b486dd315a74cfcdb642"
+  }
+ ]
+}

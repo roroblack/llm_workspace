@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <!-- 한글이 깨지지 않도록 UTF-8 문자 인코딩을 지정합니다. -->
+    <meta charset="UTF-8">
+    <!-- 모바일과 데스크톱에서 화면 폭을 장치 크기에 맞춥니다. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- 브라우저 탭에 표시할 제목입니다. -->
+    <title>{{ app_name }}</title>
+    <!-- 별도 CSS 파일을 FastAPI 정적 파일 경로에서 불러옵니다. -->
+    <link rel="stylesheet" href="/static/style.css?v=20260731-3">
+</head>
+<body>
+    <!-- 전체 페이지 내용을 중앙 컨테이너로 감쌉니다. -->
+    <main class="page-container">
+        <!-- 프로젝트 제목과 핵심 기능을 표시합니다. -->
+        <header class="hero">
+            <p class="eyebrow">FastAPI · BLIP · Stable Diffusion · Whisper · TTS</p>
+            <h1>멀티모달 AI 음성 스튜디오</h1>
+            <p>사진을 문장으로 설명하고, 텍스트 또는 음성 프롬프트로 새로운 이미지를 생성합니다.</p>
+        </header>
+
+        <!-- 두 서비스를 전환하는 탭 버튼 영역입니다. -->
+        <nav class="tabs" aria-label="서비스 선택">
+            <button id="captionTabButton" class="tab-button active" type="button">이미지 캡셔닝</button>
+            <button id="diffusionTabButton" class="tab-button" type="button">Stable Diffusion</button>
+        </nav>
+
+        <!-- 이미지 캡셔닝 서비스 영역입니다. -->
+        <section id="captionPanel" class="service-panel active">
+            <div class="panel-heading">
+                <div>
+                    <span class="step-label">SERVICE 01</span>
+                    <h2>사진을 문장으로 설명</h2>
+                </div>
+                <span class="badge">Image → Text → Voice</span>
+            </div>
+
+            <!-- 이미지 업로드 폼입니다. -->
+            <form id="captionForm" class="form-grid">
+                <label class="drop-zone" for="captionFile">
+                    <input id="captionFile" name="file" type="file" accept="image/jpeg,image/png,image/webp,image/bmp" required>
+                    <strong>사진 선택</strong>
+                    <span>JPG, PNG, WEBP, BMP · 최대 15MB</span>
+                </label>
+                <button class="primary-button" type="submit">캡션 생성</button>
+            </form>
+
+            <!-- 업로드한 사진 미리보기를 표시합니다. -->
+            <img id="captionPreview" class="preview-image hidden" alt="업로드 이미지 미리보기">
+
+            <!-- 생성된 캡션과 TTS 제어 버튼을 표시합니다. -->
+            <div id="captionResult" class="result-card hidden">
+                <h3>분석 결과</h3>
+                <p><strong>영어 캡션</strong><span id="captionEnglish"></span></p>
+                <p><strong>한국어 설명</strong><span id="captionKorean"></span></p>
+                <div class="button-row">
+                    <button id="captionTtsButton" class="secondary-button" type="button">서버 TTS 재생</button>
+                    <button id="captionBrowserTtsButton" class="ghost-button" type="button">브라우저 음성 재생</button>
+                </div>
+                <audio id="captionAudio" controls class="hidden"></audio>
+            </div>
+        </section>
+
+        <!-- Stable Diffusion 이미지 생성 서비스 영역입니다. -->
+        <section id="diffusionPanel" class="service-panel">
+            <div class="panel-heading">
+                <div>
+                    <span class="step-label">SERVICE 02</span>
+                    <h2>문장 또는 음성으로 이미지 생성</h2>
+                </div>
+                <span class="badge">Voice/Text → Image</span>
+            </div>
+
+            <!-- 마이크 녹음과 STT 상태를 제어하는 버튼입니다. -->
+            <div class="voice-control">
+                <button id="recordButton" class="record-button" type="button">● 음성 녹음 시작</button>
+                <span id="recordStatus">마이크 대기 중</span>
+            </div>
+
+            <!-- 이미지 생성 요청 폼입니다. -->
+            <form id="diffusionForm" class="form-grid">
+                <label>
+                    <span>생성 프롬프트</span>
+                    <textarea id="prompt" name="prompt" rows="4" placeholder="예: 햇빛이 비치는 숲속의 작은 오두막, 사실적인 사진" required></textarea>
+                </label>
+
+                <label>
+                    <span>제외 프롬프트</span>
+                    <textarea id="negativePrompt" name="negative_prompt" rows="2">blurry, low quality, distorted, watermark, text</textarea>
+                </label>
+
+                <div class="parameter-grid">
+                    <label>
+                        <span>반복 횟수</span>
+                        <input id="steps" name="steps" type="number" min="5" max="60" value="40">
+                    </label>
+                    <label>
+                        <span>프롬프트 강도</span>
+                        <input id="guidanceScale" name="guidance_scale" type="number" min="1" max="20" step="0.5" value="8.0">
+                    </label>
+                    <label>
+                        <span>시드(선택)</span>
+                        <input id="seed" name="seed" type="number" min="0" placeholder="비우면 자동 생성">
+                    </label>
+                </div>
+
+                <button class="primary-button" type="submit">이미지 생성</button>
+            </form>
+
+            <!-- Stable Diffusion 생성 결과를 표시합니다. -->
+            <div id="diffusionResult" class="result-card hidden">
+                <h3>생성 결과</h3>
+                <img id="generatedImage" class="preview-image" alt="Stable Diffusion 생성 이미지">
+                <p><strong>사용 시드</strong><span id="generatedSeed"></span></p>
+                <p><strong>영어 변환 프롬프트</strong><span id="generatedEnglishPrompt"></span></p>
+                <button id="promptTtsButton" class="secondary-button" type="button">프롬프트 음성 재생</button>
+                <audio id="promptAudio" controls class="hidden"></audio>
+            </div>
+        </section>
+
+        <!-- 요청 진행 상태와 오류 메시지를 공통으로 표시합니다. -->
+        <div id="messageBox" class="message-box hidden" role="status" aria-live="polite"></div>
+    </main>
+
+    <!-- 화면 동작을 담당하는 JavaScript를 마지막에 로딩합니다. -->
+    <script src="/static/app.js?v=20260731-3"></script>
+</body>
+</html>

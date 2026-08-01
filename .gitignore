@@ -58,3 +58,14 @@ hs_err_pid*
 models/
 **/models/*.pt
 **/models/*.pkl
+
+# 단, app/models/ 는 Pydantic 스키마 소스이므로 추적한다 (산출물 아님).
+# 하위 .py 만 되살리고 __pycache__ 등 산출물은 계속 무시한다.
+!**/app/models/
+!**/app/models/*.py
+
+# 작업 문서(계획서·보고서) — 소스만 푸시
+plans/
+**/plans/
+reports/
+**/reports/

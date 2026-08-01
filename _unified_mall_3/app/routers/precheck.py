@@ -20,16 +20,21 @@ from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, status
 
+from app.adapters import file_clause_store, manifest_policy_resolver
 from app.core.errors import InfraError, ValidationErr
-from app.insurance import precheck
-from app.insurance.policy_version import load_versions
-from app.insurance.schemas import (
+from app.core.usecases import precheck
+from app.schemas.precheck import (
     ExternalCaseSubmission,
     PrecheckRequest,
     PrecheckResult,
 )
 
 router = APIRouter(prefix="/v1", tags=["precheck"])
+
+#: ★유스케이스는 포트만 안다. 구체 어댑터를 고르는 것은 **여기(바깥)** 의 일이다.
+#:   DB 적재가 끝나면 이 줄만 바꾸면 된다 — 유스케이스는 손대지 않는다.
+_POLICIES = manifest_policy_resolver
+_CLAUSES = file_clause_store
 
 #: 약관 버전 목록은 매 요청마다 읽을 필요가 없다.
 _VERSIONS = None
@@ -38,7 +43,7 @@ _VERSIONS = None
 def _versions():
     global _VERSIONS
     if _VERSIONS is None:
-        _VERSIONS = load_versions()
+        _VERSIONS = _POLICIES.load_versions()
     return _VERSIONS
 
 
@@ -50,7 +55,9 @@ def create_precheck(body: PrecheckRequest) -> PrecheckResult:
       추측해서 "보장됩니다"라고 말하지 않는다.
     """
     try:
-        return precheck.run(body, versions=_versions())
+        return precheck.run(
+            body, policies=_POLICIES, clauses=_CLAUSES, versions=_versions()
+        )
     except ValidationErr as e:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=str(e)

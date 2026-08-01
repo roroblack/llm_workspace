@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+<main class="shell">
+    <section class="hero">
+        <div class="logo">GAN</div>
+        <h1>Prompt & Voice Image Generator</h1>
+        <p>숫자 0~9 프롬프트 또는 음성을 조건부 GAN 이미지로 변환합니다.</p>
+    </section>
+
+    <section class="search-area">
+        <form id="generation-form" class="search-form">
+            <input id="prompt-input" type="text" maxlength="500" placeholder="예: 숫자 7을 생성해 주세요" required>
+            <button id="microphone-button" type="button" class="mic-button" aria-label="마이크 녹음 시작">🎙️</button>
+            <button id="generate-button" type="submit" class="generate-button">생성</button>
+        </form>
+        <div class="options">
+            <label for="epochs-input">학습 에포크</label>
+            <input id="epochs-input" type="number" min="1" max="50" value="5">
+            <span>CPU에서는 1~5부터 확인하세요.</span>
+        </div>
+        <div id="microphone-status" class="status idle">
+            <span class="dot"></span>
+            <span id="microphone-status-text">마이크 대기 상태</span>
+        </div>
+        <div id="recording-links" class="links hidden">
+            <a id="audio-link" href="#" target="_blank">녹음 파일</a>
+            <a id="transcript-link" href="#" target="_blank">STT 텍스트</a>
+        </div>
+    </section>
+
+    <section id="progress-section" class="panel hidden">
+        <div class="panel-title"><h2>생성 진행 상태</h2><span id="job-status-badge" class="badge">대기</span></div>
+        <p id="job-message">작업 준비 중</p>
+        <div class="track"><div id="progress-bar" class="bar"></div></div>
+        <div class="detail"><span id="epoch-progress">0 / 0 에포크</span><span id="loss-progress">G Loss: - | D Loss: -</span></div>
+    </section>
+
+    <section id="final-result-section" class="panel hidden">
+        <div class="panel-title"><h2>최종 생성 결과</h2><span id="target-digit-badge" class="badge">숫자 -</span></div>
+        <div class="result-grid">
+            <img id="final-image" alt="최종 GAN 생성 이미지">
+            <div>
+                <h3>사용한 프롬프트</h3><p id="result-prompt" class="text-box"></p>
+                <h3>정규화된 조건</h3><p id="normalized-prompt" class="text-box"></p>
+            </div>
+        </div>
+    </section>
+
+    <section id="epoch-gallery-section" class="panel hidden">
+        <div class="panel-title"><h2>에포크별 생성 이미지</h2><span id="image-count-badge" class="badge">0장</span></div>
+        <div id="epoch-gallery" class="gallery"></div>
+    </section>
+
+    <section id="error-section" class="error hidden"><strong>오류</strong><p id="error-message"></p></section>
+</main>
+<script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+# FastAPI 웹 서버와 ASGI 실행기입니다.
+fastapi>=0.115,<1.0
+uvicorn[standard]>=0.34,<1.0
+
+# HTML 템플릿, 파일 업로드, 환경 변수 관리를 지원합니다.
+jinja2>=3.1,<4.0
+python-multipart>=0.0.20,<1.0
+pydantic-settings>=2.7,<3.0
+
+# 이미지 로딩과 AI 모델 추론에 사용합니다.
+pillow>=10.4,<13.0
+torch>=2.5,<3.0
+transformers>=4.48,<5.0
+sentencepiece>=0.2,<1.0
+
+# Stable Diffusion 파이프라인과 모델 파일 처리를 지원합니다.
+diffusers>=0.32,<0.40
+accelerate>=1.2,<2.0
+safetensors>=0.4,<1.0
+
+# PCM WAV 파형 처리와 PyTorch 기반 Whisper STT에 사용합니다.
+# faster-whisper/CTranslate2는 Windows DLL 차단 문제가 있어 사용하지 않습니다.
+numpy>=1.26,<3.0
+
+# 운영체제 내장 음성 엔진을 이용한 오프라인 TTS에 사용합니다.
+pyttsx3>=2.98,<3.0

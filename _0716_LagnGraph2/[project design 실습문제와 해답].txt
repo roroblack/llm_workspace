@@ -1,0 +1,154 @@
+[project design 실습문제와 해답]
+28강 설계 사고법을 직접 적용해, 새로운 에이전트의 설계 문서와 코드 스켈레톤을 만듭니다. 두 문제는 이어집니다(문제1 설계 → 문제2 스켈레톤).
+
+실습 준비
+bash conda activate agentic pip install pyyaml # 표준 dataclass만 써도 됨 (LLM 호출 없음)
+
+문제 1 — 설계 문서 작성
+요구사항
+"CS 티켓 자동 분류·답변 에이전트" 의 설계 문서를 작성해 docs/cs_agent_design.md로 저장하세요. 다음 4개 섹션을 반드시 포함합니다.
+
+요구사항 분석 — 입력=data/support_tickets.csv의 content, 출력=severity 분류 + 답변 초안.
+도구 목록 — 예: classify_severity, search_faq(data/faq.csv 검색), draft_reply. 각 도구의 입력/출력 타입 명시.
+데이터 흐름 — 티켓 입력 → 분류 → FAQ 검색 → 답변 생성.
+텍스트 아키텍처 다이어그램.
+기대 결과: 4개 섹션 + 최소 3개 도구가 명세된 마크다운 문서.
+
+[해답] ==========================================================================
+docs/cs_agent_design.md:
+
+# CS 티켓 자동 분류·답변 에이전트 — 설계 문서
+
+## 1. 요구사항 분석
+- 목적: 고객 지원 티켓을 자동으로 심각도 분류하고 답변 초안을 생성한다.
+- 입력: data/support_tickets.csv 의 `content`(티켓 본문 텍스트)
+- 출력: severity(긴급/보통/낮음) + 답변 초안(마크다운)
+- 사용자 시나리오:
+  - T1 "결제했는데 주문이 안 보여요" → 긴급 분류 + 즉시 안내 초안
+  - T2 "배송 언제 와요?" → 보통 분류 + FAQ 기반 안내
+
+## 2. 도구 목록
+| 도구 | 입력 → 출력 | 설명 |
+|------|-------------|------|
+| classify_severity(content: str) | str → str | 티켓 본문을 '긴급/보통/낮음'으로 분류 |
+| search_faq(keyword: str) | str → str | data/faq.csv 에서 관련 FAQ 답변 검색 |
+| draft_reply(content: str, faq: str) | (str, str) → str | 티켓+FAQ 근거로 답변 초안 작성 |
+
+## 3. 데이터 흐름
+티켓(content) → classify_severity(분류) → search_faq(근거 검색)
+→ draft_reply(초안 생성) → [severity + 답변 초안]
+
+## 4. 아키텍처 (흐름)
+1. support_tickets.csv (content)
+2. → classify_severity → severity(긴급/보통/낮음)
+3. → search_faq(키워드) → faq.csv 에서 근거
+4. → draft_reply(티켓, 근거) → 답변 초안
+5. → [출력] severity + 답변 초안
+
+## 5. 구성요소 판단
+- 도구: ✅ (분류·검색·작성)
+- RAG: △ FAQ가 짧으면 CSV 검색으로 충분, 길고 많아지면 RAG로 승격
+- 메모리: ❌ 티켓 단건 처리라 대화 맥락 불필요
+- 멀티에이전트: ❌ 도구 3개 → 단일로 시작
+관찰 포인트
+
+28강의 5단계 절차를 그대로 적용했습니다(요구사항 → 도구 분해 → 흐름 → 아키텍처 → 구성요소 판단).
+도구마다 입력/출력 타입을 명시해, 문제 2의 시그니처로 바로 옮길 수 있습니다.
+메모리·멀티에이전트를 ❌로 판단 — "필요 없는 건 안 넣는다"(03번)를 실천.
+문제 2 — 코드 스켈레톤 작성
+요구사항
+문제 1의 설계를 바탕으로 code/ch28_ex_skeleton.py를 작성하세요.
+
+ch28_design.py처럼 @dataclass AgentSpec과 도구 시그니처(classify_severity, search_faq, draft_reply — 본문은 raise NotImplementedError("구현 예정"))를 정의.
+print_design()을 구현해 실행 시 요구사항·도구목록·데이터흐름 요약이 출력되게.
+검증: python code/ch28_ex_skeleton.py 실행 시 에러 없이 설계 요약이 출력된다.
+해답
+# code/ch28_ex_skeleton.py
+# 실행: python code/ch28_ex_skeleton.py
+import sys, pathlib
+sys.path.append(str(pathlib.Path(__file__).resolve().parent))
+from common import DATA
+
+from dataclasses import dataclass
+
+
+@dataclass
+class AgentSpec:
+    """CS 티켓 분류·답변 에이전트의 설계 명세."""
+    name: str = "CS 티켓 자동 분류·답변 에이전트"
+    tools: tuple = ("classify_severity", "search_faq", "draft_reply")
+    use_rag: bool = False         # FAQ가 짧아 CSV 검색으로 충분 → RAG 보류
+    use_memory: bool = False      # 티켓 단건 처리 → 메모리 불필요
+    use_multi_agent: bool = False # 도구 3개 → 단일로 시작
+
+
+# ----- 도구 시그니처 (구현 예정) -----
+def classify_severity(content: str) -> str:
+    """티켓 본문을 '긴급/보통/낮음'으로 분류. (구현: LLM 분류 또는 규칙)"""
+    raise NotImplementedError("구현 예정")  # TODO
+
+
+def search_faq(keyword: str) -> str:
+    """data/faq.csv 에서 키워드로 FAQ 답변 검색."""
+    raise NotImplementedError("구현 예정")  # TODO
+
+
+def draft_reply(content: str, faq: str) -> str:
+    """티켓 본문 + FAQ 근거로 답변 초안 작성."""
+    raise NotImplementedError("구현 예정")  # TODO
+
+
+# ----- 진입 함수 시그니처 -----
+def handle_ticket(content: str) -> dict:
+    """티켓 한 건을 받아 {'severity':..., 'reply':...} 반환. (단일 진입점)"""
+    # TODO: severity = classify_severity(content)
+    #       faq = search_faq(키워드 추출)
+    #       reply = draft_reply(content, faq)
+    raise NotImplementedError("구현 예정")
+
+
+# ----- 설계 요약 출력 -----
+def print_design():
+    spec = AgentSpec()
+    print("=" * 60)
+    print(f"[설계] {spec.name}")
+    print("=" * 60)
+    print("요구사항:")
+    print("  입력: support_tickets.csv 의 content")
+    print("  출력: severity(긴급/보통/낮음) + 답변 초안")
+    print(f"\n도구 목록: {', '.join(spec.tools)}")
+    print(f"RAG: {spec.use_rag} / 메모리: {spec.use_memory} / "
+          f"멀티에이전트: {spec.use_multi_agent}")
+    print("\n데이터 흐름:")
+    print("  티켓 → classify_severity → search_faq → draft_reply → [severity + 초안]")
+    print(f"\n데이터 소스: {DATA}")
+
+
+if __name__ == "__main__":
+    print_design()
+=====================================================================================
+검증 실행
+
+python code/ch28_ex_skeleton.py
+============================================================
+[설계] CS 티켓 자동 분류·답변 에이전트
+============================================================
+요구사항:
+  입력: support_tickets.csv 의 content
+  출력: severity(긴급/보통/낮음) + 답변 초안
+
+도구 목록: classify_severity, search_faq, draft_reply
+RAG: False / 메모리: False / 멀티에이전트: False
+
+데이터 흐름:
+  티켓 → classify_severity → search_faq → draft_reply → [severity + 초안]
+
+데이터 소스: .../data
+
+관찰 포인트 ============================================================
+
+설계 문서(문제 1)의 도구 목록이 그대로 시그니처가 됐습니다 — 설계가 코드로 이어짐.
+본문은 raise NotImplementedError("구현 예정") — 아직 안 만들었음을 명시(05번 기법).
+실행하면 에러 없이 설계 요약이 출력 → 검증 통과. 구현 단계에서 TODO만 채우면 됩니다.
+
+ 

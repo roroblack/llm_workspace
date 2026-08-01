@@ -1,0 +1,18 @@
+# --- Web / API ---
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# --- HuggingFace ---
+transformers==4.47.1
+tokenizers==0.21.0
+huggingface-hub==0.27.0
+sentencepiece==0.2.0          # T5 / MarianMT / NLLB 토크나이저에 필요
+protobuf==5.29.2              # sentencepiece 기반 토크나이저 변환 시 필요
+sacremoses==0.1.1             # MarianMT 전처리(선택이지만 경고 제거)
+
+# --- PyTorch (CPU) ---
+# 설치 시 CPU 인덱스 사용 권장:
+#   pip install -r requirements.txt --extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.5.1

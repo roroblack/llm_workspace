@@ -93,3 +93,57 @@ def test_arch_002_inner_layer_does_not_import_outer():
         if re.search(rf"\b{re.escape(pkg)}\b", line)
     ]
     assert offenders == [], f"안쪽 계층이 바깥을 참조합니다(의존 방향 역전): {offenders}"
+
+
+# ── ARCH-003 ─────────────────────────────────────────────────────────────
+# 도메인 코드가 계층 밖에 새로 생기는 것을 막는다.
+#
+# ★왜 필요한가 — 실제로 그랬다.
+#   `app/core/domain/insurance.py` 에 `Verdict`·`PolicyVersion` 이 이미 있는데,
+#   `app/insurance/` 라는 패키지를 새로 만들어 같은 것을 또 정의했다.
+#   `app/core/domain/generation.py` 가 있는데 세대 로직도 다시 짰다.
+#   같은 사실이 두 곳에 있으면 반드시 갈라진다. 갈라지면 어느 쪽이 맞는지
+#   아무도 모르게 된다.
+
+#: 도메인 로직이 있어서는 안 되는 자리(패키지 이름).
+_FORBIDDEN_DOMAIN_PKGS = ("app/insurance", "app/domain", "app/models")
+
+#: 도메인 타입은 한 곳에서만 정의한다.
+_SINGLE_DEFINITION = ("class Verdict", "class PolicyVersion", "class GenerationProfile")
+
+
+def test_arch_003_no_domain_package_outside_core():
+    """`app/insurance` 같은 경계 밖 도메인 패키지를 만들지 않는다."""
+    offenders = [
+        pkg for pkg in _FORBIDDEN_DOMAIN_PKGS if (_ROOT / pkg).is_dir()
+    ]
+    assert offenders == [], (
+        f"도메인 코드는 app/core/{{domain,ports,usecases}} 에 둔다. "
+        f"경계 밖 패키지 발견: {offenders}"
+    )
+
+
+def test_arch_003_domain_types_defined_once():
+    """핵심 도메인 타입이 두 곳에서 정의되지 않는다."""
+    dupes: dict[str, list[str]] = {}
+    for py in (_ROOT / "app").rglob("*.py"):
+        if "__pycache__" in str(py):
+            continue
+        text = py.read_text(encoding="utf-8", errors="replace")
+        for token in _SINGLE_DEFINITION:
+            if re.search(rf"^{re.escape(token)}\b", text, re.M):
+                dupes.setdefault(token, []).append(str(py.relative_to(_ROOT)))
+    offenders = {k: v for k, v in dupes.items() if len(v) > 1}
+    assert offenders == {}, f"도메인 타입이 여러 곳에 정의됨: {offenders}"
+
+
+def test_arch_003_usecases_do_not_import_adapters():
+    """유스케이스는 어댑터를 직접 부르지 않는다 — 포트로 주입받는다."""
+    usecases = _ROOT / "app" / "core" / "usecases"
+    offenders = [
+        f"{py.relative_to(_ROOT)}: {line}"
+        for py in usecases.rglob("*.py")
+        for line in _import_lines(py.read_text(encoding="utf-8"))
+        if re.search(r"\bapp\.adapters\b", line)
+    ]
+    assert offenders == [], f"유스케이스가 어댑터를 직접 import: {offenders}"

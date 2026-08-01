@@ -1,0 +1,9 @@
+python-dotenv>=1.0.1
+pandas>=2.2.3
+PyYAML>=6.0.2
+langchain-core>=0.3.65
+langchain-openai>=0.3.24
+langchain-google-genai>=2.1.5
+openai>=1.88.0
+google-genai>=1.21.1
+pytest>=8.3.5

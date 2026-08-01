@@ -1,0 +1,18 @@
+[멀티 에이전트 실습 문제]
+
+문제 1 — 경쟁사 분석가 에이전트 추가 (3-way 라우팅)
+code/agent.py를 복사해 code/ex_three.py를 만드세요. 
+@tool search_competitor()로 data/competitor_data.csv를 조회하는 competitor_agent를 추가하고, 
+route_rule/route_llm이 "sales"/"policy"/"competitor" 3개를 반환하도록 확장하세요. 
+supervisor()도 3개 에이전트 중 알맞은 것에 위임하게 고치세요.
+
+기대 결과: "경쟁사랑 비교하면 어때?" 입력 시 [Supervisor] ...
+ → competitor 로그가 찍히고 경쟁사 데이터 기반 답이 나온다.
+
+
+문제 2 — 라우팅 정확도 테스트 작성
+code/ex_test.py를 만들어, 
+위 3-way route_rule에 (질문, 기대route) 쌍 6개(각 에이전트당 2개)를 넣고 
+실제 결과와 비교해 정확도를 출력하는 평가 스크립트를 작성하세요.
+
+검증: 실행 시 "정확도: N/6"이 출력되고, 오분류된 질문이 있으면 함께 표시.

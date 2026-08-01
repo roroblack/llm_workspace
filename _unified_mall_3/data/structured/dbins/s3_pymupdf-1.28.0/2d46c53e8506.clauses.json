@@ -1,0 +1,80 @@
+{
+ "schema_version": "1",
+ "parse_status": "ok",
+ "numbering": "numbered",
+ "toc_pages": [],
+ "built_at": "2026-08-01T14:09:08+00:00",
+ "source": {
+  "insurer": "DB손해보험",
+  "product_name": "실손의료비보장 안정화 할인 특별약관2507",
+  "product_code": "10002",
+  "sale_start": "20251013",
+  "sale_end": "",
+  "url": "https://www.idbins.com/cYakgwanDown.do?FilePath=InsProduct/%EC%95%BD%EA%B4%80_ACU%2800%29_20251013.pdf",
+  "sha256": "2d46c53e8506b109f8816779ceed83809dbc8d64e6eee86abca6be3887a3baf2",
+  "bytes": 64477
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 2,
+  "clauses": 3,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 3,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": [
+  {
+   "clause_no": "1.",
+   "title": "특별약관의 적용범위 및 효력",
+   "section": "머리말",
+   "qualified_no": "머리말/1.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 26
+   },
+   "text": "1. (특별약관의 적용범위 및 효력)\n 이 특별약관의 적용대상은 아래와 같습니다.\n    1. 회사가 판매하는 실손의료비 보장(보험업감독규정 제7-63조(제3보험의 보험상품설계 등)\n에서 정한 노후실손의료보험은 제외합니다. 이하 「실손의료비 보장」이라 합니다)이 부가\n된 보험계약(이하 「실손의료 보험계약」이라 합니다)\n 이 특별약관의 적용기간은 계약체결일로부터 1년(단, 태아가입의 경우 계약체결일로부터 출\n생일 출생일 이후 1년까지)으로 하며, 갱신시에는 이 특별약관을 적용하지 않습니다.\n\n",
+   "char_length": 277,
+   "paragraph_count": 3,
+   "tables_on_pages": {},
+   "content_hash": "690d9b0a8a93985ac1b15d73ab118e79a9a5b74c61694098b457d8de2c6cdbb1"
+  },
+  {
+   "clause_no": "2.",
+   "title": "보험료 할인대상 및 보험료 할인",
+   "section": "머리말",
+   "qualified_no": "머리말/2.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 303
+   },
+   "text": "2. (보험료 할인대상 및 보험료 할인)\n 회사는 이 특별약관의 적용기간 동안 매회 납입되는 실손의료비 보장의 보장보험료에 한하\n여 적용되며, 할인율은 사업방법서 별지에 따릅니다.\n 제1항에도 불구하고 실손의료비보장 안정화 할인(이하, ｢안정화 할인｣ 이라고 함) 외에 추\n가로 적용되고 있는 할인금액과 안정화 할인금액의 합계액이 대상 상품의 실손의료 보험계\n약의 예정사업비의 합계액을 초과하는 경우 그 예정사업비를 한도로 보험료를 할인하여 드\n립니다.\n 제2항에서의 예정사업비란, 대상상품의 보험료 및 책임준비금 산출방법서에서 정한 실손의\n료보험 담보의 계약체결비용, 계약관리비용(유지관련비용, 기타비용) 및 손해조사비를 뜻합\n니다.\n",
+   "char_length": 356,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "313f2127e8f4075fe378847a0dac208f8d7fe00d799ff97080ce7bb58453a306"
+  },
+  {
+   "clause_no": "3.",
+   "title": "준용규정",
+   "section": "머리말",
+   "qualified_no": "머리말/3.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 659
+   },
+   "text": "3. (준용규정)\n 이 특별약관에 정하지 아니한 사항은 보통약관 및 해당 특별약관을 따릅니다.              \n",
+   "char_length": 67,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "46725a2a95f5ad36927155c19ce54c8f47d00cdfc305fdb2a736c0b8989b1000"
+  }
+ ]
+}

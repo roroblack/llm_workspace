@@ -1,0 +1,34 @@
+{
+ "schema_version": "1",
+ "parse_status": "no_clause_heads",
+ "numbering": "none",
+ "toc_pages": [
+  1
+ ],
+ "built_at": "2026-08-01T10:00:14+00:00",
+ "source": {
+  "insurer": "롯데손해보험",
+  "product_name": "실손의료비보장 계약전환제도 특별약관",
+  "product_code": "0036",
+  "sale_start": "20161103",
+  "sale_end": "",
+  "url": "https://www.lotteins.co.kr/upload/C/newProduct/contract_conversion_1611_yak.pdf",
+  "sha256": "d928fc84295fcda2c8049c2e5377eb33ecdc735bc315b986292357624967398d",
+  "bytes": 70361
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 1,
+  "clauses": 0,
+  "fallback_chunks": 0,
+  "sections": 1,
+  "toc_pages_excluded": 1,
+  "unique_clause_hashes": 0,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": []
+}

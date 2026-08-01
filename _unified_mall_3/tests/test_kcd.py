@@ -1,6 +1,6 @@
 """KCD 코드 파싱·범위·면책 판정."""
 
-from app.insurance.kcd import (
+from app.core.domain.kcd_ranges import (
     CodeMention, KcdCode, KcdRange, judge, parse_ranges, scan_clause,
 )
 

@@ -1,0 +1,22 @@
+[LangGraph 실습문제]
+직접 코드를 고쳐 보며  내용을 손에 익힙니다. 
+
+문제 1 — 긴급 알림 조건 분기 추가
+TicketState에 alert 키를 추가하고 notify_node(긴급 티켓에 alert="즉시알림" 세팅)를 만든 뒤, 
+add_conditional_edges로 priority == "긴급"이면 
+priority → notify → assign, 그 외엔 priority → assign으로 분기하세요.
+
+사용 파일: data/support_tickets.csv
+
+기대 결과: 출력에 alert 열이 추가되고 긴급 티켓에만 "즉시알림"이 찍히면 성공.
+
+
+
+문제 2 — 노드 예외처리·검토필요 표시
+각 노드를 try/except로 감싸 실패 시 state["error"]에 메시지를 기록하고, 
+마지막 노드가 error가 있으면 team="검토필요"로 덮어쓰게 하세요.
+
+검증: classify_node에 일부러 예외를 던지는 코드를 넣고, 
+해당 티켓의 담당팀이 "검토필요"로 출력되는지 확인
+
+기대 결과: 예외 발생 티켓이 "검토필요" 팀으로 처리되면 성공.

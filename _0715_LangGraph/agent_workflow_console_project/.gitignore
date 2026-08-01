@@ -1,0 +1,31 @@
+# Python 캐시 및 컴파일 파일
+__pycache__/
+*.py[cod]
+*$py.class
+
+# 가상환경
+.venv/
+venv/
+env/
+
+# API 키와 로컬 환경설정
+.env
+
+# PyCharm 설정
+.idea/
+*.iml
+
+# 테스트 및 품질 도구 캐시
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# 운영체제 임시 파일
+.DS_Store
+Thumbs.db
+
+# 로그와 임시 출력
+*.log
+tmp/

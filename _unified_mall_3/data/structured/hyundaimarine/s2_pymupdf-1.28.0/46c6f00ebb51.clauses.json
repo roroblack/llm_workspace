@@ -1,0 +1,51 @@
+{
+ "schema_version": "1",
+ "parse_status": "ok",
+ "numbering": "article",
+ "toc_pages": [
+  2,
+  3
+ ],
+ "built_at": "2026-08-01T09:05:49+00:00",
+ "source": {
+  "insurer": "현대해상",
+  "product_name": "실손보상 온실 풍수해보험（V）",
+  "product_code": "d61b1847-ce19-44bc-81bc-8fd42a2bcf3f",
+  "sale_start": "20180102",
+  "sale_end": "20180331",
+  "url": "https://www.hi.co.kr/FileActionServlet/download/0/data/201801/20180101_poong5%20wd.pdf",
+  "sha256": "46c6f00ebb5175c5045115edc27bc78aba426c7986bab9ec023fa2722b32b5d8",
+  "bytes": 106188
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 4,
+  "clauses": 1,
+  "sections": 1,
+  "toc_pages_excluded": 2,
+  "unique_clause_hashes": 1,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": [
+  {
+   "clause_no": "제1조",
+   "title": "목적",
+   "section": "머리말",
+   "qualified_no": "머리말/제1조",
+   "locator": {
+    "page_from": 4,
+    "page_to": 4,
+    "char_offset": 39
+   },
+   "text": "제1조(목적) 이 보험계약(이하 ‘계약’이라 합니다)은 보험계약자(이하 ‘계약\n자’라 합니다)와 보험회사(이하 ‘회사’라 합니다) 사이에 피보험자가 보험의 목\n적[별표1 보험의 목적 참조]에 태풍, 호우, 홍수, 강풍, 풍랑, 해일, 대설, 지진의 \n직접적인 결과로 입은 손해에 대한 위험을 보장하기 위하여 체결됩니다.\n제2\n",
+   "char_length": 182,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "f75b13f0783687074d848634ebb4053a7b5ed174e83039a4bfad40a8f09c8d7b"
+  }
+ ]
+}

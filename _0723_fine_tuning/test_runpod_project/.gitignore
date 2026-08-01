@@ -1,0 +1,27 @@
+# === 시크릿 ===
+# .env는 절대 커밋하지 않습니다 (.env.example만 추적).
+.env
+
+# === 생성/학습 산출물 (소스가 아님) ===
+# 01_create_dataset.py가 생성하는 데이터셋
+data/
+
+# 02_train_sft.py가 생성하는 체크포인트·어댑터·TensorBoard 로그·학습 요약
+outputs/
+
+# === 가상환경 / IDE / 캐시 ===
+.venv/
+venv/
+env/
+.idea/
+.vscode/
+__pycache__/
+*.pyc
+
+# === 모델 바이너리 (혹시 outputs/ 밖에 생겨도 무시) ===
+*.safetensors
+*.bin
+*.pt
+*.pth
+*.ckpt
+*.gguf

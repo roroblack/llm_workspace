@@ -1,0 +1,26 @@
+# FastAPI 웹 API 프레임워크입니다.
+fastapi>=0.115,<1.0
+
+# FastAPI ASGI 서버입니다.
+uvicorn[standard]>=0.34,<1.0
+
+# .env 기반 설정 관리를 제공합니다.
+pydantic-settings>=2.7,<3.0
+
+# OpenAI Responses 및 Embeddings API 클라이언트입니다.
+openai>=1.68,<3.0
+
+# 공식 MCP Python SDK입니다.
+mcp[cli]>=1.2,<2.0
+
+# CPU 환경에서 사용할 수 있는 FAISS 패키지입니다.
+faiss-cpu>=1.9,<2.0
+
+# Qdrant local/server 클라이언트입니다.
+qdrant-client>=1.13,<2.0
+
+# 벡터 배열 계산에 사용합니다.
+numpy>=1.26,<3.0
+
+# MySQL 연결 드라이버입니다.
+mysql-connector-python>=9.1,<10.0

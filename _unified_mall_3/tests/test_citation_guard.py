@@ -1,6 +1,6 @@
 """인용 검증 — 지어낸 조항을 거르는지."""
 
-from app.insurance.citation_guard import EvidenceClause, verify
+from app.core.domain.citation_guard import EvidenceClause, verify
 
 _EV = [
     EvidenceClause(

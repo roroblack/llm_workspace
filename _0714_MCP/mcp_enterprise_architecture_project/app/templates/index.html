@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<main class="container">
+    <h1>{{ app_name }}</h1>
+    <p class="architecture">사용자 → FastAPI → OpenAI → MCP Client → MCP Server → Tools → 외부 시스템</p>
+
+    <section class="panel">
+        <h2>1. 서버 상태</h2>
+        <button id="healthButton">상태 확인</button>
+        <pre id="healthOutput"></pre>
+    </section>
+
+    <section class="panel">
+        <h2>2. MCP Tool 목록</h2>
+        <button id="toolsButton">Tool 불러오기</button>
+        <pre id="toolsOutput"></pre>
+    </section>
+
+    <section class="panel">
+        <h2>3. MCP Tool 직접 호출</h2>
+        <label>Tool 이름</label>
+        <input id="toolName" value="python_calculate">
+        <label>JSON 인수</label>
+        <textarea id="toolArguments">{"expression":"(12 + 8) * 3"}</textarea>
+        <button id="callButton">Tool 호출</button>
+        <pre id="callOutput"></pre>
+    </section>
+
+    <section class="panel">
+        <h2>4. OpenAI + MCP Assistant</h2>
+        <label>자연어 요청</label>
+        <textarea id="assistantMessage">업무 문서 목록을 확인해줘.</textarea>
+        <button id="assistantButton">Assistant 실행</button>
+        <pre id="assistantOutput"></pre>
+    </section>
+
+    <p><a href="/docs">Swagger API 문서 열기</a></p>
+</main>
+<script src="/static/app.js"></script>
+</body>
+</html>

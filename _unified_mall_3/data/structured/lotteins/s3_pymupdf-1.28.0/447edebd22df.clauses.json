@@ -1,0 +1,80 @@
+{
+ "schema_version": "1",
+ "parse_status": "ok",
+ "numbering": "article",
+ "toc_pages": [],
+ "built_at": "2026-08-01T16:13:58+00:00",
+ "source": {
+  "insurer": "롯데손해보험",
+  "product_name": "표준화 실손의료비보장 안정화 할인(2021) 특별약관",
+  "product_code": "0052",
+  "sale_start": "20210101",
+  "sale_end": "",
+  "url": "https://www.lotteins.co.kr/upload/C/newProduct/standard_yak.pdf",
+  "sha256": "447edebd22df72a7215e16c196204d2584539863735946a97391aaa6cd60cb63",
+  "bytes": 68658
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 1,
+  "clauses": 3,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 3,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "표준화 실손의료비보장 안정화 할인(2021) 특별약관"
+ ],
+ "clauses": [
+  {
+   "clause_no": "제1조",
+   "title": "특별약관의 적용범위 및 효력",
+   "section": "표준화 실손의료비보장 안정화 할인(2021) 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인(2021) 특별약관/제1조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 35
+   },
+   "text": "제1조(특별약관의 적용범위 및 효력)\n① 이 특별약관(이하 '특약'이라 합니다.)의 적용 대상은 아래와 같습니다.\n2021년 1월 1일부터 2021년 12월 31일까지 갱신이 도래하는 실손의료비 보장이 부가된 보험계약(보험업감독업\n무시행세칙 제5-13조(표준사업방법서 및 표준약관) 별표14 및 별표15에서 정한 실손의료비 보장을 말합니다.(이\n하 '실손의료 보험계약'이라 함))을 말하며 대상상품 및 담보는 사업방법서 별지에 따릅니다.\n단, 보험업감독규정 제7-49조(사업방법서 관련 신고기준)에서 정한 노후실손의료보험은 제외합니다.\n② 이 특약의 적용기간은 아래와 같습니다.\n이 특약의 적용기간은 '실손의료 보험계약'의 보험기간으로 하며, 차회 이후 갱신시에는 이 특약을 적용하지 아니합\n니다.\n \n",
+   "char_length": 393,
+   "paragraph_count": 4,
+   "tables_on_pages": {},
+   "content_hash": "28d8d7de60d42ddc5cd2ef8dd6be47f5496b6f66c7fbdc47d09deb8961e9ad50"
+  },
+  {
+   "clause_no": "제2조",
+   "title": "보험료 할인대상 및 보험료 할인",
+   "section": "표준화 실손의료비보장 안정화 할인(2021) 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인(2021) 특별약관/제2조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 428
+   },
+   "text": "제2조(보험료 할인대상 및 보험료 할인)\n① 회사는 이 특별약관의 적용기간 동안 매회 납입되는 실손의료보험 계약의 보장보험료에 한하여 적용되며, 할인율\n은 사업방법서 별지에 따릅니다.\n② 제1항에도 불구하고 표준화 실손의료비보장 안정화 할인(2021)(이하, '안정화 할인'이라고 함) 외에 추가로 적용\n되고 있는 할인금액과 안정화 할인금액의 합계액이 대상상품의 실손의료 보험계약의 예정사업비의 합계액을 초과\n하는 경우 그 예정사업비를 한도로 보험료를 할인하여 드립니다.\n③ 제2항에서의 예정사업비란, 대상상품의 산출방법서에서 정한 실손의료 보험담보의 예정사업비(신계약비, 유지비, \n수금비) 또는 계약체결비용, 계약관리비용(유지관리비용, 기타비용)을 뜻합니다.\n",
+   "char_length": 371,
+   "paragraph_count": 6,
+   "tables_on_pages": {},
+   "content_hash": "401147dafc77832b49badf17196b26d6cd6ad5d78f3f253c34700e07cbe75a5c"
+  },
+  {
+   "clause_no": "제3조",
+   "title": "준용규정",
+   "section": "표준화 실손의료비보장 안정화 할인(2021) 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인(2021) 특별약관/제3조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 799
+   },
+   "text": "제3조(준용규정)  \n이 특별약관에 정하지 아니한 사항은 보통약관 및 해당 특별약관을 따릅니다.  \n",
+   "char_length": 56,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "76245c952d650a70ded6c4868497e39c4c29c7f8dcce9ab0717267aa873bf9d0"
+  }
+ ]
+}

@@ -1,0 +1,80 @@
+{
+ "schema_version": "1",
+ "parse_status": "ok",
+ "numbering": "numbered",
+ "toc_pages": [],
+ "built_at": "2026-08-01T14:20:59+00:00",
+ "source": {
+  "insurer": "DB손해보험",
+  "product_name": "표준화 실손의료비보장 안정화 할인 특별약관",
+  "product_code": "3302",
+  "sale_start": "20160101",
+  "sale_end": "",
+  "url": "https://www.idbins.com/cYakgwanDown.do?FilePath=InsProduct/3374_20160101_%EC%95%BD%EA%B4%80_%ED%91%9C%EC%A4%80%ED%99%94%20%EC%8B%A4%EC%86%90%EC%9D%98%EB%A3%8C%EB%B9%84%EB%B3%B4%EC%9E%A5%20%EC%95%88%EC%A0%95%ED%99%94%20%ED%95%A0%EC%9D%B8%20%ED%8A%B9%EB%B3%84%EC%95%BD%EA%B4%80.pdf",
+  "sha256": "64ba11ebe09448b06efd4beae153b99029baaecac8ff470e2b949993ec867f38",
+  "bytes": 64372
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 2,
+  "clauses": 3,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 3,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "표준화 실손의료비보장 안정화 할인 특별약관"
+ ],
+ "clauses": [
+  {
+   "clause_no": "1.",
+   "title": "특별약관의 적용범위 및 효력",
+   "section": "표준화 실손의료비보장 안정화 할인 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인 특별약관/1.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 26
+   },
+   "text": "1. (특별약관의 적용범위 및 효력)\n 이 특별약관(이하 『특약』이라 합니다.)의 적용 대상은 아래와 같습니다.\n     ① 2016년 1월 1일부터 2016년 12월 31일까지 판매하는 실손의료비 보장이 부가된 보\n    험계약(보험업감독업무시행세칙 제5-13조(표준사업방법서 및 표준약관) 별표14 및 별\n    표15에서 정한 실손의료비 보장을 말합니다. (이하 「실손의료 보험계약」이라 함)\n       단, 보험업감독규정 제7-49조(사업방법서 관련 신고기준)에서 정한 노후실손의료보험은\n    제외합니다.\n     ② 2016년 1월 1일부터 2016년 12월 31일까지 갱신이 도래하는 갱신형 「실손의료 보험\n    계약」을 말하며 대상상품 및 담보는 사업방법서 별지에 따릅니다.\n 이 특약의 적용기간은 아래와 같습니다.\n     ① 제1항 제1호의 경우에는 계약체결일로부터 1년\n     ② 제1항 제2호의 경우에는 해당 갱신 보험기간으로 하며, 차회 이후 갱신시에는 이 특약\n    을 적용하지 아니합니다.\n",
+   "char_length": 517,
+   "paragraph_count": 9,
+   "tables_on_pages": {},
+   "content_hash": "4e1ce8de9e98578e5edd205ead883836fd5319b953f7f580433dbb27495a2338"
+  },
+  {
+   "clause_no": "2.",
+   "title": "보험료 할인대상 및 보험료 할인",
+   "section": "표준화 실손의료비보장 안정화 할인 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인 특별약관/2.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 543
+   },
+   "text": "2. (보험료 할인대상 및 보험료 할인)\n 회사는 이 특별약관의 적용기간 동안 매회 납입되는 실손의료보험 계약의 보장보험료에 한\n하여 적용되며, 할인은 사업방법서 별지에 따릅니다.\n 제1항에도 불구하고 표준화 실손의료비보장 안정화 할인(이하, ｢안정화 할인｣ 이라고 함)\n외에 추가로 적용되고 있는 할인금액과 안정화 할인금액의 합계액이 대상 상품의 실손의료\n보험계약의 예정사업비의 합계액을 초과하는 경우 그 예정사업비를 한도로 보험료를 할인하\n여 드립니다.\n 제2항에서의 예정사업비란, 대상상품의 산출방법서에서 정한 실손의료보험 담보의 예정사업\n비(신계약비, 유지비, 수금비) 또는 계약체결비용 및 계약관리비용(유지관리비용, 기타비용)을\n뜻합니다.\n",
+   "char_length": 363,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "93a7dd61a4d1a422924e9bf41268d359985798b7b175f6117ee61167134dc4b7"
+  },
+  {
+   "clause_no": "3.",
+   "title": "준용규정",
+   "section": "표준화 실손의료비보장 안정화 할인 특별약관",
+   "qualified_no": "표준화 실손의료비보장 안정화 할인 특별약관/3.",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 906
+   },
+   "text": "3. (준용규정)\n 이 특별약관에 정하지 아니한 사항은 보통약관 및 해당 특별약관을 따릅니다.              \n",
+   "char_length": 67,
+   "paragraph_count": 1,
+   "tables_on_pages": {},
+   "content_hash": "84d3b7ff1c9b294d3225f401508884664be7940130e42f6092f1796d5fbbb071"
+  }
+ ]
+}

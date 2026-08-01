@@ -1,0 +1,24 @@
+# FastAPI 웹 서버 프레임워크입니다.
+fastapi>=0.115,<1.0
+
+# ASGI 서버입니다.
+uvicorn[standard]>=0.34,<1.0
+
+# 환경변수와 .env 설정을 관리합니다.
+pydantic-settings>=2.7,<3.0
+
+# HTML 템플릿을 렌더링합니다.
+jinja2>=3.1,<4.0
+
+# OpenAI Responses API를 호출합니다.
+openai>=1.68,<3.0
+
+# MCP Server와 Client를 구현합니다.
+mcp[cli]>=1.2,<2.0
+
+# GitHub, Slack, Browser HTTP 요청에 사용합니다.
+httpx>=0.27,<1.0
+
+# 비동기 테스트를 지원합니다.
+pytest>=8.3,<9.0
+pytest-asyncio>=0.25,<1.0

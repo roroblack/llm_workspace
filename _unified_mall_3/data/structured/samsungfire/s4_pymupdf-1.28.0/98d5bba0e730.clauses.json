@@ -1,0 +1,81 @@
+{
+ "schema_version": "4",
+ "parse_status": "ok",
+ "parse_warnings": [],
+ "numbering": "article",
+ "toc_pages": [],
+ "built_at": "2026-08-01T19:21:37+00:00",
+ "source": {
+  "insurer": "삼성화재",
+  "product_name": "4세대 실손의료비전환 특별할인 특별약관",
+  "product_code": "40002",
+  "sale_start": "20220101",
+  "sale_end": "20220428",
+  "url": "https://www.samsungfire.com/publication/pdf/40002_0_20220101_file1.pdf",
+  "sha256": "98d5bba0e73054db1ecbdb2740d56e20ac596fab82c9c15eb437586196741aeb",
+  "bytes": 68985
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 1,
+  "clauses": 3,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 3,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": [
+  {
+   "clause_no": "제1조",
+   "title": "특별약관의 적용범위 및 효력",
+   "section": "머리말",
+   "qualified_no": "머리말/제1조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 33
+   },
+   "text": "제1조(특별약관의 적용범위 및 효력) \n이 4세대 실손의료비전환 특별할인 특별약관(2201)(이하 ‘특별약관’이라 합니다)의 적용 대상은 \n아래에 조건을 만족하는 계약 중 사업방법서 별지에서 정한 상품에 한합니다. \n1. 이 특별약관의 사업방법서 별지에 따른 상품 중 2022년 1월 1일부터 2022년 6월 30일까지 \n체결되는 신계약에 한합니다. \n2. 적용기간은 계약체결시점부터 1년으로 하며, 이후에는 이 특별약관을 적용하지 않습니다. \n3. 제1호 내지 제2호의 할인 대상 보험료는 예정사업비(계약체결 비용 및 계약관리비용)가 \n부가된 보장보험료를 대상으로 합니다. \n \n",
+   "char_length": 325,
+   "paragraph_count": 6,
+   "tables_on_pages": {},
+   "content_hash": "6e76629128b43fc3e3d2a0f0ce50a3711d091e518fdfd5b3b50afc6e273ff1cc"
+  },
+  {
+   "clause_no": "제2조",
+   "title": "보험료 할인 대상 및 보험료 할인",
+   "section": "머리말",
+   "qualified_no": "머리말/제2조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 358
+   },
+   "text": "제2조(보험료 할인 대상 및 보험료 할인) \n이 특별약관에서 정하는 ‘특별할인’은 적용기간 동안 매회 납입되는 실손의료비보장의 \n보장보험료에 이 특별약관의 사업방법서 별지에 따른 할인율을 적용합니다. \n \n",
+   "char_length": 115,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "aa92b6aeeeb3a0429a93f4b6fbdc914d7a6b91bbed91bb8f0f26fdba8f20b040"
+  },
+  {
+   "clause_no": "제3조",
+   "title": "준용규정",
+   "section": "머리말",
+   "qualified_no": "머리말/제3조",
+   "locator": {
+    "page_from": 1,
+    "page_to": 1,
+    "char_offset": 473
+   },
+   "text": "제3조(준용규정) \n이 특별약관에서 정하지 않은 사항은 해당 계약의 보통약관 및 해당 특별약관을 따릅니다. \n",
+   "char_length": 61,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "19384a3fdc4fcd6d0bb540dba278923318b5835572dccf722727367d1f9a1375"
+  }
+ ]
+}

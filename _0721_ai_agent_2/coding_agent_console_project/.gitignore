@@ -1,0 +1,12 @@
+.venv/
+venv/
+.idea/
+__pycache__/
+*.py[cod]
+.env
+.DS_Store
+# AI가 생성한 수정본은 원본과 구분하며 필요에 따라 Git 추적 여부를 결정합니다.
+data/fixed_script.py
+data/fixed_script_loop.py
+data/my_buggy.py
+data/my_buggy_fixed.py

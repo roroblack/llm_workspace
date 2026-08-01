@@ -3,7 +3,8 @@
 import pytest
 
 from app.core.errors import ValidationErr
-from app.insurance.policy_version import NotResolved, PolicyVersion, resolve
+from app.adapters.manifest_policy_resolver import resolve
+from app.core.ports.precheck import NotResolved, PolicyVersionRow as PolicyVersion
 
 
 def _v(start, end="", name="실손의료비보험", gen=3, ins="삼성화재"):

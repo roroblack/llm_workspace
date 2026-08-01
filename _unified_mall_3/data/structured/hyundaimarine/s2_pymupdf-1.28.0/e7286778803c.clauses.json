@@ -1,0 +1,80 @@
+{
+ "schema_version": "1",
+ "parse_status": "ok",
+ "numbering": "article",
+ "toc_pages": [],
+ "built_at": "2026-08-01T09:35:20+00:00",
+ "source": {
+  "insurer": "현대해상",
+  "product_name": "실손의료비보장 안정화 할인 특별약관",
+  "product_code": "f5c8e9bf-1174-4c6f-b388-6ee55274aea5",
+  "sale_start": "20230701",
+  "sale_end": "20231231",
+  "url": "https://www.hi.co.kr/FileActionServlet/download/0/data/202307/98c6cfa75015a0d62b2bfc207deefaa0.pdf",
+  "sha256": "e7286778803c6a2a779526acc92a67d006f9441732536e634fda83b5f8df73af",
+  "bytes": 34400
+ },
+ "identification": "unidentified",
+ "extractor": "pymupdf/1.28.0:",
+ "stats": {
+  "pages": 2,
+  "clauses": 3,
+  "sections": 1,
+  "toc_pages_excluded": 0,
+  "unique_clause_hashes": 3,
+  "duplicate_clauses": 0
+ },
+ "sections": [
+  "머리말"
+ ],
+ "clauses": [
+  {
+   "clause_no": "제1조",
+   "title": "특별약관의 적용대상 및 적용기간",
+   "section": "머리말",
+   "qualified_no": "머리말/제1조",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 24
+   },
+   "text": "제1조(특별약관의 적용대상 및 적용기간)\n  ① 이 특별약관(이하 『특약』이라 합니다.)의 적용 대상은 아래와 같습니다.\n    1. 안정화 할인 적용 대상\n    가. 신계약\n     (1) 2023년 7월 1일부터 2023년 12월 31일까지 판매하는 실손의료비 보장이 부가된 보\n험계약(보험업감독업무시행세칙 제5-13조(표준사업방법서 및 표준약관) 별표14 및 \n별표15에서 정한 실손의료비 보장을 말하며, 보험업감독규정 제7-63조(제3보험의 \n보험상품설계 등)에서 정한 노후실손의료비보험 및 유병력자실손의료비보험은 제외\n함, 이하 「실손의료 보험계약」이라 함)\n     (2) 2023년 7월 1일부터 2023년 12월 31일까지 판매하는 유병력자 실손의료비 보장이 \n부가된 보험계약(보험업감독규정 제7-63조(제3보험의 보험상품설계 등)에서 정한 \n유병력자실손의료비 보장을 말함, 이하 「유병력자 실손의료 보험계약」이라 함)\n    나. 갱신계약\n     2023년 7월 1일부터 2023년 12월 31일까지 갱신이 도래하는 「실손의료 보험계약」\n    2. 실손전환 인센티브 할인 적용 대상\n     당사 「실손의료 보험계약」에 대하여 2023년 7월 1일부터 2023년 12월 31일까지 「실\n손의료비보장 계약전환제도 특별약관」에 따라 2021년 7월 1일 이후 판매되는 실손의료\n비로 전환한 계약\n  ② 이 특약의 적용 기간은 아래와 같습니다.\n    1. 안정화 할인 적용 기간\n     「실손의료 보험계약」의 계약체결일(또는 갱신일)로부터 보험기간(계약을 체결할 때 피\n보험자가 될 자가 출생전자녀(태아)인 경우, 계약체결일부터 출생 후 최초 갱신도래 전)\n에 한하며, 차회 이후 갱신시에는 실손의료비보장 안정화 할인을 적용하지 아니합니다.\n    2. 실손전환 인센티브 할인 적용 기간\n     전환일부터 1년\n",
+   "char_length": 914,
+   "paragraph_count": 12,
+   "tables_on_pages": {},
+   "content_hash": "e0d2419385831b1d675e925d1e77dfe5e5017acf7dc628aa7c107b2bf750e18c"
+  },
+  {
+   "clause_no": "제2조",
+   "title": "보험료 차등적용에 관한 사항",
+   "section": "머리말",
+   "qualified_no": "머리말/제2조",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 938
+   },
+   "text": "제2조(보험료 차등적용에 관한 사항)\n  회사는 사업방법서 별지에서 정한 할인율이 적용된 보험료를 영업보험료로 운영합니다.\n",
+   "char_length": 69,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "cd934cfe080ed12082b73389280186ec8678b844ddea2becf25009dd90d5ef9f"
+  },
+  {
+   "clause_no": "제3조",
+   "title": "준용규정",
+   "section": "머리말",
+   "qualified_no": "머리말/제3조",
+   "locator": {
+    "page_from": 2,
+    "page_to": 2,
+    "char_offset": 1007
+   },
+   "text": "제3조(준용규정)  \n  이 특별약관에 정하지 아니한 사항은 보통약관 및 해당 특별약관을 따릅니다.  \n",
+   "char_length": 58,
+   "paragraph_count": 0,
+   "tables_on_pages": {},
+   "content_hash": "4054d3b382c40f04272595d12766a157f224e5d5337841c35b629864096a1dfd"
+  }
+ ]
+}

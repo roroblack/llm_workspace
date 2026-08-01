@@ -1,0 +1,173 @@
+/* 모든 요소의 너비 계산에 테두리와 안쪽 여백을 포함합니다. */
+* { box-sizing: border-box; }
+
+/* 문서 전체의 기본 여백, 글꼴, 배경색과 글자색을 설정합니다. */
+body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Segoe UI", "Noto Sans KR", sans-serif;
+    color: #172033;
+    background: #f2f5fa;
+}
+
+/* 콘텐츠 폭을 제한하고 화면 중앙에 배치합니다. */
+.page-container {
+    width: min(1100px, calc(100% - 32px));
+    margin: 0 auto;
+    padding: 48px 0 72px;
+}
+
+/* 상단 소개 영역의 아래 간격을 지정합니다. */
+.hero { margin-bottom: 28px; }
+
+/* 기술 스택 안내 문구를 작은 대문자 형태로 표시합니다. */
+.eyebrow, .step-label {
+    color: #4169e1;
+    font-size: 0.78rem;
+    font-weight: 800;
+    letter-spacing: 0.12em;
+}
+
+/* 메인 제목 크기와 여백을 지정합니다. */
+.hero h1 { margin: 8px 0 10px; font-size: clamp(2rem, 5vw, 3.4rem); }
+
+/* 설명 문단의 색상과 줄 간격을 지정합니다. */
+.hero p:last-child { max-width: 760px; color: #566078; line-height: 1.7; }
+
+/* 탭 버튼을 가로로 배치합니다. */
+.tabs { display: flex; gap: 10px; margin-bottom: 16px; }
+
+/* 기본 탭 버튼 스타일입니다. */
+.tab-button {
+    border: 1px solid #d6ddeb;
+    border-radius: 12px;
+    padding: 12px 18px;
+    background: #ffffff;
+    color: #566078;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+/* 선택된 탭을 진하게 표시합니다. */
+.tab-button.active { border-color: #4169e1; background: #4169e1; color: #ffffff; }
+
+/* 서비스 패널은 기본적으로 숨깁니다. */
+.service-panel {
+    display: none;
+    background: #ffffff;
+    border: 1px solid #e0e5ef;
+    border-radius: 20px;
+    padding: 28px;
+    box-shadow: 0 16px 45px rgba(25, 42, 77, 0.08);
+}
+
+/* 현재 선택된 서비스 패널만 표시합니다. */
+.service-panel.active { display: block; }
+
+/* 패널 제목과 배지를 양쪽으로 정렬합니다. */
+.panel-heading { display: flex; justify-content: space-between; gap: 20px; align-items: start; margin-bottom: 24px; }
+
+/* 패널 제목의 여백을 조정합니다. */
+.panel-heading h2 { margin: 5px 0 0; }
+
+/* 서비스 데이터 흐름을 배지 형태로 표시합니다. */
+.badge { padding: 8px 11px; border-radius: 999px; background: #edf1ff; color: #3453b8; font-size: 0.82rem; font-weight: 700; }
+
+/* 폼 내부 요소를 세로 간격으로 배치합니다. */
+.form-grid { display: grid; gap: 16px; }
+
+/* 라벨 내부의 안내 문구를 위쪽에 표시합니다. */
+label > span { display: block; margin-bottom: 7px; font-weight: 700; }
+
+/* 텍스트 입력, 숫자 입력, 텍스트 영역의 공통 스타일입니다. */
+textarea, input[type="number"] {
+    width: 100%;
+    border: 1px solid #ccd5e5;
+    border-radius: 10px;
+    padding: 12px;
+    font: inherit;
+    background: #fbfcff;
+}
+
+/* 입력 요소에 포커스되면 파란 테두리를 표시합니다. */
+textarea:focus, input[type="number"]:focus { outline: 2px solid #b9c7ff; border-color: #4169e1; }
+
+/* 파일 선택 영역을 점선 박스로 표시합니다. */
+.drop-zone {
+    min-height: 150px;
+    border: 2px dashed #bdc7da;
+    border-radius: 16px;
+    display: grid;
+    place-content: center;
+    gap: 6px;
+    text-align: center;
+    cursor: pointer;
+    background: #fafbfe;
+}
+
+/* 실제 파일 입력은 숨기고 라벨 전체를 클릭하도록 만듭니다. */
+.drop-zone input { display: none; }
+
+/* 주요 버튼 공통 스타일입니다. */
+.primary-button, .secondary-button, .ghost-button, .record-button {
+    border: 0;
+    border-radius: 11px;
+    padding: 12px 18px;
+    font: inherit;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+/* 주요 실행 버튼 색상입니다. */
+.primary-button { background: #4169e1; color: #ffffff; }
+
+/* 보조 실행 버튼 색상입니다. */
+.secondary-button { background: #172033; color: #ffffff; }
+
+/* 강조가 낮은 버튼 색상입니다. */
+.ghost-button { background: #edf1f7; color: #172033; }
+
+/* 녹음 버튼 기본 색상입니다. */
+.record-button { background: #f8dfe3; color: #9b1c31; }
+
+/* 실제 녹음 중인 버튼을 더 진하게 표시합니다. */
+.record-button.recording { background: #b91c36; color: #ffffff; }
+
+/* 녹음 버튼과 상태 문구를 한 줄로 정렬합니다. */
+.voice-control { display: flex; gap: 14px; align-items: center; margin-bottom: 18px; }
+
+/* 세부 생성 파라미터를 반응형 열로 배치합니다. */
+.parameter-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+/* 결과 카드의 배경과 간격을 지정합니다. */
+.result-card { margin-top: 22px; border-radius: 15px; padding: 20px; background: #f7f9fd; border: 1px solid #e0e6f0; }
+
+/* 결과 라벨과 값을 세로로 구분합니다. */
+.result-card p { display: grid; gap: 5px; line-height: 1.6; }
+
+/* 이미지가 영역을 벗어나지 않도록 제한합니다. */
+.preview-image { display: block; width: min(100%, 640px); max-height: 640px; object-fit: contain; margin: 20px auto; border-radius: 14px; background: #e9edf5; }
+
+/* 여러 버튼을 가로로 배치합니다. */
+.button-row { display: flex; flex-wrap: wrap; gap: 10px; }
+
+/* 상태 및 오류 메시지 박스입니다. */
+.message-box { margin-top: 16px; border-radius: 12px; padding: 14px 16px; background: #eaf0ff; color: #273f91; font-weight: 700; }
+
+/* 오류 상태의 메시지 색상을 변경합니다. */
+.message-box.error { background: #fde7e9; color: #9b1c31; }
+
+/* 처리 중 버튼을 흐리게 표시합니다. */
+button:disabled { opacity: 0.55; cursor: wait; }
+
+/* JavaScript에서 필요한 요소를 숨길 때 사용합니다. */
+.hidden { display: none !important; }
+
+/* 작은 화면에서는 파라미터를 한 열로 변경합니다. */
+@media (max-width: 720px) {
+    .page-container { width: min(100% - 20px, 1100px); padding-top: 24px; }
+    .service-panel { padding: 20px; }
+    .panel-heading { flex-direction: column; }
+    .parameter-grid { grid-template-columns: 1fr; }
+    .voice-control { align-items: stretch; flex-direction: column; }
+}
