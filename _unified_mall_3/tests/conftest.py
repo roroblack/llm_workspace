@@ -23,8 +23,7 @@ from app.core.config import get_settings  # noqa: E402
 
 get_settings.cache_clear()
 
-from app.db.database import Base, SessionLocal, engine  # noqa: E402
-from app.db.seed import seed_products  # noqa: E402
+from app.db.database import Base, engine  # noqa: E402
 from app.main import app  # noqa: E402
 
 
@@ -32,11 +31,10 @@ from app.main import app  # noqa: E402
 def _prepare_db():
     Base.metadata.drop_all(bind=engine)
     Base.metadata.create_all(bind=engine)
-    db = SessionLocal()
-    try:
-        seed_products(db)
-    finally:
-        db.close()
+    #: ★커머스 상품을 시딩하지 않는다.
+    #:   시딩 CSV 는 `legacy/` 로 옮겼고, **현행 코드가 레거시를 참조하면
+    #:   레거시를 지울 수 없게 된다.** 지금 남은 테스트는 상품이 필요 없다.
+    #:   보험 픽스처가 필요해지면 `tests/fixtures/` 에 따로 만든다.
     yield
     try:
         os.remove(_TMP_DB)
@@ -65,6 +63,3 @@ def auth_header(client: TestClient, username: str, password: str) -> dict:
     return {"Authorization": f"Bearer {token}"}
 
 
-def order_headers(auth: dict, key: str | None = None) -> dict:
-    """주문 생성용 헤더: 인증 + Idempotency-Key(Phase 6, 필수). key 미지정 시 새 키 생성."""
-    return {**auth, "Idempotency-Key": key or uuid.uuid4().hex}

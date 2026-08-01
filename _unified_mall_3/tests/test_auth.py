@@ -28,11 +28,16 @@ def test_wrong_password_401(client, unique_user):
     assert r.status_code == 401
 
 
+#: ★보호 엔드포인트로 `/api/orders` 를 쓰던 것을 `/api/admin/*` 으로 바꿨다.
+#:   주문 라우터는 커머스라 `legacy/` 로 옮겼다. 인증 검사 자체는 도메인과 무관하므로
+#:   현행에 남아 있는 보호 라우터로 검증한다.
 def test_invalid_token_401(client):
-    r = client.get("/api/orders", headers={"Authorization": "Bearer invalid.token.here"})
+    r = client.get(
+        "/api/admin/events", headers={"Authorization": "Bearer invalid.token.here"}
+    )
     assert r.status_code == 401
 
 
 def test_protected_route_without_token_401(client):
-    r = client.get("/api/orders")
+    r = client.get("/api/admin/events")
     assert r.status_code == 401

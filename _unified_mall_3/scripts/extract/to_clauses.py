@@ -32,6 +32,7 @@ import argparse
 import hashlib
 import json
 import re
+from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -41,7 +42,22 @@ _ROOT = Path(__file__).resolve().parents[2]
 _IN = _ROOT / "data" / "extracted"
 _OUT = _ROOT / "data" / "structured"
 
-SCHEMA_VERSION = "4"
+#: v5 — 목차 판정을 비율에서 **구조**로 교체(본문 25,252쪽 복구).
+#:      s4 를 덮어쓰지 않는다. 두 벌을 나란히 놓고 비교할 수 있어야 한다.
+SCHEMA_VERSION = "5"
+
+
+def _version_tag() -> str:
+    """조항 산출물 경로에 넣을 버전 태그.
+
+    ★페이지 JSON 의 태그(`to_page_json._version_tag()`)와 **따로 간다.**
+      추출기는 그대로인데 조항 스키마만 올라가는 일이 있다(v5 가 그렇다).
+      같이 묶으면 s4 를 덮어써서 **비교 대상이 사라진다** —
+      v3 의 35% 손상을 찾을 수 있었던 건 s3 를 남겨 뒀기 때문이다.
+    """
+    from scripts.extract.to_page_json import EXTRACTOR
+
+    return f"s{SCHEMA_VERSION}_{EXTRACTOR.replace('/', '-').replace(':', '')}"
 
 #: 조항 머리. ★**줄 시작**에 있는 것만 인정한다.
 #: 본문 속 상호참조("제4조에 따라…")를 머리로 오인하면 5~6자짜리 가짜 조항이 쏟아진다
@@ -96,7 +112,134 @@ _DOTS = re.compile(r"[.·․‥…]{5,}")
 _TOC_MARK = re.compile(r"^\s*목\s*차\s*$", re.MULTILINE)
 
 #: ★목차 신호 3 — 줄 끝의 페이지 번호. `… 121` 처럼 끝난다.
-_TOC_LINE = re.compile(r"[.·․‥…]{5,}\s*\d{1,4}\s*$", re.MULTILINE)
+#: ★`\s` 를 쓰면 줄바꿈을 먹어 **다음 줄까지 넘어가 매칭된다.** `[ \t]` 로 못박는다.
+#:   (아래 `_TOC_TITLE` 주석의 롯데손보 사고와 같은 원인)
+_TOC_LINE = re.compile(r"[.·․‥…]{5,}[ \t]*\d{1,4}[ \t]*$", re.MULTILINE)
+
+#: ★목차 신호 4 (v5 신설) — **목차 항목 줄**.
+#:
+#:   v4 는 "조 머리가 촘촘하고 머리당 글자가 짧으면 목차"라는 **비율**로 판정했다.
+#:   그게 본문을 목차로 오판했다. 원인은 **법령 인용이 조밀한 본문**이다.
+#:
+#:     "「국민건강보험법」제5조, 제53조, 제54조에 따라 요양급여 또는
+#:      「의료급여법」제4조, 제15조, 제17조에 따라 의료급여를 …"
+#:
+#:   실측(NH농협생명 176쪽 `42ce81976809`) — 같은 지표로 목차와 본문이 안 갈린다:
+#:
+#:     쪽  실제      제N조수  글자수/n   v4판정
+#:     19  진짜목차     11      39.5     TOC  (정답)
+#:     86  본문          7     202.3     BODY (정답)
+#:     87  본문          8     170.1     TOC  ✗
+#:     93  본문          7     181.0     TOC  ✗
+#:     115 본문         13     100.3     TOC  ✗
+#:
+#:   전량 집계: 162,678쪽 중 29,221쪽(18.0%)을 목차로 뺐고,
+#:   그중 25,736쪽(**전체의 15.8%**)이 **비율 규칙 단독**이었다.
+#:   피해: 그 NH 문서의 「보상하지 않는 사항」이 목차상 3개인데 산출물엔 1개뿐이고,
+#:   그 1개조차 p39·40·41·44 가 빠진 채 조립됐다 — **면책 조항이 없는 것처럼 보인다.**
+#:
+#: ★그래서 비율을 버리고 **구조**를 본다. 목차 줄에는 반드시 **쪽번호**가 붙는다.
+#:   조판이 둘이라 양쪽을 다 받는다.
+#:     (가) 같은 줄 끝에 번호   `제1 조 【보장종목】 ......... 28`
+#:     (나) 다음 줄에 번호      `제1조【보장종목】` / 다음 줄 `28`   ← NH 실측
+#:
+#:   실측 대조(같은 문서): 목차 p19·20·23 은 쌍이 15·28·24 개,
+#:   본문 p29·35·58·86·87·93·102·115·167 은 **전부 0** 이었다. 겹치지 않는다.
+_TOC_ENTRY_HEAD = re.compile(r"^\s*제\s*\d{1,3}\s*(?:조(?:의\s*\d{1,2})?|관|절|장|편)")
+_NUM_ONLY_LINE = re.compile(r"^\s*\d{1,4}\s*$")
+_TRAILING_NUM = re.compile(r"\d{1,4}\s*$")
+
+
+def _toc_entry_count(text: str) -> int:
+    """`제N조…` + 쪽번호(같은 줄 끝 또는 다음 줄) 꼴의 목차 항목 줄 수."""
+    lines = [ln for ln in text.split("\n") if ln.strip()]
+    n = 0
+    for i, ln in enumerate(lines):
+        if not _TOC_ENTRY_HEAD.match(ln):
+            continue
+        if _TRAILING_NUM.search(ln) or (
+            i + 1 < len(lines) and _NUM_ONLY_LINE.match(lines[i + 1])
+        ):
+            n += 1
+    return n
+
+
+#: ★목차 신호 1 (v5 재작성) — **줄이 `…목차` 로 끝나는 제목 줄**.
+#:
+#:   v4 는 `^\s*목\s*차\s*$` — `목 차` **단독 줄**만 봤다. 두 가지가 틀렸다.
+#:
+#:   (1) ★`\s` 가 **줄바꿈을 먹는다.** 단독 줄 제한이 사실은 없었다.
+#:       롯데손보는 페이지 옆에 세로 탭으로 `목` / `차` 를 한 글자씩 찍는데,
+#:       그게 `목\n차` 로 추출돼 매칭됐다. **실제 본문 103쪽(2문서)이 통째로 삭제**됐다
+#:       (`1b922d9f78a4` 53쪽 · `1cdb018a5867` 50쪽 — p40 은 세로 내비 바로 뒤에
+#:       보통약관 제1조 본문이 온다). 코덱스가 잡았다. `[ \t]` 로 못박는다.
+#:
+#:   (2) 제목이 `목 차` 단독인 문서가 오히려 소수다. 실제로는
+#:       `상품 목차` `상황별 목차` `별표 목차` `보통약관(공통조항) 목차` 처럼 쓴다.
+#:       이걸 못 잡아 **825쪽(399문서)** 의 목차가 본문으로 새고 있었다
+#:       (삼성생명 602 · 현대해상 141 · 삼성화재 82 — 코덱스 실측).
+#:
+#:   그래서 "짧은 줄이 `목차`로 끝나면 목차 제목"으로 바꾼다.
+#:   DB손보의 `☞ 목차로 돌아가기` 는 줄 끝이 `목차` 가 아니라 안 걸린다
+#:   (그 문구는 28문서 2,791쪽에 있다 — 잘못 잡으면 피해가 크다).
+_TOC_TITLE = re.compile(r"^[ \t]*[^\n]{0,80}목[ \t]*차(?:[ \t]+\d{1,4})?[ \t]*$", re.MULTILINE)
+
+#: ★목차 신호 5 — **목차 연속 페이지**.
+#:   목차 제목은 첫 장에만 찍힌다. 둘째 장부터는 제목도 점선도 없이 항목만 이어진다.
+#:   현대해상 `dc72bc8035b4` p33 이 `보통약관(공통조항) 목차`, p34 가 그 연속인데
+#:   p34 는 어느 신호에도 안 걸려 **가짜 조항 23개**를 만들었다.
+#:   조건: 직전 쪽이 목차 제목 쪽 + 목차항목 3개 이상 + 조 머리 6개 이상.
+#:   실측 24쪽(17문서) 추가 검출, **전부 목차 연속 페이지였다**(코덱스 확인).
+TOC_CONT_MIN_ENTRY = 3
+TOC_CONT_MIN_HEAD = 6
+
+#: ★★폐기한 신호 — "조 머리 줄 밀집도"(`제N조…` 로 시작하는 줄의 비율).
+#:
+#:   신호 4(목차항목)가 **쪽번호에 의존**하는 게 약점이라 보고, 쪽번호 없이
+#:   "조 머리가 빽빽하면 목차"라는 신호를 넣었다. 실측으로 갈리는 듯했다:
+#:     목차 p19 15/40=0.38 · p20 30/59=0.51   /   본문 p87 1 · p93 1 · p115 1
+#:
+#: ★**코덱스가 반례를 찾았다 — 관계법령 부록.**
+#:   약관 뒤에 붙는 인용 법령 페이지는 목차와 **구조가 같다.**
+#:
+#:     제250조(살인, 존속살해)          ← 조 머리 줄
+#:     ① 사람을 살해한 자는 …           ← 본문 줄
+#:     제252조(촉탁, 승낙에 의한 살인 등)
+#:     ① 사람의 촉탁 또는 승낙을 받어 …
+#:
+#:   실측 밀집도: 흥국생명 `76e173e5747b` p131 = 15/45(0.33),
+#:   NH손보 `ba396b382a73` p287 = 16/39(0.41) — **목차(0.38~0.51)와 겹친다.**
+#:   그 외 동양생명 단체취급특약(조항이 한 줄씩 짧다)·삼성화재 본문도 걸렸다.
+#:
+#:   밀집도로는 목차와 법령 부록을 **가를 수 없다.** 그래서 신호를 뺀다.
+#:   대가로 현대해상 구형 목차(`제1장 일반사항 1 / 제1조 (담보종목)` — 쪽번호가
+#:   장에만 붙는 조판)를 놓친다. 그건 감수한다 —
+#:   **본문을 지우는 것보다 가짜 조항이 섞이는 편이 낫다.** 가짜는 눈에 띄고,
+#:   지운 것은 아무도 모른다(그게 v4 의 15.8% 였다).
+
+
+def _toc_signals(text: str) -> dict[str, int]:
+    """발동한 목차 신호 **전부**를 `{이름: 수치}` 로.
+
+    ★첫 신호만 반환하지 않는다. 페이지를 통째로 버리는 판단이라
+      나중에 "왜 이게 빠졌나"를 되짚을 수 있어야 한다(코덱스 지적).
+    """
+    sig: dict[str, int] = {}
+    if _TOC_TITLE.search(text):
+        sig["목차제목"] = 1
+    n = len(_TOC_LINE.findall(text))
+    if n >= TOC_MIN_HEADS:
+        sig["점선줄"] = n
+    n = _toc_entry_count(text)
+    if n >= TOC_MIN_HEADS:
+        sig["목차항목"] = n
+    return sig
+
+
+def _toc_verdict(text: str) -> str:
+    """목차면 대표 신호 이름, 아니면 빈 문자열. (연속 페이지 판정은 `build()` 안에 있다)"""
+    sig = _toc_signals(text)
+    return next(iter(sig), "")
 
 #: 부(部) 경계. ★**단독 줄로 나온 것만** 인정한다.
 #: 초안은 페이지 앞 400자에서 아무 데나 매칭해 '용어의정의'가 266개로 잡혔다 —
@@ -152,12 +295,19 @@ def _looks_like_section(line: str, title: str) -> bool:
         return False
     return True
 
-#: 목차 페이지 판정 임계값. 실측 근거:
-#:   목차 p3=조항머리 36개/머리당 41자, p4=19개/61자, p6=18개/77자
-#:   본문 p12=4개/258자, p13=5개/234자
-#: 조항머리가 촘촘하고 머리당 텍스트가 짧으면 목차다.
+#: 목차로 보려면 그 신호가 몇 줄 이상 나와야 하는가.
+#: 한두 줄은 본문에도 나온다(`제3조(의료기관) 참조 12` 같은 인용).
 TOC_MIN_HEADS = 6
-TOC_MAX_CHARS_PER_HEAD = 200
+
+#: ★v4 의 비율 임계 `TOC_MAX_CHARS_PER_HEAD = 200` 은 **삭제했다.**
+#:   본문(100~200)과 목차(≈40)가 이 축에서 겹쳐, 본문 25,736쪽을 목차로 버렸다.
+#:   상세는 위 `_TOC_ENTRY_HEAD` 주석. 되살리지 말 것.
+#:
+#: v5 교체 효과(1,367문서 162,678쪽 전량 재계산):
+#:   목차 제외      29,221쪽(18.0%) → 3,970쪽(2.4%)
+#:   되찾은 본문    25,252쪽  — 12개사 층화 표본 39건 전수 확인, **오판 0건**
+#:   새로 잡은 목차     1쪽  — 실제 목차였다(`목 차 21` + 조 제목·쪽번호).
+#:                              v4 는 `목 차` 뒤에 쪽번호가 붙어 단독 줄이 아니라 놓쳤다
 
 
 def _norm(text: str) -> str:
@@ -176,23 +326,24 @@ def build(page_doc: dict) -> dict:
         raise ValidationErr("페이지가 없습니다.")
 
     # ── 목차 페이지 식별 (6단계 정확도의 전제) ──
-    #: ★신호를 셋 쓴다. 비율 하나만 보다가 목차를 본문으로 오판했다.
+    #: ★v5 — 비율을 버리고 **구조**를 본다. 근거는 `_TOC_ENTRY_HEAD` 주석.
+    #:   페이지를 통째로 버리는 판단이므로 **왜 버렸는지 반드시 남긴다.**
     toc_pages: set[int] = set()
+    toc_reasons: dict[int, dict[str, int]] = {}
+    prev_titled = False          # 직전 쪽이 `…목차` 제목 쪽이었나
     for pg in pages:
         text = pg["text"]
-        # (1) 페이지에 `목 차` 가 찍혀 있으면 그것으로 끝이다.
-        if _TOC_MARK.search(text):
+        sig = _toc_signals(text)
+        #: ★목차 둘째 장 — 제목도 점선도 없이 항목만 이어진다.
+        if not sig and prev_titled:
+            e = _toc_entry_count(text)
+            h = len(_ARTICLE.findall(text))
+            if e >= TOC_CONT_MIN_ENTRY and h >= TOC_CONT_MIN_HEAD:
+                sig = {"목차연속": h}
+        if sig:
             toc_pages.add(pg["page"])
-            continue
-        # (2) 점선+페이지번호로 끝나는 줄이 여럿이면 목차다.
-        if len(_TOC_LINE.findall(text)) >= TOC_MIN_HEADS:
-            toc_pages.add(pg["page"])
-            continue
-        # (3) 비율. ★점선을 지우고 잰다 — 점선이 글자수를 부풀린다.
-        stripped = _DOTS.sub(" ", text)
-        n = len(_ARTICLE_ANY.findall(stripped))
-        if n >= TOC_MIN_HEADS and len(stripped) / n < TOC_MAX_CHARS_PER_HEAD:
-            toc_pages.add(pg["page"])
+            toc_reasons[pg["page"]] = sig
+        prev_titled = "목차제목" in sig or "목차연속" in sig
 
     # ── 5) 문서 구조 복원: 단독 줄로 나온 부 제목만 인정 ──
     section_of_page: dict[int, str] = {}
@@ -268,7 +419,7 @@ def build(page_doc: dict) -> dict:
         #:   대신 **성격이 다른 산출물**임을 명시한 fallback 을 만든다.
         #:   RAG 검색에는 쓰되(문서를 버릴 이유는 없다), 자동 판정에는
         #:   `parse_status` 를 보고 걸러야 한다.
-        return _fallback(page_doc, pages, toc_pages, section_of_page)
+        return _fallback(page_doc, pages, toc_pages, toc_reasons, section_of_page)
 
     text_of = {pg["page"]: pg["text"] for pg in pages}
     tables_of = {pg["page"]: pg.get("tables", []) for pg in pages}
@@ -347,6 +498,34 @@ def build(page_doc: dict) -> dict:
     if ambiguous:
         warnings.append("번호 체계를 확신할 수 없다(두 형식의 머리 수가 비슷하다)")
 
+    #: ★사후 검증 (v5 신설) — **놓친 목차가 만든 가짜 조항**을 잡는다.
+    #:
+    #:   위 두 검사는 "조항이 너무 길다"와 "너무 적다"만 본다. 목차 페이지를 놓치면
+    #:   반대 방향으로 망가진다 — **짧은 가짜가 대량으로 늘어난다.**
+    #:
+    #:   실측(현대해상 `dc72bc8035b4` 104쪽): 목차 p33·p34 를 놓쳐 가짜 조항 51개
+    #:   (15~92자)가 생겼다. 전체 157개의 **32.5%**. 그런데
+    #:     · 최대 길이 3,515자 → 길이 검사 통과
+    #:     · 가짜가 조항 수를 부풀려 → "너무 적다" 검사도 통과
+    #:   결국 `parse_status="ok"` 로 나갔다. **두 검사가 서로의 사각을 못 메운다**(코덱스).
+    #:
+    #:   목차가 새면 **한 페이지에서 조 머리가 무더기로** 나오고 그 조항들이 다 짧다.
+    #:   지우지는 않는다 — 세어서 `suspect` 로 보낸다.
+    TINY_CLAUSE_CHARS = 100
+    HEADS_PER_PAGE_ALARM = 20
+    if clauses:
+        per_page = Counter(c["locator"]["page_from"] for c in clauses)
+        page, cnt = per_page.most_common(1)[0]
+        if cnt >= HEADS_PER_PAGE_ALARM:
+            lens = sorted(c["char_length"] for c in clauses
+                          if c["locator"]["page_from"] == page)
+            med = lens[len(lens) // 2]
+            if med < TINY_CLAUSE_CHARS:
+                warnings.append(
+                    f"p{page} 한 쪽에서 조항 {cnt}개(중앙 {med}자) — "
+                    f"목차를 본문으로 읽은 것으로 보인다"
+                )
+
     parse_status = "ok" if not warnings else "suspect"
 
     return {
@@ -358,6 +537,8 @@ def build(page_doc: dict) -> dict:
         #: 어떤 번호 체계로 쪼갰나. `제N조` 인지 특별약관의 `N.` 인지.
         "numbering": numbering,
         "toc_pages": sorted(toc_pages),
+        #: ★어느 신호로 뺐는지. 근거 없이 페이지를 버리지 않는다.
+        "toc_reasons": {str(p): toc_reasons[p] for p in sorted(toc_pages)},
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": page_doc["source"],
         "identification": page_doc.get("identification", "unidentified"),
@@ -376,7 +557,7 @@ def build(page_doc: dict) -> dict:
 
 
 def _fallback(page_doc: dict, pages: list[dict], toc_pages: set[int],
-              section_of_page: dict[int, str]) -> dict:
+              toc_reasons: dict[int, str], section_of_page: dict[int, str]) -> dict:
     """조항 머리를 못 찾은 문서 — **페이지 단위 청크**로 남긴다.
 
     ★왜 실패로 버리지 않나
@@ -425,6 +606,7 @@ def _fallback(page_doc: dict, pages: list[dict], toc_pages: set[int],
         "parse_status": "no_clause_heads",
         "numbering": "none",
         "toc_pages": sorted(toc_pages),
+        "toc_reasons": {str(p): toc_reasons[p] for p in sorted(toc_pages)},
         "built_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
         "source": page_doc["source"],
         "identification": page_doc.get("identification", "unidentified"),
@@ -455,8 +637,10 @@ def main() -> None:
     src = hits[0]
     doc = build(json.loads(src.read_text(encoding="utf-8")))
 
+    #: ★입력 경로(`s4_…`)를 그대로 따라가면 **s4 산출물을 덮어쓴다.**
+    #:   조항 스키마 버전으로 갈아 끼운다.
     rel = src.relative_to(_IN)
-    out = _OUT / rel.parent / f"{args.sha[:12]}.clauses.json"
+    out = _OUT / rel.parent.parent / _version_tag() / f"{args.sha[:12]}.clauses.json"
     out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(json.dumps(doc, ensure_ascii=False, indent=1), encoding="utf-8")
 

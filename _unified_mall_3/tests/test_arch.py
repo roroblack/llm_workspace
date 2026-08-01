@@ -147,3 +147,58 @@ def test_arch_003_usecases_do_not_import_adapters():
         if re.search(r"\bapp\.adapters\b", line)
     ]
     assert offenders == [], f"유스케이스가 어댑터를 직접 import: {offenders}"
+
+
+# ── ARCH-004 ─────────────────────────────────────────────────────────────
+# 현행 코드가 레거시를 참조하지 않는다.
+#
+# ★왜 필요한가 — 실제로 그럴 뻔했다.
+#   커머스 시딩 CSV 를 `legacy/` 로 옮기고 `settings.LEGACY_DATA_DIR` 을 만들어
+#   현행 코드가 그걸 읽게 했다. 그러면 "레거시"가 아니라 **그냥 다른 폴더에 있는
+#   현행 코드**다. 레거시는 통째로 지워도 되는 것이어야 한다.
+#
+#   그래서 압축본으로만 둔다. 이 테스트는 그 규칙이 다시 무너지지 않게 막는다.
+
+
+#: 레거시를 코드로 참조하는 흔적.
+_LEGACY_REF = re.compile(
+    r"legacy[/\\]v\d|LEGACY_DATA_DIR|import\s+legacy|from\s+legacy"
+)
+
+
+def test_arch_004_current_code_does_not_reference_legacy():
+    """`app/` · `tests/` · `scripts/` 가 `legacy/` 를 코드로 참조하지 않는다."""
+    targets = [_ROOT / d for d in ("app", "tests", "scripts")]
+    offenders: list[str] = []
+    for base in targets:
+        if not base.exists():
+            continue
+        for py in base.rglob("*.py"):
+            if "__pycache__" in str(py) or py.name == "test_arch.py":
+                continue
+            for i, line in enumerate(py.read_text(encoding="utf-8", errors="replace").splitlines(), 1):
+                stripped = line.strip()
+                #: 주석·문서화 문자열의 언급은 참조가 아니다.
+                if stripped.startswith("#") or stripped.startswith("*"):
+                    continue
+                if re.search(_LEGACY_REF, line):
+                    offenders.append(f"{py.relative_to(_ROOT)}:{i}: {stripped[:70]}")
+    assert offenders == [], (
+        "현행 코드가 legacy/ 를 참조합니다. 레거시는 지워도 되는 것이어야 합니다:\n"
+        + "\n".join(offenders)
+    )
+
+
+def test_arch_004_legacy_is_archived_not_importable():
+    """레거시는 **압축본**으로만 둔다 — 풀린 상태로 두면 import 될 수 있다."""
+    legacy = _ROOT / "legacy"
+    if not legacy.exists():
+        return  # 레거시가 없는 것은 정상이다
+    loose = [
+        str(p.relative_to(_ROOT))
+        for p in legacy.rglob("*.py")
+        if "__pycache__" not in str(p)
+    ]
+    assert loose == [], (
+        f"레거시에 풀린 .py 가 있습니다. 압축해서 보관하세요: {loose[:5]}"
+    )

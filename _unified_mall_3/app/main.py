@@ -27,23 +27,20 @@ from app.core.config import get_settings
 from app.core.errors import register_exception_handlers
 from app.obs.trace import TraceMiddleware
 from app.routers import (
-    a2a,
     admin,
-    agent,
     auth,
     bounty,
     face,
     health,
     lab,
-    mcp,
-    nlp,
     precheck,
     rag,
     voice,
     workflow,
 )
 
-#: ★커머스 라우터(products/orders/payments)는 `app/legacy/` 로 옮겼다.
+#: ★커머스 라우터(products/orders/payments)와 이름만 A2A 인 `a2a` 라우터는
+#:   저장소 루트 `legacy/v3_commerce/` 로 옮겼다.
 #:   코드는 보존하되 **API 표면에서 뺀다** — 보험 API 문서에 `/api/products` 가
 #:   섞이면 쓰는 사람이 혼란스럽다. 되살리려면 여기서 다시 import 하면 된다.
 
@@ -83,7 +80,6 @@ def create_app(role: str = "full") -> FastAPI:
     app.include_router(auth.router)
     #: 보험 보장 사전판정 — 이 프로젝트의 본체다.
     app.include_router(precheck.router)
-    app.include_router(agent.router)
     app.include_router(voice.router)
     app.include_router(face.router)
 
@@ -92,10 +88,7 @@ def create_app(role: str = "full") -> FastAPI:
     # 축소). 어떤 고객 페이지도 이 엔드포인트들을 호출하지 않는다(rag/mcp는 운영 페이지 전용).
     if role != "customer":
         app.include_router(rag.router)
-        app.include_router(nlp.router)
         app.include_router(lab.router)
-        app.include_router(mcp.router)
-        app.include_router(a2a.router)
         app.include_router(bounty.router)
         app.include_router(workflow.router)
         app.include_router(admin.router)

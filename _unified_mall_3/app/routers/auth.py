@@ -17,7 +17,7 @@ from app.core.config import get_settings
 from app.core.errors import AuthErr, ValidationErr
 from app.db.database import get_db
 from app.routers._uploads import read_capped
-from app.schemas.commerce import LoginResponse, SignupRequest, TokenResponse
+from app.schemas.auth import LoginResponse, SignupRequest, TokenResponse
 from app.services import face_service, user_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])

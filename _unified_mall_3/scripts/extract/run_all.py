@@ -120,8 +120,12 @@ def main() -> None:
     from scripts.extract import to_clauses, to_page_json
 
     tag = to_page_json._version_tag()
+    #: ★조항 산출물은 **조항 스키마 버전**으로 나눈다. 추출기는 그대로인데
+    #:   조항 로직만 바뀌는 일이 있다(v5). 같은 태그를 쓰면 이전 판을 덮어써
+    #:   비교가 불가능해진다.
+    clause_tag = to_clauses._version_tag()
     targets = _targets(args.insurer, args.limit)
-    print(f"대상 {len(targets):,}건  (추출기 {tag})")
+    print(f"대상 {len(targets):,}건  (페이지 {tag} / 조항 {clause_tag})")
 
     if args.dry_run:
         need_p = sum(
@@ -145,7 +149,7 @@ def main() -> None:
         pdf = _ROOT / meta["saved_as"]
 
         page_out = _EXTRACTED / slug / tag / f"{sha12}.json"
-        clause_out = _STRUCTURED / slug / tag / f"{sha12}.clauses.json"
+        clause_out = _STRUCTURED / slug / clause_tag / f"{sha12}.clauses.json"
 
         # ── 4단계: PDF → 페이지 JSON ──────────────────────────────
         if args.stage in ("pages", "both"):

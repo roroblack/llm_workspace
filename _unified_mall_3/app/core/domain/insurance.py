@@ -13,11 +13,15 @@
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass, field
 from datetime import date
 from enum import Enum
 
 from app.core.errors import ValidationErr
+
+#: 95% 신뢰구간에 쓰는 표준정규 분위수. `CohortStats.rate_interval` 참조.
+_Z_95 = 1.959963984540054
 
 
 class InsurerKind(str, Enum):
@@ -151,14 +155,50 @@ class CohortStats:
         return self.n >= self.min_sample
 
     def approval_rate(self) -> float:
-        """승인 비율.
+        """★**우리 표본에서 관측된** 승인 비율. 모집단 추정치가 아니다.
 
         ★표본이 최소치에 미달하면 **계산해 주지 않고 실패한다.**
         40건으로 낸 82.5%는 신뢰구간이 ±12%p 수준이라 단정하면 거짓이 된다.
         '계산할 수 있다'와 '말해도 된다'는 다르다.
+
+        ★게이트를 넘겨도 **이 값을 단독으로 말하지 않는다.**
+        반드시 :meth:`rate_interval` 과 함께 낸다 — 점추정만 보여주면
+        읽는 쪽은 그것을 '실제 승인율'로 받아들인다.
         """
         if not self.min_sample_met:
             raise ValidationErr(
                 f"표본이 부족해 비율을 산출하지 않습니다 (n={self.n}, 최소 {self.min_sample})."
             )
         return self.approved_n / self.n
+
+    def rate_interval(self) -> tuple[float, float]:
+        """승인 비율의 **95% 신뢰구간** (Wilson score interval).
+
+        ★왜 점추정 대신 구간인가
+
+            팀 결정(`팀MVP6 §2-2`)은 *"40건으로 비율을 내면 안 된다.
+            '82.5%'라고 단정하면 거짓이다"* 였다. 그런데 최소표본만으로 막으면
+            **게이트를 넘는 순간 다시 점추정을 단정하게 된다.**
+
+            구간은 숨기지도 단정하지도 않는다. 40건의 33건은
+            "82.5%"가 아니라 **"68~91%"** 이고, 표본이 적다는 사실이
+            경고 문구가 아니라 **숫자 자체로** 드러난다.
+
+        ★왜 Wilson 인가 — 정규근사 ``p ± z·√(p(1-p)/n)`` 는 n 이 작거나
+            p 가 0·1 에 가까우면 구간이 [0,1] 을 벗어나고 실제 포함확률이
+            95% 에 못 미친다. 우리 표본은 수십 건 규모라 정확히 그 영역이다.
+
+        ★표본 미달이면 계산하지 않는다 — :meth:`approval_rate` 와 같은 게이트다.
+        """
+        if not self.min_sample_met:
+            raise ValidationErr(
+                f"표본이 부족해 신뢰구간을 산출하지 않습니다 "
+                f"(n={self.n}, 최소 {self.min_sample})."
+            )
+        n, p = self.n, self.approved_n / self.n
+        z2 = _Z_95 * _Z_95
+        denom = 1.0 + z2 / n
+        center = (p + z2 / (2 * n)) / denom
+        half = _Z_95 * math.sqrt(p * (1 - p) / n + z2 / (4 * n * n)) / denom
+        #: 수치오차로 [0,1] 을 벗어나지 않게 자른다.
+        return (max(0.0, center - half), min(1.0, center + half))

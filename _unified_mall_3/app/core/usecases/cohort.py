@@ -5,8 +5,11 @@
 
 ★이 유스케이스가 막아야 하는 것
 
-1. **표본이 적은데 비율만 보여주는 것.** 40건의 33건은 82.5%로 보이지만
-   95% 신뢰구간이 ±12%p 수준이다. 최소표본 미달이면 비율을 내지 않는다.
+1. **표본이 적은데 비율을 단정하는 것.** 40건의 33건은 82.5%로 보이지만
+   95% 신뢰구간이 ±12%p 수준이다. 방어를 두 겹으로 둔다 —
+   최소표본 미달이면 **비율 자체를 내지 않고**, 게이트를 넘겨도
+   **점추정 대신 구간**으로 말한다(`"82.5%"` 가 아니라 `"68~91%"`).
+   ★게이트만으로는 부족하다. 넘는 순간 다시 단정하게 되기 때문이다.
 2. **생존 편향을 숨기는 것.** 지급받은 사람이 부지급 당한 사람보다 훨씬 많이 제보한다.
    승인율이 실제보다 높게 나오며, 이것은 **사후 보정이 불가능한 구조적 편향**이다.
    보정하는 척하지 않고 경고로 남긴다.
@@ -38,14 +41,25 @@ class CohortAnswer:
     """화면·API 어디로 나가든 이 값들이 함께 나간다."""
 
     stats: CohortStats
-    #: 표본이 충분할 때만 채워진다. 미달이면 ``None`` 이고, 대신 ``headline`` 이 사실만 말한다.
+    #: ★**우리 표본에서 관측된** 비율. 모집단 추정치가 아니다.
+    #: 표본이 충분할 때만 채워지고, 채워지면 ``approval_ci`` 도 반드시 함께 채워진다.
     approval_rate: float | None
-    #: 사람이 읽는 한 줄. 비율이 아니라 건수로 말한다.
+    #: ★95% 신뢰구간. ``approval_rate`` 와 **항상 짝으로** 나간다.
+    #: 점추정만 보여주면 읽는 쪽은 그것을 '실제 승인율'로 받아들인다.
+    approval_ci: tuple[float, float] | None
+    #: 사람이 읽는 한 줄. **비율을 단정하지 않는다** — 건수와 구간으로 말한다.
     headline: str
 
     @property
     def data_source(self) -> DataSource:
         return self.stats.data_source
+
+    def __post_init__(self) -> None:
+        #: ★구조로 강제한다 — 점추정만 있고 구간이 없는 응답을 만들 수 없다.
+        if (self.approval_rate is None) != (self.approval_ci is None):
+            raise ValidationErr(
+                "approval_rate 와 approval_ci 는 항상 함께 있거나 함께 없어야 합니다."
+            )
 
 
 class CohortQuery:
@@ -98,12 +112,32 @@ class CohortQuery:
         )
 
         rate = enriched.approval_rate() if enriched.min_sample_met else None
-        return CohortAnswer(stats=enriched, approval_rate=rate, headline=_headline(enriched))
+        ci = enriched.rate_interval() if enriched.min_sample_met else None
+        return CohortAnswer(
+            stats=enriched,
+            approval_rate=rate,
+            approval_ci=ci,
+            headline=_headline(enriched),
+        )
 
 
 def _headline(stats: CohortStats) -> str:
-    """건수로 말한다. 비율은 표본이 충분할 때만 덧붙인다."""
+    """사람이 읽는 한 줄.
+
+    ★**점추정을 단정하지 않는다.**
+
+        고치기 전에는 게이트를 넘으면 ``"… (82.5%)"`` 를 붙였다.
+        그런데 그 문자열은 `팀MVP6 §2-2` 가 **쓰지 말자고 정한 바로 그 표현**이다.
+        최소표본으로 막아도 게이트를 넘는 순간 같은 문제가 돌아온다.
+
+        그래서 비율 대신 **구간**을 말한다. 40건의 33건은 "82.5%"가 아니라
+        **"68~91%"** 이고, 표본이 적다는 사실이 경고가 아니라 숫자로 드러난다.
+    """
+    if stats.n <= 0:
+        #: ★0건을 "0건 중 0건 승인"이라고 쓰지 않는다. 비어 있다고 말한다.
+        return "검증된 사례가 없습니다"
     base = f"검증된 {stats.n}건 중 {stats.approved_n}건 승인 · {stats.denied_n}건 부지급"
     if not stats.min_sample_met:
         return f"{base} (표본이 적어 비율은 표시하지 않습니다)"
-    return f"{base} ({stats.approved_n / stats.n:.1%})"
+    lo, hi = stats.rate_interval()
+    return f"{base} (승인 비율 {lo:.0%}~{hi:.0%}, 95% 신뢰구간)"
