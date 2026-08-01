@@ -37,6 +37,7 @@ from app.routers import (
     lab,
     mcp,
     nlp,
+    precheck,
     rag,
     voice,
     workflow,
@@ -80,6 +81,8 @@ def create_app(role: str = "full") -> FastAPI:
     # 음성·얼굴). 이 집합만 고객 포트(8080)에 노출한다.
     app.include_router(health.router)
     app.include_router(auth.router)
+    #: 보험 보장 사전판정 — 이 프로젝트의 본체다.
+    app.include_router(precheck.router)
     app.include_router(agent.router)
     app.include_router(voice.router)
     app.include_router(face.router)

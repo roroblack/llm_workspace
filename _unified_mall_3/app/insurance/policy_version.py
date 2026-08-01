@@ -187,8 +187,15 @@ def resolve(
         )
 
     #: ★본약관을 먼저 본다. 특약은 본계약에 붙는 것이라 "가입 상품"이 아니다.
-    #:   상품명을 명시했으면 그 뜻을 존중해 특약도 후보로 둔다.
-    if not product_name:
+    #:
+    #:   상품명을 주면 특약도 후보로 두던 때가 있었는데, 그랬더니
+    #:   `product_name="실손의료비"` 에 **`실손의료비 안정화 추가할인 특별약관`** 이
+    #:   골라졌다. 그 특약에는 면책 코드가 없어 판정이 `no_evidence` 로 끝났다.
+    #:   상품명은 **좁히는 용도**지 "특약을 달라"는 뜻이 아니다.
+    #:
+    #:   사용자가 정말 특약을 지목한 경우(이름에 '특약'이 들어감)에만 특약을 본다.
+    wants_rider = bool(product_name and _RIDER.search(product_name))
+    if not wants_rider:
         main_only = [v for v in applicable if not v.is_rider]
         if main_only:
             applicable = main_only
@@ -200,22 +207,26 @@ def resolve(
     #:   일반 실손 / 노후실손 / 유병력자실손은 자기부담금 체계가 아예 다르다.
     #:   시작일이 우연히 하나만 최신이라고 노후실손을 골라 버리면,
     #:   일반 실손 가입자에게 노후실손 기준으로 답하게 된다.
-    if not product_name:
-        lines = {v.product_line for v in applicable if v.product_line}
-        if len(lines) > 1:
-            latest_per_line = {}
-            for v in applicable:
-                cur = latest_per_line.get(v.product_line)
-                if cur is None or v.sale_start > cur.sale_start:
-                    latest_per_line[v.product_line] = v
-            return NotResolved(
-                reason_code="ambiguous_product_line",
-                message=(
-                    "일반 실손·노후실손·유병력자실손 중 어느 상품인지 알려주세요. "
-                    "상품에 따라 자기부담금이 다릅니다."
-                ),
-                candidates=tuple(latest_per_line.values()),
-            )
+    #:
+    #:   ★상품명을 줬다고 건너뛰면 안 된다. `"실손의료비"` 는
+    #:     `무배당노후실손의료비보장보험` 에도 들어 있어 **라인을 못 가린다.**
+    #:     실제로 현대해상에 "실손의료비"를 물었더니 노후실손이 골라졌다.
+    #:     좁힌 뒤에도 라인이 둘 이상이면 물어야 한다.
+    lines = {v.product_line for v in applicable if v.product_line}
+    if len(lines) > 1:
+        latest_per_line: dict[str, PolicyVersion] = {}
+        for v in applicable:
+            cur = latest_per_line.get(v.product_line)
+            if cur is None or v.sale_start > cur.sale_start:
+                latest_per_line[v.product_line] = v
+        return NotResolved(
+            reason_code="ambiguous_product_line",
+            message=(
+                "일반 실손·노후실손·유병력자실손 중 어느 상품인지 알려주세요. "
+                "상품에 따라 자기부담금이 다릅니다."
+            ),
+            candidates=tuple(latest_per_line.values()),
+        )
 
     #: 같은 시작일이 여럿이면 상품을 특정하지 못한 것이다.
     same = [v for v in applicable if v.sale_start == best.sale_start]
