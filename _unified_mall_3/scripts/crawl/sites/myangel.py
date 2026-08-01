@@ -59,7 +59,10 @@ MAX_PAGES = 60
 
 _ROOT = Path(__file__).resolve().parents[3]
 _RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
-_MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
+#: ★보험사별 매니페스트. 예전에는 전 보험사가 한 파일(`fetch_manifest.jsonl`)을
+#:   같이 썼는데, 분리할 때 이 어댑터들을 안 고쳐서 **기록이 두 곳으로 갈라졌다.**
+#:   그 바람에 "이미 받았다" 판정과 진행률이 서로 다른 파일을 보게 됐다.
+_MANIFEST = _ROOT / "data" / "raw" / "manifests" / f"{INSURER_SLUG}.jsonl"
 _CATALOG_DIR = _ROOT / "data" / "catalog"
 
 #: ★검색어를 추측하지 않는다. 빈 검색어로 **전체를 받아 로컬에서 거른다.**

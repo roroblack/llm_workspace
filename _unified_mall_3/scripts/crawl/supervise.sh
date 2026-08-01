@@ -17,9 +17,18 @@ LOCK="/tmp/sv_${SITE}.lock"
 # ★중복 실행 방지. 이게 없어서 같은 사이트를 12개 프로세스가 동시에 긁었고,
 #   기록이 9,574행까지 부풀고(실제 파일 2,260개) 서로 파일을 덮어 잘린 PDF 가 생겼다.
 if ! mkdir "$LOCK" 2>/dev/null; then
-  echo "이미 실행 중입니다: $SITE (락: $LOCK)" >&2
-  exit 1
+  # ★좀비 락 처리. 프로세스가 죽으면 trap 이 안 돌 수 있어 락만 남는다.
+  #   PID 를 적어 두고, 그 프로세스가 없으면 락을 회수한다.
+  old_pid=$(cat "$LOCK/pid" 2>/dev/null || echo "")
+  if [ -n "$old_pid" ] && kill -0 "$old_pid" 2>/dev/null; then
+    echo "이미 실행 중입니다: $SITE (pid=$old_pid)" >&2
+    exit 1
+  fi
+  echo "좀비 락 회수: $SITE (죽은 pid=$old_pid)" >&2
+  rm -rf "$LOCK"
+  mkdir "$LOCK" || exit 1
 fi
+echo $$ > "$LOCK/pid"
 trap 'rmdir "$LOCK" 2>/dev/null' EXIT INT TERM
 
 : > "$LOG"

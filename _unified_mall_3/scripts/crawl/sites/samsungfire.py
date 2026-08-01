@@ -67,7 +67,10 @@ _ROOT = Path(__file__).resolve().parents[3]
 #: 폴더명은 영문 슬러그를 쓴다(한글 경로는 Windows/git 에서 인코딩이 깨진다).
 INSURER_SLUG = "samsungfire"
 _RAW = _ROOT / "data" / "raw" / "insurance_terms" / INSURER_SLUG
-_MANIFEST = _ROOT / "data" / "raw" / "fetch_manifest.jsonl"
+#: ★보험사별 매니페스트. 예전에는 전 보험사가 한 파일(`fetch_manifest.jsonl`)을
+#:   같이 썼는데, 분리할 때 이 어댑터들을 안 고쳐서 **기록이 두 곳으로 갈라졌다.**
+#:   그 바람에 "이미 받았다" 판정과 진행률이 서로 다른 파일을 보게 됐다.
+_MANIFEST = _ROOT / "data" / "raw" / "manifests" / f"{INSURER_SLUG}.jsonl"
 _CATALOG_DIR = _ROOT / "data" / "catalog"
 
 #: 실손 후보 판별. 넓게 잡고 **확정은 하지 않는다**(식별 단계의 일).

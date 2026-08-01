@@ -40,8 +40,27 @@ INSURER_KO = {
     "myangel": "동양생명", "heungkuklife": "흥국생명", "nhfire": "NH농협손보",
 }
 
-#: 카탈로그 파일이 없는 브라우저 수집분. 대상은 화면에서 센 값이다.
-KNOWN_TARGET = {"samsunglife": 223, "meritzfire": 157, "nhfire": 12}
+#: ★대상 건수는 **어댑터가 실제로 쓰는 필터**를 거친 값이어야 한다.
+#: 카탈로그를 내가 따로 세면 어댑터와 달라진다 — 실제로 그렇게 해서
+#: 삼성화재가 74%(341/458)로 보였는데 어댑터 기준으로는 409/409 전량 완료였다.
+#: 그래서 어댑터가 로그에 남긴 **확정 대상 수**를 여기 적는다.
+#: (근거: 각 어댑터 실행 로그의 "대상 N건" 줄)
+KNOWN_TARGET = {
+    #: ★어댑터 로그의 "409건"은 **작업 건수**다. 그중 서로 다른 URL 은 406개다
+    #:   (같은 PDF 가 상품 3건에 겹쳐 붙어 있다 — 실측). 문서 수는 406 이 맞다.
+    "samsungfire": 406,
+    "dbins": 462,           # "여행 제외 462건"
+    "heungkukfire": 222,    # "약관으로 보이는 것 222건"
+    "hyundaimarine": 310,   # 카탈로그 여행 제외
+    "kbinsure": 116,
+    "lotteins": 93,
+    "nhlife": 52,
+    "myangel": 10,
+    "heungkuklife": 18,
+    "samsunglife": 223,     # 화면 검색 '실손'
+    "meritzfire": 157,      # 화면 검색형 '실손'
+    "nhfire": 12,           # 단독실손 12개 상품
+}
 
 
 #: ★카탈로그는 **전체 상품**을 담는다. 실손만 세야 대상 건수가 맞다.
@@ -53,7 +72,7 @@ _TRAVEL = re.compile(r"해외여행|국내여행|여행자")
 def _target(slug: str) -> tuple[int, str]:
     """(실손 대상 건수, 출처)."""
     if slug in KNOWN_TARGET:
-        return KNOWN_TARGET[slug], "화면"
+        return KNOWN_TARGET[slug], "어댑터"
     hits = sorted(_CATALOG.glob(f"*_{slug}_products.jsonl"))
     if not hits:
         return 0, "없음"
