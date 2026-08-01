@@ -37,13 +37,14 @@ from app.routers import (
     lab,
     mcp,
     nlp,
-    orders,
-    payments,
-    products,
     rag,
     voice,
     workflow,
 )
+
+#: ★커머스 라우터(products/orders/payments)는 `app/legacy/` 로 옮겼다.
+#:   코드는 보존하되 **API 표면에서 뺀다** — 보험 API 문서에 `/api/products` 가
+#:   섞이면 쓰는 사람이 혼란스럽다. 되살리려면 여기서 다시 import 하면 된다.
 
 _STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -67,7 +68,8 @@ def create_app(role: str = "full") -> FastAPI:
     settings = get_settings()
     suffix = {"customer": " (고객)", "admin": " (운영)", "full": ""}.get(role, "")
     app = FastAPI(
-        title=f"{settings.BRAND_NAME} AI 커머스 에이전트{suffix}",
+        #: 커머스 실습에서 보험 판정으로 도메인이 바뀌었다.
+        title=f"{settings.BRAND_NAME} 보험 보장 판정 에이전트{suffix}",
         version="0.3.0",
         lifespan=lifespan,
     )
@@ -78,9 +80,6 @@ def create_app(role: str = "full") -> FastAPI:
     # 음성·얼굴). 이 집합만 고객 포트(8080)에 노출한다.
     app.include_router(health.router)
     app.include_router(auth.router)
-    app.include_router(products.router)
-    app.include_router(orders.router)
-    app.include_router(payments.router)
     app.include_router(agent.router)
     app.include_router(voice.router)
     app.include_router(face.router)
