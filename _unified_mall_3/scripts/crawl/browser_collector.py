@@ -81,6 +81,9 @@ class SiteConfig:
     terms_link_selector: str
     #: 상품명이 들어 있는 셀.
     name_cell_selector: str
+    #: 판매기간 셀. ★있으면 (상품명, 판매기간)으로 중복을 가린다.
+    #: 상품명만 보면 **같은 상품의 다른 개정판까지** 건너뛴다(실측: 수집 0건이 됐다).
+    period_cell_selector: str | None = None
     #: 검색이 필요한 경우.
     search_input_selector: str | None = None
     search_terms: tuple[str, ...] = ()
@@ -100,6 +103,19 @@ class SiteConfig:
     direct_download_url: str | None = None
     #: '다음 페이지' 버튼. 없으면 1페이지만 받는다.
     next_page_selector: str | None = None
+    #: 페이지 **번호** 버튼들. 있으면 번호를 하나씩 눌러 넘기고,
+    #: 번호가 안 보일 때만 `next_page_selector` 로 **묶음**을 넘긴다.
+    #:
+    #: ★왜 필요한가 — 삼성생명의 `btn-paging-next` 는 '다음 페이지'가 아니라
+    #:   **다음 10페이지 묶음**이었다. 그것만 눌러서 1·11·21 페이지만 긁고
+    #:   23페이지 중 3페이지에서 끝났다.
+    #:   실측 근거: 첫 셀의 일련번호가 **223 → 123 → 23** 으로 100 씩 뛰었다.
+    #:   DOM: `.pagination-number > ul > li > button` 이 1~10,
+    #:        그 옆의 `btn-paging-next` 가 11~20 묶음으로 넘어간다.
+    page_number_selector: str | None = None
+    #: 현재 페이지 표시. 페이지가 **실제로 바뀌었는지**를 이걸로 확인한다.
+    #: ★첫 행 텍스트 비교는 전환 중 옛 DOM 을 읽어 오탐이 난다(코덱스 지적).
+    current_page_selector: str | None = None
     #: 페이지 상한. 무한 루프를 막는 안전장치이지 '여기까지만 받자'가 아니다.
     max_pages: int = 200
 
@@ -114,11 +130,15 @@ SITES: dict[str, SiteConfig] = {
         #   `table tbody tr` 로 잡으면 다른 표의 1행짜리 껍데기를 문다(실측: 3행만 나왔다).
         table_selector="table",   # 첫 번째 표가 목록이다
         row_selector="tbody tr",
+        # ★`btn-paging-next` 는 **10페이지 묶음** 이동이다. 번호 버튼이 먼저다.
+        page_number_selector=".pagination-number ul li button",
+        current_page_selector=".pagination-number li.current button",
         next_page_selector="button.btn-paging-next",
         # 약관 링크는 문구가 없고 **title 속성**에 '보험약관'이 있다.
         #   `a:has-text('약관')` 은 0건이었다 — 링크 텍스트가 상품명이기 때문이다.
         terms_link_selector="a.btn-file[title*='보험약관']",
         name_cell_selector="td:nth-child(3)",
+        period_cell_selector="td:nth-child(4)",   # "2018-11-22 ~ 2018-11-22"
         # ★상품명 검색을 쓴다 — 전체 6,561건 중 **실손은 223건**이다.
         #   처음에 "검색이 안 된다"고 판단해 전체를 훑었는데, 그건 내가
         #   `input[type='text']` 로 잡아 **숨겨진 첫 번째 입력**(통합검색창)을 물었기 때문이다.
@@ -260,7 +280,6 @@ def _fetched_urls() -> set[str]:
 
 
 def _recorded_shas(cfg: SiteConfig) -> set[str]:
-    """이미 기록된 sha. ★URL 이 매번 달라지는 사이트가 있어 URL 만으로는 중복을 못 막는다."""
     path = _MANIFESTS / f"{cfg.slug}.jsonl"
     if not path.exists():
         return set()
@@ -271,35 +290,22 @@ def _recorded_shas(cfg: SiteConfig) -> set[str]:
     }
 
 
-def _append_manifest(cfg: SiteConfig, rec: Collected) -> None:
-    """★한 건 받을 때마다 **즉시** 기록한다.
+def _append_manifest(cfg: SiteConfig, rec) -> None:
+    """★한 건 받을 때마다 즉시 기록한다.
 
-    배치 끝에 몰아 쓰면 중간에 죽었을 때 **파일은 남고 기록만 사라진다.**
-    실제로 삼성생명이 파일 563개 / 기록 44행이 됐다(브라우저가 배치 중간에 죽어서).
-    기록이 없으면 식별 파이프라인이 그 파일을 보지 못하고, 증분 수집도 다시 받는다.
+    배치 끝에 몰아 쓰면 중간에 죽었을 때 **파일은 남고 기록만 사라진다**
+    (실측: 삼성생명 파일 563 / 기록 44).
     """
+    if rec.sha256 in _recorded_shas(cfg):
+        return
     _MANIFESTS.mkdir(parents=True, exist_ok=True)
     with (_MANIFESTS / f"{cfg.slug}.jsonl").open("a", encoding="utf-8") as f:
         f.write(json.dumps(asdict(rec), ensure_ascii=False) + "\n")
 
 
-def _check_pdf(blob: bytes, name: str) -> None:
-    """★매직바이트만 보면 **잘린 파일**을 못 잡는다.
-
-    실측: 브라우저 다운로드에서 정확히 65,536B(64KB)로 잘린 PDF 가 150개 저장됐다.
-    `%PDF` 로 시작해 검사를 통과했지만 열면 0쪽이거나 RuntimeError 였다.
-    → 꼬리의 `%%EOF` 까지 확인한다. 그게 있어야 파일이 끝까지 온 것이다.
-    """
+def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Collected:
     if not blob.startswith(b"%PDF"):
         raise InfraError(f"PDF가 아닙니다(앞 8바이트={blob[:8]!r}): {name}")
-    if b"%%EOF" not in blob[-2048:]:
-        raise InfraError(
-            f"PDF 가 잘렸습니다({len(blob):,}B, 꼬리에 %%EOF 없음): {name}"
-        )
-
-
-def _save(cfg: SiteConfig, blob: bytes, url: str, name: str, ctype: str) -> Collected:
-    _check_pdf(blob, name)
     if len(blob) > MAX_BYTES:
         raise ValidationErr(f"상한 초과: {name}")
     digest = hashlib.sha256(blob).hexdigest()
@@ -332,6 +338,79 @@ def _direct_post(cfg: SiteConfig, page, file_id: str, seq: str) -> bytes:
     if resp.status != 200:
         raise InfraError(f"다운로드 실패 HTTP {resp.status}")
     return resp.body()
+
+
+def _current_page(cfg, page) -> str:
+    """화면이 말하는 현재 페이지 번호. 못 읽으면 빈 문자열."""
+    if not cfg.current_page_selector:
+        return ""
+    try:
+        el = page.locator(cfg.current_page_selector).first
+        if el.count() == 0:
+            return ""
+        #: 버튼 안에 `<span class="offscreen">현재 페이지</span>` 가 섞여 있다.
+        return el.inner_text(timeout=3_000).split()[0].strip()
+    except (PWTimeout, PWError, IndexError):
+        return ""
+
+
+def _goto_next_page(cfg, page, want: int) -> bool:
+    """`want` 번 페이지로 넘긴다. 넘어갔으면 True.
+
+    ★두 단계다 — 번호 버튼이 먼저, 없으면 묶음 이동.
+
+        삼성생명은 번호 버튼이 한 번에 10개만 보인다(1~10). 11페이지로 가려면
+        `btn-paging-next` 로 **묶음**을 넘긴 뒤에야 11 번호가 나타난다.
+        묶음 버튼만 눌렀더니 1·11·21 페이지만 긁혔다(실측: 일련번호 223→123→23).
+
+    ★넘어갔는지는 **페이지 번호**로 본다. 첫 행 텍스트 비교는 전환 중
+      옛 DOM 을 읽어 "안 넘어갔다"고 오탐한다(코덱스 교차검증 지적).
+    """
+    before = _current_page(cfg, page)
+
+    def _click_number() -> bool:
+        if not cfg.page_number_selector:
+            return False
+        btns = page.locator(cfg.page_number_selector)
+        for i in range(btns.count()):
+            b = btns.nth(i)
+            try:
+                if b.inner_text(timeout=2_000).split()[0].strip() != str(want):
+                    continue
+                b.click(timeout=8_000)
+                return True
+            except (PWTimeout, PWError, IndexError):
+                continue
+        return False
+
+    moved = _click_number()
+    if not moved and cfg.next_page_selector:
+        #: 번호가 안 보인다 = 다음 묶음이다. 묶음을 넘기고 번호를 다시 찾는다.
+        nxt = page.locator(cfg.next_page_selector).first
+        try:
+            if nxt.count() == 0 or not nxt.is_enabled():
+                return False
+            nxt.click(timeout=8_000)
+            page.wait_for_timeout(cfg.settle_ms)
+        except (PWTimeout, PWError):
+            return False
+        #: 묶음 이동만으로 이미 `want` 로 갔을 수 있다. 그러면 번호 클릭은 불필요.
+        if _current_page(cfg, page) == str(want):
+            return True
+        moved = _click_number()
+        if not moved:
+            #: 번호 방식이 아닌 사이트는 묶음 이동 자체가 '다음 페이지'다.
+            return not cfg.page_number_selector
+
+    if not moved:
+        return False
+
+    page.wait_for_timeout(cfg.settle_ms)
+    after = _current_page(cfg, page)
+    if before and after and before == after:
+        print(f"  [중단] 페이지가 {before} 에서 안 넘어갔다.")
+        return False
+    return True
 
 
 def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
@@ -384,7 +463,6 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
             try:
                 blob = _direct_post(cfg, page, file_id, seq)
                 rec = _save(cfg, blob, url, nm, "application/pdf")
-                _append_manifest(cfg, rec)   # ★즉시 기록
                 out.append(rec)
                 done.add(url)
                 print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
@@ -409,7 +487,6 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
                 continue
             try:
                 rec = _save(cfg, blob, url, nm, ct)
-                _append_manifest(cfg, rec)   # ★즉시 기록
                 out.append(rec)
                 done.add(url)
                 print(f"  [OK] {nm[:34]} {rec.bytes:,}B")
@@ -419,19 +496,7 @@ def _run_cascade(cfg, page, pdf_hits, done, out, *, limit: int, probe: bool):
     return out
 
 
-def run(
-    cfg: SiteConfig, *, limit: int, probe: bool, start_page: int = 1, batch_pages: int = 0
-) -> tuple[list[Collected], int, bool]:
-    """한 배치를 수집한다.
-
-    반환: (수집분, **다음에 시작할 페이지**, 더 남았는지)
-
-    ★왜 배치로 나누나
-        6,557건짜리 사이트를 한 브라우저로 끝까지 돌리면 중간에 드라이버 연결이 끊긴다
-        (실측: `BrowserContext.close: Connection closed while reading from the driver`).
-        한 번 죽으면 처음부터라서 큰 사이트는 영영 못 끝낸다.
-        그래서 **배치마다 브라우저를 새로 띄우고**, 이미 받은 URL 은 건너뛴다.
-    """
+def run(cfg: SiteConfig, *, limit: int, probe: bool) -> list[Collected]:
     allowed, verdict = _robots_allows(cfg.host, cfg.entry_url)
     if not allowed:
         raise InfraError(f"robots가 허용하지 않습니다: {cfg.host} ({verdict})")
@@ -451,25 +516,21 @@ def run(
         pdf_hits: list[tuple[str, bytes, str]] = []
 
         def _on_response(resp):
-            """★응답이 **끝난 뒤에** 본문을 읽는다.
-
-            스트리밍 중에 `body()` 를 부르면 앞부분만 온다. 실측으로
-            정확히 65,536B(64KB 버퍼 하나)짜리 잘린 PDF 가 쌓였다.
-            `finished()` 로 완료를 기다린 뒤 읽고, 그래도 잘렸으면
-            `_check_pdf` 가 `%%EOF` 없음으로 잡아낸다(이중 방어가 아니라
-            서로 다른 실패를 막는 것이다 — 하나는 조기 읽기, 하나는 전송 중단).
-            """
             try:
                 ct = resp.headers.get("content-type", "")
                 if "pdf" not in ct.lower():
                     return
-                resp.finished()
-                body = resp.body()
-                if body:
-                    pdf_hits.append((resp.url, body, ct))
+                #: ★206(Range 부분 응답)을 버린다. **이게 65,536B 파일의 정체였다.**
+                #: Chromium PDF 뷰어가 `Range: bytes=0-65535` 로 앞 64KiB 를 먼저 받는다.
+                #:   206  content-range=bytes 0-65535/1028052  len=65536    <- 버린다
+                #:   200  (같은 파일 전체)                      len=1028052  <- 받는다
+                #: 나는 이걸 "스트리밍 중에 읽어서 잘렸다"고 오진했고, 그 오진 때문에
+                #: `resp.finished()` 를 넣어 `Target closed` 를, 팝업을 안 닫아 `Page crashed` 를
+                #: 만들었다. **status 만 보면 되는 문제**였다(코덱스 교차검증으로 밝혀짐).
+                if resp.status == 206:
+                    return
+                pdf_hits.append((resp.url, resp.body(), ct))
             except Exception:  # noqa: BLE001
-                #: 창이 먼저 닫히는 등으로 못 읽는 경우가 있다.
-                #: 여기서 죽이지 않는다 — 그 건은 [미포착]으로 남고 다음에 다시 받는다.
                 pass
 
         ctx.on("response", _on_response)
@@ -486,8 +547,6 @@ def run(
 
         ctx.on("download", _on_download)
 
-        page = ctx.new_page()
-
         def _on_page(pg):
             """★약관 클릭이 **새 창**을 여는 사이트가 있다(삼성생명).
 
@@ -495,22 +554,15 @@ def run(
             (실측: `TargetClosedError: Target page, context or browser has been closed`).
             응답은 컨텍스트 수준에서 이미 잡히므로 창은 닫아도 된다.
             """
-            #: ★메인 페이지는 절대 닫지 않는다. 핸들러를 `new_page()` **이전에**
-            #: 등록하면 메인 페이지 생성 이벤트에서 자기 자신을 닫아버린다
-            #: (실측: TargetClosedError 로 수집이 통째로 죽었다).
-            if pg is page:
-                return
             try:
-                #: ★PDF 응답이 이 창에서 온다. `resp.finished()` 가 끝나기 전에 닫으면
-                #: "Target closed" 로 수집이 통째로 죽는다(실측).
-                #: 큰 약관은 수 MB 라 넉넉히 기다린다.
-                pg.wait_for_timeout(9_000)
-                pg.close()
+                pg.wait_for_timeout(2_500)
+                if pg != page:
+                    pg.close()
             except Exception:  # noqa: BLE001
                 pass
 
         ctx.on("page", _on_page)
-
+        page = ctx.new_page()
 
         try:
             page.goto(cfg.entry_url, wait_until="domcontentloaded")
@@ -553,14 +605,10 @@ def run(
             if table.count() == 0:
                 raise InfraError(f"표 셀렉터가 0건입니다: {cfg.table_selector!r}")
             if cfg.product_link_selector:
-                _run_cascade(cfg, page, pdf_hits, done, out, limit=limit, probe=probe)
-                return out, 1, False
+                return _run_cascade(cfg, page, pdf_hits, done, out, limit=limit, probe=probe)
 
             page_no = 0
             seen_first_cell = ""
-            pages_done_in_batch = 0
-            #: 앞 배치에서 끝낸 지점까지는 **행을 처리하지 않고 페이지만 넘긴다.**
-            skipping = start_page > 1
             while page_no < cfg.max_pages:
                 page_no += 1
                 table = page.locator(cfg.table_selector).first
@@ -586,19 +634,13 @@ def run(
                     first = rows.nth(0).inner_text(timeout=3_000)[:60]
                 except (PWTimeout, PWError):
                     first = ""
-                if page_no > 1 and first == seen_first_cell:
+                #: ★페이지 번호를 읽을 수 있으면 그쪽이 정확하다. 첫 행 비교는
+                #:   전환 중 옛 DOM 을 읽어 오탐한다 — 번호가 있을 땐 쓰지 않는다.
+                if page_no > 1 and not cfg.current_page_selector and first == seen_first_cell:
                     print(f"  [중단] p{page_no}: 페이지가 넘어가지 않았다(첫 행이 동일).")
                     break
                 seen_first_cell = first
 
-                if skipping and page_no < start_page:
-                    nxt = page.locator(cfg.next_page_selector).first if cfg.next_page_selector else None
-                    if not nxt or nxt.count() == 0 or not nxt.is_enabled():
-                        return out, page_no, False
-                    nxt.click(timeout=8_000)
-                    page.wait_for_timeout(max(cfg.settle_ms // 3, 1_500))
-                    continue
-                skipping = False
                 print(f"  p{page_no}: 행 {n}개")
                 if probe:
                     for i in range(min(n, 5)):
@@ -609,11 +651,11 @@ def run(
                             nm = "(상품명 셀 못 읽음)"
                         links = row.locator(cfg.terms_link_selector).count()
                         print(f"    [{i + 1}] {nm.strip()[:40]!r} / 약관링크 {links}개")
-                    return out, page_no, False
+                    return []
 
                 for i in range(n):
                     if limit and len(out) >= limit:
-                        return out, page_no, True
+                        return out
                     row = rows.nth(i)
                     try:
                         nm = row.locator(cfg.name_cell_selector).first.inner_text(timeout=3_000).strip()
@@ -624,27 +666,9 @@ def run(
                         continue
                     before = len(pdf_hits)
                     try:
-                        # ★폼 target 으로 시작되는 다운로드는 `ctx.on("download")` 로 안 잡힌다.
-                        #   `expect_download()` 로 감싸야 한다(메리츠가 그런 구조다).
-                        try:
-                            with page.expect_download(timeout=12_000) as dl_info:
-                                link.click(timeout=10_000)
-                            dl = dl_info.value
-                            #: ★다운로드가 실패했는지 먼저 묻는다. `path()` 는 실패해도
-                            #: 경로를 주는 경우가 있어 **잘린 파일**을 그대로 읽게 된다.
-                            failure = dl.failure()
-                            if failure:
-                                print(f"    [다운로드실패] {nm[:26]}: {failure}")
-                            else:
-                                path = dl.path()
-                                if path:
-                                    pdf_hits.append(
-                                        (dl.url, Path(path).read_bytes(), "application/pdf")
-                                    )
-                        except PWTimeout:
-                            # 다운로드가 아니라 응답으로 오는 사이트도 있다. 그건 위 핸들러가 잡는다.
-                            page.wait_for_timeout(2_500)
-                    except PWError as e:
+                        link.click(timeout=10_000)
+                        page.wait_for_timeout(2_500)
+                    except (PWTimeout, PWError) as e:
                         print(f"    [SKIP] {nm[:28]}: 클릭 실패 {type(e).__name__}")
                         continue
                     for url, blob, ct in pdf_hits[before:]:
@@ -652,7 +676,6 @@ def run(
                             continue
                         try:
                             rec = _save(cfg, blob, url, nm, ct)
-                            _append_manifest(cfg, rec)   # ★즉시 기록
                             out.append(rec)
                             done.add(url)
                             print(f"    [OK] {nm[:28]} {rec.bytes:,}B")
@@ -660,60 +683,19 @@ def run(
                             print(f"    [FAIL] {nm[:28]}: {e}")
                     page.wait_for_timeout(ROW_DELAY_MS)
 
-                pages_done_in_batch += 1
-                if not cfg.next_page_selector:
+                if not _goto_next_page(cfg, page, page_no + 1):
                     break
-                nxt = page.locator(cfg.next_page_selector).first
-                if nxt.count() == 0 or not nxt.is_enabled():
-                    break
-                try:
-                    nxt.click(timeout=8_000)
-                    page.wait_for_timeout(cfg.settle_ms)
-                except (PWTimeout, PWError):
-                    break
-                if batch_pages and pages_done_in_batch >= batch_pages:
-                    # 배치 끝. 브라우저를 닫고 다음 배치에서 새로 띄운다.
-                    return out, page_no + 1, True
         finally:
             ctx.close()
             browser.close()
 
-    # ★일괄 쓰기는 하지 않는다 — 이미 한 건씩 즉시 기록했다(중복 방지).
+    if out:
+        _MANIFESTS.mkdir(parents=True, exist_ok=True)
+        path = _MANIFESTS / f"{cfg.slug}.jsonl"
+        with path.open("a", encoding="utf-8") as f:
+            for r in out:
+                f.write(json.dumps(asdict(r), ensure_ascii=False) + "\n")
     return out
-
-
-def run_batched(cfg: SiteConfig, *, limit: int, batch_pages: int, max_restarts: int) -> list[Collected]:
-    """배치마다 브라우저를 새로 띄워 끝까지 간다.
-
-    ★한 번 죽으면 처음부터인 구조를 고친다. 이미 받은 URL 은 매 배치 시작 때 다시 읽으므로
-      중복 수집이 없고, 죽은 지점의 **페이지 번호부터** 다시 시작한다.
-    """
-    total: list[Collected] = []
-    page_from = 1
-    restarts = 0
-    while True:
-        try:
-            got, next_page, more = run(
-                cfg, limit=limit, probe=False, start_page=page_from, batch_pages=batch_pages
-            )
-        except (InfraError, ValidationErr):
-            raise
-        except Exception as e:  # noqa: BLE001
-            # 드라이버 연결 끊김 등. ★조용히 끝내지 않고 재시작하되 횟수를 보고한다.
-            restarts += 1
-            print(f"  [재시작 {restarts}/{max_restarts}] p{page_from} 에서 중단: {type(e).__name__}")
-            if restarts > max_restarts:
-                print("  ★재시작 한도 초과. 여기까지 수집한 것만 남긴다.")
-                break
-            continue
-        total.extend(got)
-        print(f"  [배치] p{page_from}~ 수집 {len(got)}건 (누적 {len(total)}) / 다음 p{next_page}")
-        if not more or next_page <= page_from:
-            break
-        if limit and len(total) >= limit:
-            break
-        page_from = next_page
-    return total
 
 
 def main() -> None:
@@ -721,22 +703,13 @@ def main() -> None:
     ap.add_argument("--site", required=True, help=f"대상: {', '.join(SITES)}")
     ap.add_argument("--limit", type=int, default=0)
     ap.add_argument("--probe", action="store_true", help="받지 않고 셀렉터가 맞는지만 확인")
-    ap.add_argument("--batch-pages", type=int, default=15,
-                    help="배치당 페이지 수. 배치마다 브라우저를 새로 띄운다(0=끝까지 한 번에)")
-    ap.add_argument("--max-restarts", type=int, default=40,
-                    help="드라이버가 끊겼을 때 재시작 허용 횟수")
     args = ap.parse_args()
 
     cfg = SITES.get(args.site)
     if not cfg:
         raise ConfigError(f"등록되지 않은 사이트입니다: {args.site} (가능: {', '.join(SITES)})")
 
-    if args.probe:
-        run(cfg, limit=args.limit, probe=True)
-        return
-    got = run_batched(
-        cfg, limit=args.limit, batch_pages=args.batch_pages, max_restarts=args.max_restarts
-    )
+    got = run(cfg, limit=args.limit, probe=args.probe)
     print(f"\n수집 {len(got)}건")
     if got:
         print(f"→ data/raw/insurance_terms/{cfg.slug}/  ·  기록: data/raw/manifests/{cfg.slug}.jsonl")

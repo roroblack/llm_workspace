@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ app_name }}</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <main class="container">
+        <header class="header">
+            <h1>{{ app_name }}</h1>
+            <p>Base 모델과 Fine-tuned 모델의 답변 품질 및 추론 속도를 비교합니다.</p>
+        </header>
+
+        <section class="panel">
+            <h2>1. 서버 상태</h2>
+            <button id="healthButton" type="button">상태 확인</button>
+            <pre id="healthResult">상태 확인 버튼을 누르세요.</pre>
+        </section>
+
+        <section class="panel">
+            <h2>2. 단일 질문 추론</h2>
+
+            <label for="modelKind">모델 선택</label>
+            <select id="modelKind">
+                <option value="base">Base 모델</option>
+                <option value="fine_tuned">Fine-tuned 모델</option>
+            </select>
+
+            <label for="prompt">질문</label>
+            <textarea id="prompt" rows="6">파인튜닝 모델의 성능 평가 방법을 설명하세요.</textarea>
+
+            <label for="maxNewTokens">최대 생성 토큰</label>
+            <input id="maxNewTokens" type="number" value="256" min="1" max="2048">
+
+            <button id="generateButton" type="button">답변 생성</button>
+            <pre id="generateResult">생성 결과가 여기에 표시됩니다.</pre>
+        </section>
+
+        <section class="panel">
+            <h2>3. 평가 데이터 전체 실행</h2>
+
+            <label for="evaluationModelKind">평가 모델</label>
+            <select id="evaluationModelKind">
+                <option value="base">Base 모델</option>
+                <option value="fine_tuned">Fine-tuned 모델</option>
+            </select>
+
+            <label class="checkbox-label">
+                <input id="useBertScore" type="checkbox">
+                BERTScore 계산
+            </label>
+
+            <label for="evaluationLimit">평가 개수 제한</label>
+            <input id="evaluationLimit" type="number" placeholder="비우면 전체 평가" min="1">
+
+            <button id="runEvaluationButton" type="button">평가 실행</button>
+            <button id="compareButton" type="button">두 모델 비교</button>
+            <pre id="evaluationResult">평가 결과가 여기에 표시됩니다.</pre>
+        </section>
+    </main>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>
