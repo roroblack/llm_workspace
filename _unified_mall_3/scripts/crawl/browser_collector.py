@@ -119,9 +119,17 @@ SITES: dict[str, SiteConfig] = {
         #   `a:has-text('약관')` 은 0건이었다 — 링크 텍스트가 상품명이기 때문이다.
         terms_link_selector="a.btn-file[title*='보험약관']",
         name_cell_selector="td:nth-child(3)",
-        # ★검색을 쓰지 않는다. 이 화면은 검색 없이도 전체(6,557건)를 보여주고,
-        #   보이는 검색창 셀렉터가 숨김 요소를 잡아 fill 이 실패했다(실측).
-        #   전체를 받아 로컬에서 거르는 편이 "무엇을 놓쳤나"를 걱정하지 않아도 된다.
+        # ★상품명 검색을 쓴다 — 전체 6,561건 중 **실손은 223건**이다.
+        #   처음에 "검색이 안 된다"고 판단해 전체를 훑었는데, 그건 내가
+        #   `input[type='text']` 로 잡아 **숨겨진 첫 번째 입력**(통합검색창)을 물었기 때문이다.
+        #   실제 상품명 입력은 `#keywordSearch` 다.
+        #   전수 조사는 남의 서버에 **30배 부하**를 주는 일이었다.
+        #
+        #   ★검색 실행은 **Enter** 로 한다. 돋보기 버튼(`button.icon.search`)은
+        #     같은 셀렉터에 2개가 걸려 strict mode 위반이고, `.first` 로 좁혀도
+        #     클릭이 타임아웃한다(실측). Enter 는 바로 먹는다.
+        search_input_selector="#keywordSearch",
+        search_terms=("실손",),
         settle_ms=9_000,
     ),
     "nhfire": SiteConfig(
