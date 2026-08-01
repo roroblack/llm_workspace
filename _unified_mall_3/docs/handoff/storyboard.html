@@ -50,19 +50,12 @@
 <div class="box d">
   <b>왜 2트랙인가 — 화면만 그리면 우리 주장을 증명하지 못한다</b>
   <code>MVP 기능선정 §6</code>: <b style="display:inline">"AI 에이전트가 화면 없이 직접 쓴다는 것이 이 프로젝트의 포지셔닝 전체이고,
-  그 주장의 유일한 증거가 에이전트 경로다. 증거 없는 포지셔닝은 발표에서 그냥 말이 된다."</b><br><br>
+  그 주장의 유일한 증거가 에이전트 경로다. 증거 없는 포지셔닝은 발표에서 X."</b><br><br>
   그래서 <b style="display:inline">같은 9컷을 두 표면으로 그린다.</b> 사람은 화면을 보고, 에이전트는 JSON을 받는다.
   둘은 <b style="display:inline">같은 유스케이스(<code>precheck.run()</code>)</b>를 부르며 로직을 두 벌 만들지 않는다.
 </div>
 
-<div class="box w">
-  <b>★확인 필요 — <code>verdict</code> 값이 문서와 코드가 다르다</b>
-  이 스토리보드는 <b style="display:inline">실제 코드</b>(<code>app/core/domain/insurance.py</code> 의 <code>Verdict</code>)를 따랐다:
-  <code>likely_covered · unlikely · needs_documents · needs_expert</code><br>
-  <code>05_계약_AI2_판정.md</code> · <code>08_계약_프론트.md</code> 는 <code>covered / conditional / not_covered / unknown</code> 으로 적혀 있는데
-  <b style="display:inline">그 값은 코드에 없다.</b> 프론트가 문서대로 분기하면 어떤 값에도 매칭되지 않는다.
-  (<code>app/schemas/precheck.py</code> 주석이 "그 4값을 새로 만들었다가 도메인에 이미 있는 것을 뒤늦게 알았다"고 기록해 두었다.)
-</div>
+
 
 <h2>0. 두 표면 · 하나의 코어</h2>
 
@@ -432,21 +425,7 @@ GET /v1/demo/cohorts     ← 합성
 ★<b>에이전트에게 <code>data_source</code> 를 생략하지 않는다.</b> 사람은 화면의 DEMO 배지를 보지만,
 에이전트는 필드를 안 보면 <b>합성 수치를 실제로 오해해 자기 사용자에게 전달한다.</b></div>
 
-<div class="box k" style="margin:.9rem 0 0">
-<b>★해결됨 (2026-08-02) — 게이트만으로는 부족해서 구간을 도입했다</b>
-<code>팀MVP6 §2-2</code> 는 *"40건으로 비율을 내면 안 된다. '82.5%'라고 단정하면 거짓이다"* 라고 결론냈는데,
-<code>DEFAULT_MIN_SAMPLE = 30</code> 이면 <b style="display:inline">n=40 이 게이트를 통과해</b> <code>_headline()</code> 이
-<code>"… (82.5%)"</code> 를 붙이고 있었다 — <b style="display:inline">팀이 쓰지 말자고 정한 바로 그 문자열이다.</b>
-<div style="margin-top:.45rem"><b style="display:inline">고친 방식 — 방어를 두 겹으로 둔다.</b>
-① 최소표본 미달이면 비율 자체를 내지 않고, ② 게이트를 넘겨도 <b style="display:inline">점추정 대신 구간</b>으로 말한다.
-<code>CohortStats.rate_interval()</code>(Wilson 95%)이 그 값을 낸다.</div>
-<div style="margin-top:.45rem">★<b style="display:inline">게이트만으로는 부족하다</b> — 넘는 순간 다시 단정하게 되기 때문이다.
-그리고 <code>approval_rate</code> 와 <code>approval_ci</code> 는 <b style="display:inline">둘 다 있거나 둘 다 없어야</b> 하며,
-한쪽만 채우면 <code>CohortAnswer.__post_init__</code> 이 <code>ValidationErr</code> 로 막는다 — 규칙이 아니라 구조다.</div>
-<div style="margin-top:.45rem">실측(<code>tests/test_cohort.py</code> 13건 통과): 33/40 → <code>(0.6805, 0.9125)</code>.
-관측값 기준 <b style="display:inline">-14.5%p / +8.8%p 로 비대칭</b>이다 —
-"±12%p"라는 대칭 표현 자체가 정규근사의 흔적이라 Wilson 을 썼다.</div>
-</div>
+
 </div></div>
 
 <div class="cut">
