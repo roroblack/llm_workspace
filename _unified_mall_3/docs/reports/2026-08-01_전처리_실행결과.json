@@ -1,0 +1,39 @@
+{
+ "extractor_tag": "s1_pymupdf-1.28.0",
+ "targets": 10,
+ "pages_built": 9,
+ "pages_skipped": 1,
+ "clauses_built": 6,
+ "clauses_skipped": 0,
+ "elapsed_sec": 82.7,
+ "failures": [
+  {
+   "sha": "050d86caf7e8",
+   "slug": "dbins",
+   "stage": "clauses",
+   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+  },
+  {
+   "sha": "074065284125",
+   "slug": "dbins",
+   "stage": "clauses",
+   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+  },
+  {
+   "sha": "082993f95d42",
+   "slug": "dbins",
+   "stage": "clauses",
+   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+  },
+  {
+   "sha": "0aa22f4f0bd1",
+   "slug": "dbins",
+   "stage": "clauses",
+   "why": "InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.",
+   "trace": "Traceback (most recent call last):\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\run_all.py\", line 152, in main\n    built = to_clauses.build(\n            ^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\playdata2\\Documents\\llm_workspace\\_unified_mall_3\\scripts\\extract\\to_clauses.py\", line 118, in build\n    raise InfraError(\napp.core.errors.InfraError: 조항 머리(`제○조`)를 하나도 찾지 못했습니다. 약관이 아니거나 텍스트 추출이 실패했을 수 있습니다.\n"
+  }
+ ]
+}
