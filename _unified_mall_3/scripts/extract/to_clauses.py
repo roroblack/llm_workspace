@@ -824,15 +824,21 @@ def build(page_doc: dict) -> dict:
         for c in clauses
     ]
     faults = structure_faults(audit_blocks)
-    if faults.get("S1_aba_reentry"):
-        warnings.append(
-            f"조 번호가 되돌아온다({faults['S1_aba_reentry']}회) — 본문이 앞 조로 오귀속된 것으로 보인다")
-    if faults.get("S3_embedded_header"):
-        warnings.append(
-            f"조항 안에 다른 조 머리가 {faults['S3_embedded_header']}개 — 경계를 놓쳤다")
-    if faults.get("S4_annex_absorption"):
-        warnings.append(
-            f"조항 {faults['S4_annex_absorption']}개가 붙임·별표를 삼켰다 — KCD 오인용 위험")
+
+    #: ★★구조 모순을 `parse_warnings` 에 **넣지 않는다.** 축이 다르기 때문이다.
+    #:
+    #:   처음엔 넣었다가 `parse_status` 의 `ok` 가 **1,108 → 161 로 떨어졌다.**
+    #:   `precheck` 는 `parse_status == "ok"` 만 쓰므로 판정 가능 문서가 88% 사라진다.
+    #:
+    #:   두 값은 다른 질문에 답한다:
+    #:     `parse_status`      파싱이 됐나 (길이·개수가 말이 되나)
+    #:     `citation_eligible` **인용해도 되나** (경계가 서로 모순이 아닌가)
+    #:   섞으면 둘 다 뜻을 잃는다. 판정은 **두 값을 다 봐야 한다.**
+    #:
+    #:   ★그리고 이 신호들은 **precision 이 검증되지 않았다.** 정답셋이 없다.
+    #:     실제로 부록 흡수 신호는 만든 날 과탐이 드러나 11,478 → 4,789 로 줄었다
+    #:     (문장 안 인용 `제9조([별표1] 비급여대상)에 의한…` 을 잡고 있었다).
+    #:     검증 안 된 신호로 `parse_status` 를 끄면 **멀쩡한 문서를 버린다.**
 
     parse_status = "ok" if not warnings else "suspect"
 
