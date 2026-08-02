@@ -247,6 +247,31 @@ def ensure_schema(conn) -> None:
             "CREATE INDEX IF NOT EXISTS policy_clause_occurrence_gen "
             "ON policy_clause_occurrence (index_generation)"
         )
+        #: ★★**세대를 기본키에 넣는다.** 이걸 빠뜨리면 조용히 새는 곳이 생긴다 —
+        #:   `upsert_occurrences` 는 `ON CONFLICT DO NOTHING` 이라,
+        #:   `(hash, sha, no, page)` 가 같은 옛 세대 행이 이미 있으면
+        #:   **새 세대 행이 버려지고** 그 자리는 계속 `s5-mixed` 로 남는다.
+        #:   검색은 현재 세대만 보므로 그 조항은 **영원히 안 나온다.**
+        #:   적재 로그에는 "이미 있음"으로 찍혀 정상처럼 보인다. 최악의 실패다.
+        cur.execute(
+            """
+            DO $$
+            BEGIN
+                IF NOT EXISTS (
+                    SELECT 1 FROM information_schema.key_column_usage
+                    WHERE table_name = 'policy_clause_occurrence'
+                      AND constraint_name = 'policy_clause_occurrence_pkey'
+                      AND column_name = 'index_generation'
+                ) THEN
+                    ALTER TABLE policy_clause_occurrence
+                        DROP CONSTRAINT IF EXISTS policy_clause_occurrence_pkey;
+                    ALTER TABLE policy_clause_occurrence
+                        ADD PRIMARY KEY (content_hash, sha256, qualified_no,
+                                         page_from, index_generation);
+                END IF;
+            END $$;
+            """
+        )
         cur.execute(
             "CREATE INDEX IF NOT EXISTS policy_clause_chunk_hnsw "
             "ON policy_clause_chunk USING hnsw (embedding vector_l2_ops)"

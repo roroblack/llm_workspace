@@ -157,6 +157,36 @@
     </div>
   </section>
 
+  <!-- 컷⑨ 증빙 제출 -->
+  <section class="card" style="margin-top:26px">
+    <h2>실제 청구 결과 알려주기</h2>
+    <p class="small muted" style="margin:0 0 14px">
+      실제로 청구해 보신 결과를 알려주시면 통계와 <strong>우리 판정의 사후 검증</strong>에 씁니다.
+      <br>★이 보고는 <strong>다른 사람의 판정 근거로 쓰이지 않습니다</strong> —
+      약관 조항과 같은 등급으로 인용하지 않습니다.
+      <br>★검증 전까지 <strong>통계에도 반영되지 않습니다</strong>.
+    </p>
+    <div class="row">
+      <div><label for="obInsurer">보험사</label>
+        <input id="obInsurer" list="insurers" placeholder="예: DB손해보험" autocomplete="off"></div>
+      <div><label for="obCodes">질병기호</label>
+        <input id="obCodes" placeholder="F32" autocomplete="off"></div>
+      <div><label for="obOutcome">결과</label>
+        <select id="obOutcome">
+          <option value="paid">지급됨</option>
+          <option value="partial">일부 지급</option>
+          <option value="denied">부지급</option>
+          <option value="pending">심사 중</option>
+        </select></div>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <div><label for="obReason">보험사가 밝힌 사유 (선택)</label>
+        <input id="obReason" placeholder="예: 면책기간 미경과" autocomplete="off"></div>
+    </div>
+    <button class="ghost" id="obGo" style="margin-top:12px">제출하기</button>
+    <div id="obOut" style="margin-top:12px"></div>
+  </section>
+
   <p class="small muted" style="margin-top:34px">
     이 화면은 참고용 사전 안내입니다. 최종 지급 여부는 보험사의 심사로 결정됩니다.
   </p>

@@ -162,6 +162,7 @@ def main(argv: list[str] | None = None) -> int:
                     c.get("title") or "",
                     int(loc.get("page_from") or c.get("page_from") or 0),
                     int(loc.get("page_to") or c.get("page_to") or 0),
+                    "clause",
                 )
             )
 
@@ -189,6 +190,7 @@ def main(argv: list[str] | None = None) -> int:
                 a.get("label") or "",
                 int(loc.get("page_from") or 0),
                 int(loc.get("page_to") or 0),
+                "annex",
             ))
 
     print(

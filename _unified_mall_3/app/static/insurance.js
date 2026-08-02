@@ -124,8 +124,14 @@ function renderResult(status, b) {
       </dl>` : ''}
 
       ${(b.candidates || []).length ? `<h2 style="margin-top:16px">후보 약관</h2>
-        <div class="small muted">어느 것인지 특정하지 못했습니다. 하나를 고르면 다시 판정합니다.</div>
-        ${b.candidates.map((c) => `<div class="chip">${esc(c.product_name)} · ${esc(c.sale_start)}</div>`).join('')}` : ''}
+        <div class="small muted">어느 것인지 특정하지 못했습니다.
+          ★<strong>고르지 않으면 판정하지 않습니다</strong> — 아무거나 골라 답하면
+          다른 약관의 조항을 근거로 대게 됩니다.</div>
+        <div style="margin-top:8px">
+        ${b.candidates.map((c, i) => `<button class="chip-btn cand" data-i="${i}"
+            data-name="${esc(c.product_name)}">${esc(c.product_name)} ·
+            ${esc(c.sale_start)}${c.generation_label ? ' · ' + esc(c.generation_label) : ''}</button>`).join('')}
+        </div>` : ''}
 
       ${(b.per_code || []).length ? `<h2 style="margin-top:16px">질병기호별</h2>
         ${b.per_code.map((a) => {
@@ -143,7 +149,17 @@ function renderResult(status, b) {
     </section>`;
 }
 
-async function runPrecheck() {
+/* ── 컷③ 되묻기 ──────────────────────────────────────────────────
+ * ★후보를 고르면 **그 상품명을 실어 다시 판정한다.**
+ *   화면이 후보 중 하나를 임의로 고르지 않는다 — 고르는 것은 사용자다.
+ *   임의로 고르면 다른 약관의 조항을 근거로 대게 된다.
+ */
+function bindCandidates() {
+  document.querySelectorAll('.cand').forEach((b) =>
+    b.addEventListener('click', () => runPrecheck(b.dataset.name)));
+}
+
+async function runPrecheck(productName) {
   const codes = $('codes').value.split(',').map((s) => s.trim()).filter(Boolean);
   $('status').textContent = '판정 중…';
   $('go').disabled = true;
@@ -155,12 +171,15 @@ async function runPrecheck() {
       insurer: $('insurer').value.trim(),
       enrolled_on: $('enrolled').value.trim(),
       kcd_codes: codes,
+      //: ★사용자가 후보를 고른 경우에만 실린다. 화면이 지어내지 않는다.
+      ...(productName ? { product_name: productName } : {}),
     }),
   });
 
   $('status').textContent = '';
   $('go').disabled = !$('consent').checked;
   renderResult(status, body);
+  bindCandidates();
   if (codes.length) loadCohorts(codes[0]);
 }
 
@@ -265,10 +284,55 @@ async function sendChat(text) {
   }
 }
 
+/* ── 컷⑨ 증빙 제출 ────────────────────────────────────────────── */
+
+/* ★제출 결과를 "반영되었습니다"로 그리지 않는다.
+ *   서버는 `verification="unverified"` 로 고정해 저장하고, 검증 전까지
+ *   통계에 넣지 않는다. 화면이 그보다 강하게 말하면 거짓말이 된다.
+ */
+async function submitObservation() {
+  const out = $('obOut');
+  const insurer = $('obInsurer').value.trim();
+  if (!insurer) {
+    out.innerHTML = '<div class="banner warn small">보험사를 적어 주세요.</div>';
+    return;
+  }
+  $('obGo').disabled = true;
+  const { status, body } = await api('/v1/observations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      client_ref: 'web-ui',
+      insurer,
+      enrolled_on: $('enrolled').value.trim(),
+      kcd_codes: $('obCodes').value.split(',').map((s) => s.trim()).filter(Boolean),
+      outcome: $('obOutcome').value,
+      outcome_reason: $('obReason').value.trim(),
+    }),
+  });
+  $('obGo').disabled = false;
+
+  if (status === 503) {
+    out.innerHTML = `<div class="banner danger small">저장하지 못했습니다 — ${esc(body?.detail || '')}</div>`;
+    return;
+  }
+  if (status !== 202 || !body) {
+    out.innerHTML = `<div class="banner danger small">제출하지 못했습니다 (HTTP ${status}).</div>`;
+    return;
+  }
+  out.innerHTML = `
+    <div class="banner ok small">${esc(body.note || '')}</div>
+    <div class="small muted">
+      검증 상태 <code>${esc(body.verification)}</code>
+      ${body.duplicate ? ' · 이미 접수된 보고입니다(중복으로 쌓지 않았습니다)' : ''}
+    </div>`;
+}
+
 /* ── 시작 ─────────────────────────────────────────────────────── */
 
 $('consent').addEventListener('change', (e) => { $('go').disabled = !e.target.checked; });
 $('go').addEventListener('click', runPrecheck);
+$('obGo').addEventListener('click', submitObservation);
 $('chatGo').addEventListener('click', () => sendChat());
 $('chatIn').addEventListener('keydown', (e) => { if (e.key === 'Enter') sendChat(); });
 document.querySelectorAll('.chip-btn').forEach((b) =>
