@@ -629,6 +629,16 @@ def build(page_doc: dict) -> dict:
 
     clauses: list[dict] = []
     doc_unresolved = 0          # 번호를 못 읽은 항 (문서 전체)
+    #: ★수록(occurrence) 식별자. **내용 해시로는 대신할 수 없다.**
+    #:
+    #:   `content_hash` 는 **정체성**이다 — 정의상 문서 간에 공유되고(전량 중복 65.4%),
+    #:   같은 문서 안에서도 3,578건 겹친다(544문서). "이 조항이 **어느 문서 몇 쪽**에
+    #:   실렸나"를 못 답한다. `citation` 은 더 나쁘다 — 문서 내 충돌 46,540건(1,210문서).
+    #:
+    #:   ★uuid 를 쓰지 않는다. 재실행할 때마다 값이 바뀌면 **같은 입력이 다른 산출물**이
+    #:     되고, s4↔s5 대조나 색인 계보 추적이 불가능해진다.
+    #:     `(문서 sha12, ordinal)` 이면 결정적이면서 유일하다. DB PK 는 적재 시 만든다.
+    ordinal = 0
     doc_ambiguous_cite = 0      # 한 조 안에서 항 번호가 되풀이되는 조항 수
     for i, (page, off, no, sub, title) in enumerate(heads):
         # 본문 = 이 머리부터 다음 머리 전까지 (페이지를 넘어갈 수 있다)
@@ -679,8 +689,11 @@ def build(page_doc: dict) -> dict:
         cite_ambiguous = len(_nos) != len(set(_nos))
         if cite_ambiguous:
             doc_ambiguous_cite += 1
+        ordinal += 1
         clauses.append(
             {
+                #: 이 문서 안에서의 수록 순번. 재실행해도 같다.
+                "ordinal": ordinal - 1,
                 "clause_no": label,
                 "title": title,
                 # ★특별약관이 여러 개면 조 번호가 1부터 다시 시작한다.
@@ -783,7 +796,52 @@ def build(page_doc: dict) -> dict:
                     f"목차를 본문으로 읽은 것으로 보인다"
                 )
 
+    #: ★★사후 검증 (v5 · 2026-08-02 추가) — **구조 모순**.
+    #:
+    #:   위 검사들은 "길이"와 "개수"만 본다. 그걸 다 통과하면서 **경계가 서로 모순**인
+    #:   산출물이 나온다. 실측 반례 `16b227ff95b8`(삼성화재 임신질환 특약, 16쪽):
+    #:
+    #:       조 번호 순서   제1 제2 제3 제4 제5 **제4** 제6 …   ← 제5조 본문이 제4조로 오귀속
+    #:       제27조         p12~16 · 4,162자 · 붙임·질병분류표를 삼킴
+    #:       parse_status   **ok** · 경고 0개
+    #:
+    #:   ★그 문서는 `_3rd_project_4` 도 `coverage 100.0 / OK` 로 통과시킨다.
+    #:     **두 파이프라인 공통 결함**이고, 지표가 못 잡는다는 증거다.
+    #:
+    #:   질병분류표가 `제27조(준용규정) 제2항 제7호` 안에 들어가면
+    #:   **KCD 코드가 잘못된 조항에 인용된다.** 이 서비스에서 가장 위험한 실패다.
+    #:
+    #: ★확정 신호만 쓴다. `번호 비연속`·`항호 이상`은 원문 결번·표 숫자에도 걸려
+    #:   저정밀이므로 **검수 우선순위 신호**로만 두고 여기 넣지 않는다(코덱스 지적).
+    #: ★판정식은 `scripts/eval/struct_audit.py` 와 **같아야 한다.**
+    #:   두 곳이 어긋나면 감사와 산출물이 다른 말을 한다.
+    from scripts.eval.struct_audit import structure_faults
+
+    audit_blocks = [
+        {"no": (int(m.group(1)) if (m := re.match(r"제(\d{1,3})조|(\d{1,3})[-.]",
+                                                  c["clause_no"])) and m.group(1) else None),
+         "kind": numbering, "title": c["title"], "text": c["text"]}
+        for c in clauses
+    ]
+    faults = structure_faults(audit_blocks)
+    if faults.get("S1_aba_reentry"):
+        warnings.append(
+            f"조 번호가 되돌아온다({faults['S1_aba_reentry']}회) — 본문이 앞 조로 오귀속된 것으로 보인다")
+    if faults.get("S3_embedded_header"):
+        warnings.append(
+            f"조항 안에 다른 조 머리가 {faults['S3_embedded_header']}개 — 경계를 놓쳤다")
+    if faults.get("S4_annex_absorption"):
+        warnings.append(
+            f"조항 {faults['S4_annex_absorption']}개가 붙임·별표를 삼켰다 — KCD 오인용 위험")
+
     parse_status = "ok" if not warnings else "suspect"
+
+    #: ★판정 근거로 인용해도 되는가. **`parse_status` 와 다른 축이다.**
+    #:   길이·개수는 멀쩡한데 경계가 모순인 문서가 있다(위 반례).
+    #:   `precheck` 는 `parse_status == "ok"` 만 보고 있다 — 이 값도 봐야 한다.
+    citation_eligible = not (faults.get("S1_aba_reentry")
+                             or faults.get("S3_embedded_header")
+                             or faults.get("S4_annex_absorption"))
 
     return {
         "schema_version": SCHEMA_VERSION,
@@ -791,6 +849,10 @@ def build(page_doc: dict) -> dict:
         #:   `suspect` 는 "만들긴 했는데 믿지 말라"는 뜻이다.
         "parse_status": parse_status,
         "parse_warnings": warnings,
+        #: ★판정 근거로 인용해도 되는가. `parse_status` 와 **다른 축**이다.
+        #:   `precheck` 는 지금 `parse_status == "ok"` 만 본다 — 이 값도 봐야 한다.
+        "citation_eligible": citation_eligible,
+        "structure_faults": {k: v for k, v in faults.items() if k != "n_blocks"},
         #: 어떤 번호 체계로 쪼갰나. `제N조` 인지 특별약관의 `N.` 인지.
         "numbering": numbering,
         "toc_pages": sorted(toc_pages),
