@@ -88,6 +88,8 @@ def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="인덱스 A 적재")
     ap.add_argument("--limit", type=int, default=0, help="문서 수 제한(맛보기)")
     ap.add_argument("--stats", action="store_true", help="현황만 출력")
+    ap.add_argument("--ignore-citation-gate", action="store_true",
+                    help="★구조 모순 문서도 색인한다. 끈 사실이 출력에 남는다")
     args = ap.parse_args(argv)
 
     conn = get_conn()
@@ -102,12 +104,29 @@ def main(argv: list[str] | None = None) -> int:
     texts: dict[str, str] = {}
     occurrences: list[tuple] = []
     n_docs = n_skip_doc = n_clause = n_skip_clause = 0
+    n_skip_cite = 0     # citation_eligible=false 로 건너뛴 문서
 
     for p, doc in _iter_docs(args.limit or None):
         status = doc.get("parse_status") or "unknown"
         if status != "ok":
             #: ★추출이 의심스러운 문서의 조항은 판정 근거가 될 수 없다.
             n_skip_doc += 1
+            continue
+        #: ★★`parse_status` 만으로는 부족하다. **축이 다르다.**
+        #:
+        #:   `parse_status` — 파싱이 됐나(길이·개수가 말이 되나)
+        #:   `citation_eligible` — **인용해도 되나**(조 경계가 서로 모순이 아닌가)
+        #:
+        #:   실측 반례 `16b227ff95b8`: `parse_status=ok` 인데
+        #:     · 조 번호가 `제4 → 제5 → 제4` 로 되돌아온다(본문이 앞 조로 오귀속)
+        #:     · `제27조(준용규정)` 이 붙임·질병분류표를 삼켰다
+        #:   그대로 색인하면 **KCD 코드가 잘못된 조항에 인용된다.**
+        #:
+        #:   ★신호의 precision 은 아직 검증되지 않았다(정답셋 없음). 그래서 이 게이트는
+        #:     **보수적**이다 — 지금 통과하는 문서는 161건뿐이다.
+        #:     `--ignore-citation-gate` 로 끌 수 있게 두되, **끈 사실을 출력에 남긴다.**
+        if not args.ignore_citation_gate and doc.get("citation_eligible") is False:
+            n_skip_cite += 1
             continue
         n_docs += 1
         src = doc.get("source") or {}
@@ -136,9 +155,11 @@ def main(argv: list[str] | None = None) -> int:
             )
 
     print(
-        f"[모음] ok 문서 {n_docs:,} (건너뜀 {n_skip_doc:,}) · "
+        f"[모음] 적재 대상 문서 {n_docs:,} · "
+        f"건너뜀: parse_status {n_skip_doc:,} + citation_eligible {n_skip_cite:,} · "
         f"조항 등장 {n_clause:,} → 고유 {len(texts):,} "
-        f"(내용/해시 없음 {n_skip_clause:,})",
+        f"(내용/해시 없음 {n_skip_clause:,})"
+        + ("  ★인용 게이트를 껐다(--ignore-citation-gate)" if args.ignore_citation_gate else ""),
         flush=True,
     )
 
