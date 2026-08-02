@@ -155,13 +155,32 @@ def main() -> int:
         if len(probes) >= 60:
             break
 
+    #: ★과제 ② — **면책 조항 검색.** 이게 우리 서비스의 급소다.
+    #:
+    #:   질의 = 조항 끝에 붙은 「다만 …」 단서 문장 **원문 그대로**.
+    #:   정답 = 그 단서를 담고 있는 조항.
+    #:
+    #:   ★질의를 지어내지 않는다. 문서에 이미 적힌 문장이다.
+    #:   ★단서는 조항 **뒤쪽**(200자 이후)에만 있는 것을 골랐다.
+    #:     앞부분만 임베딩하는 모델은 이 문장을 **본 적이 없으므로** 못 찾는다.
+    #:     제목→본문 검색으로는 이 실패가 안 보인다 — 제목은 앞에 있기 때문이다.
+    #:   ★"다만" 이라는 표지는 **떼어 낸다.** 남겨 두면 그 낱말만 보고 맞힐 수 있다.
+    proviso_queries = []
+    for pr in probes:
+        tail = pr["with_proviso"][len(pr["head"]) :].strip()
+        q = re.sub(r"^다만[,\s]*", "", tail).strip()
+        if len(q) < 25:
+            continue
+        proviso_queries.append({"query": q, "gold_id": pr["id"]})
+
     out = {
-        "built_at": "2026-08-02",
+        "built_at": "2026-08-03",
         "built_from": "s5",
         "source_documents": n_doc,
         "corpus_size": len(corpus),
         "query_count": len(queries),
         "proviso_probe_count": len(probes),
+        "proviso_query_count": len(proviso_queries),
         "note": (
             "질의는 문서에 이미 적힌 조항 제목이다. 지어내지 않았다. "
             "본문에서 제목 문구를 지워 문자열 일치로 맞히지 못하게 했다. "
@@ -171,12 +190,14 @@ def main() -> int:
         "corpus": corpus,
         "queries": queries,
         "proviso_probes": probes,
+        "proviso_queries": proviso_queries,
     }
     _OUT.parent.mkdir(parents=True, exist_ok=True)
     _OUT.write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
 
     print(
-        f"코퍼스 {len(corpus):,} · 질의 {len(queries)} · 면책탐침 {len(probes)} "
+        f"코퍼스 {len(corpus):,} · 제목질의 {len(queries)} · "
+        f"면책질의 {len(proviso_queries)} · 면책탐침 {len(probes)} "
         f"(문서 {n_doc:,}개에서)"
     )
     print(f"→ {_OUT.relative_to(_ROOT)}")

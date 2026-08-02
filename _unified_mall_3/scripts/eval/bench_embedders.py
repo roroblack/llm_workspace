@@ -48,9 +48,14 @@ CANDIDATES = [
     ("BAAI/bge-m3", 2.3, "", "", ""),
     ("intfloat/multilingual-e5-large", 2.2, "query: ", "passage: ", "모델팀 선정 후보"),
     ("nlpai-lab/KoE5", 2.2, "query: ", "passage: ", ""),
-    ("Qwen/Qwen3-Embedding-0.6B", 2.4, "", "", "instruction 지원"),
+    #: ★Qwen3 계열은 질의에 instruction 을 붙인다(문서는 안 붙인다).
+    #:   앞서 빈 접두어로 재서 MRR 0.455 가 나왔는데, 그건 **모델이 아니라 우리 설정**이다.
+    #:   모델카드: `model.encode(queries, prompt_name="query")` · 문서는 접두어 없음.
+    ("Qwen/Qwen3-Embedding-0.6B", 2.4, "@qwen", "", "instruction 필요"),
     ("jinaai/jina-embeddings-v5-text-small", 2.7, "", "", "★CC BY-NC 상업불가"),
-    ("nvidia/Nemotron-3-Embed-1B-BF16", 4.0, "", "", "2026-07 신규"),
+    #: ★Nemotron 은 접두어가 **필수**다("Add the query:/passage: prefix").
+    #:   빈 접두어로 재서 MRR 0.088 이 나왔다 — 모델이 나쁜 게 아니라 우리가 틀렸다.
+    ("nvidia/Nemotron-3-Embed-1B-BF16", 4.0, "query: ", "passage: ", "접두어 필수"),
     ("google/embeddinggemma-300m", 1.2, "task: search result | query: ", "title: none | text: ", "게이트"),
     ("Qwen/Qwen3-Embedding-4B", 8.0, "", "", "★8GB 빠듯"),
     ("Qwen/Qwen3-Embedding-8B", 16.0, "", "", "★8GB 불가 — GPU 여유 있을 때만"),
@@ -122,35 +127,60 @@ def run(model_id: str, *, q_prefix: str, d_prefix: str, batch: int, device: str,
     body_tokens = [len(tok.encode(c["body"])) for c in corpus]
     truncated = sum(1 for n in body_tokens if max_len and n > max_len)
 
-    def enc(texts: list[str]) -> "np.ndarray":
+    #: ★`@qwen` 은 접두어가 아니라 **prompt_name 을 쓰라는 표시**다.
+    #:   Qwen3 의 instruction 템플릿은 모델 설정에 들어 있으므로
+    #:   문자열을 우리가 지어내지 않고 라이브러리가 붙이게 한다.
+    use_prompt = q_prefix == "@qwen"
+    qp = "" if use_prompt else q_prefix
+
+    def enc(texts: list[str], *, as_query: bool = False) -> "np.ndarray":
+        kw2 = {}
+        if as_query and use_prompt and "query" in (getattr(model, "prompts", {}) or {}):
+            kw2["prompt_name"] = "query"
         return model.encode(
             texts, batch_size=batch, normalize_embeddings=True,
-            convert_to_numpy=True, show_progress_bar=False,
+            convert_to_numpy=True, show_progress_bar=False, **kw2,
         )
 
     t1 = time.time()
     doc_vecs = enc([d_prefix + c["body"] for c in corpus])
     enc_s = time.time() - t1
-    q_vecs = enc([q_prefix + q["query"] for q in queries])
+    q_vecs = enc([qp + q["query"] for q in queries], as_query=True)
 
     ids = [c["id"] for c in corpus]
     pos = {cid: i for i, cid in enumerate(ids)}
-    sims = q_vecs @ doc_vecs.T
-    order = np.argsort(-sims, axis=1)
 
-    r1 = r5 = r10 = 0
-    mrr = 0.0
-    for i, q in enumerate(queries):
-        gold = pos.get(q["gold_id"])
-        if gold is None:
-            continue
-        rank = int(np.where(order[i] == gold)[0][0]) + 1
-        r1 += rank <= 1
-        r5 += rank <= 5
-        r10 += rank <= 10
-        if rank <= 10:
-            mrr += 1.0 / rank
-    n = len(queries)
+    def score(qs: list[dict]) -> dict:
+        """질의 묶음 하나를 채점한다."""
+        if not qs:
+            return {"n": 0, "recall@1": None, "recall@5": None,
+                    "recall@10": None, "mrr@10": None}
+        v = enc([qp + q["query"] for q in qs], as_query=True)
+        order = np.argsort(-(v @ doc_vecs.T), axis=1)
+        r1 = r5 = r10 = 0
+        mrr = 0.0
+        for i, q in enumerate(qs):
+            gold = pos.get(q["gold_id"])
+            if gold is None:
+                continue
+            rank = int(np.where(order[i] == gold)[0][0]) + 1
+            r1 += rank <= 1
+            r5 += rank <= 5
+            r10 += rank <= 10
+            if rank <= 10:
+                mrr += 1.0 / rank
+        m = len(qs)
+        return {"n": m, "recall@1": round(r1 / m, 4), "recall@5": round(r5 / m, 4),
+                "recall@10": round(r10 / m, 4), "mrr@10": round(mrr / m, 4)}
+
+    title = score(queries)
+    #: ★면책 조항 검색 — 우리 서비스의 급소.
+    #:   조항 **뒤쪽**에 있는 단서를 질의로 쓴다. 앞부분만 임베딩하는 모델은
+    #:   그 문장을 본 적이 없으므로 못 찾는다.
+    proviso = score(data.get("proviso_queries") or [])
+    r1, r5, r10 = title["recall@1"], title["recall@5"], title["recall@10"]
+    mrr_v = title["mrr@10"]
+    n = title["n"]
 
     #: ★면책 민감도. 0 이면 모델이 뒷부분을 안 본 것이다.
     h = enc([p["head"] for p in probes])
@@ -172,10 +202,12 @@ def run(model_id: str, *, q_prefix: str, d_prefix: str, batch: int, device: str,
         "truncated_ratio": round(truncated / len(corpus), 4),
         "body_tokens_p50": int(np.median(body_tokens)),
         "body_tokens_p90": int(np.percentile(body_tokens, 90)),
-        "recall@1": round(r1 / n, 4),
-        "recall@5": round(r5 / n, 4),
-        "recall@10": round(r10 / n, 4),
-        "mrr@10": round(mrr / n, 4),
+        "recall@1": r1,
+        "recall@5": r5,
+        "recall@10": r10,
+        "mrr@10": mrr_v,
+        #: ★면책 조항 검색 성적. 제목→본문 성적과 **따로** 본다.
+        "proviso": proviso,
         "proviso_delta_mean": round(float(np.mean(deltas)), 6),
         "proviso_delta_min": round(float(np.min(deltas)), 6),
         "proviso_blind_count": blind,
@@ -197,19 +229,27 @@ def report() -> None:
         print("아직 결과가 없습니다.")
         return
     rows.sort(key=lambda r: -r.get("mrr@10", 0))
-    head = f"{'모델':52} {'차원':>5} {'최대':>5} {'R@1':>6} {'R@10':>6} {'MRR':>6} {'면책Δ':>8} {'잘림':>6} {'ms/건':>7}"
+    head = (f"{'모델':50} {'차원':>5} {'최대':>6} {'MRR':>6} {'R@10':>6} "
+            f"{'면책MRR':>8} {'면책R@10':>9} {'면책못봄':>8} {'잘림':>6}")
     print(head)
     print("-" * len(head))
     for r in rows:
         flag = " ★면책못봄" if r.get("proviso_blind_count", 0) > 0 else ""
+        pv = r.get("proviso") or {}
+        pm = pv.get("mrr@10")
+        pr = pv.get("recall@10")
         print(
-            f"{r['model']:52} {r['dim']:>5} {r['max_seq_length']:>5} "
-            f"{r['recall@1']:>6.3f} {r['recall@10']:>6.3f} {r['mrr@10']:>6.3f} "
-            f"{r['proviso_delta_mean']:>8.5f} {r['truncated_ratio']:>6.1%} "
-            f"{r['sec_per_1k']:>7.1f}{flag}"
+            f"{r['model']:50} {r['dim']:>5} {r['max_seq_length']:>6} "
+            f"{r['mrr@10']:>6.3f} {r['recall@10']:>6.3f} "
+            f"{(f'{pm:.3f}' if pm is not None else '—'):>8} "
+            f"{(f'{pr:.3f}' if pr is not None else '—'):>9} "
+            f"{r['proviso_blind_count']:>3}/{r['proviso_probes']:<4} "
+            f"{r['truncated_ratio']:>6.1%}{flag}"
         )
     print()
-    print("면책Δ = 1 - cos(앞부분, 앞부분+단서). ★0 이면 모델이 뒷부분을 안 본 것이다.")
+    print("면책MRR/R@10 = 조항 **뒤쪽** 「다만 …」 단서를 질의로 준 검색 성적.")
+    print("  ★앞부분만 임베딩하는 모델은 그 문장을 본 적이 없으므로 못 찾는다.")
+    print("면책못봄 = 앞부분과 **완전히 같은 벡터**가 나온 탐침 수.")
     print("잘림 = 코퍼스 중 모델 최대 길이를 넘은 비율.")
 
 
