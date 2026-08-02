@@ -277,11 +277,20 @@ def _citations(pairs, status: str) -> list[Citation]:
 
 
 def _dedupe(cites: list[Citation]) -> list[Citation]:
-    seen: set[str] = set()
+    """같은 인용을 한 번만 남긴다.
+
+    ★`clause_id` 하나로 접으면 **서로 다른 조항이 조용히 사라진다.**
+      `{sha12}/{qualified_no}` 는 31,085건 충돌한다(문서의 86%) —
+      부 탐지 입도가 특약보다 굵어 다른 특약이 한 라벨에 뭉치기 때문이다.
+      `clause_id` 에 내용 해시를 붙여 고쳤지만, 여기서도 **페이지를 함께 본다.**
+      같은 내용이 다른 쪽에 또 실렸으면 그건 다른 인용이다.
+    """
+    seen: set[tuple[str, int, int]] = set()
     out: list[Citation] = []
     for c in cites:
-        if c.clause_id in seen:
+        key = (c.clause_id, c.page_from, c.page_to)
+        if key in seen:
             continue
-        seen.add(c.clause_id)
+        seen.add(key)
         out.append(c)
     return out
