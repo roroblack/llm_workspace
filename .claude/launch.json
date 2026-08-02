@@ -4,26 +4,48 @@
     {
       "name": "unified-mall-2-api",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["_unified_mall_2/scripts/run_dev_server.py"],
+      "runtimeArgs": [
+        "_unified_mall_2/scripts/run_dev_server.py"
+      ],
       "port": 8080
     },
     {
       "name": "unified-mall-2-customer",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["_unified_mall_2/scripts/run_customer_server.py"],
+      "runtimeArgs": [
+        "_unified_mall_2/scripts/run_customer_server.py"
+      ],
       "port": 8080
     },
     {
       "name": "unified-mall-2-admin",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["_unified_mall_2/scripts/run_admin_server.py"],
+      "runtimeArgs": [
+        "_unified_mall_2/scripts/run_admin_server.py"
+      ],
       "port": 8081
     },
     {
       "name": "unified-mall-2-llm",
       "runtimeExecutable": "python",
-      "runtimeArgs": ["_unified_mall_2/scripts/local_model_server.py"],
+      "runtimeArgs": [
+        "_unified_mall_2/scripts/local_model_server.py"
+      ],
       "port": 8000
+    },
+    {
+      "name": "insurance",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--port",
+        "8099",
+        "--app-dir",
+        "_unified_mall_3"
+      ],
+      "port": 8099
     }
   ]
 }
