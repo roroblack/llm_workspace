@@ -56,3 +56,7 @@ legacy/
 data/external/
 # 코호트 이벤트 — 실제 청구 결과. 같은 이유.
 data/cohort/
+
+# 임시 측정 출력 — 실수로 커밋돼 있었다.
+_cov.txt
+_gap.txt
