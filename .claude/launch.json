@@ -34,18 +34,22 @@
       "port": 8000
     },
     {
-      "name": "insurance",
+      "name": "insurance-customer",
       "runtimeExecutable": "python",
       "runtimeArgs": [
-        "-m",
-        "uvicorn",
-        "app.main:app",
-        "--port",
-        "8099",
-        "--app-dir",
-        "_unified_mall_3"
+        "_unified_mall_3/scripts/run_customer_server.py"
       ],
-      "port": 8099
+      "port": 8080,
+      "autoPort": false
+    },
+    {
+      "name": "insurance-admin",
+      "runtimeExecutable": "python",
+      "runtimeArgs": [
+        "_unified_mall_3/scripts/run_admin_server.py"
+      ],
+      "port": 8081,
+      "autoPort": false
     }
   ]
 }
