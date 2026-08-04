@@ -1265,7 +1265,7 @@
       elements.simBar.style.width = `${pct}%`;
       elements.simProgressText.textContent =
         `${done}/${planned} (${pct}%) · 제출 ${sim.submitted} · 승격 ${sim.promoted} · ` +
-        `중복 ${sim.duplicated} · 실패 ${sim.failed}`;
+        `검증거절 ${sim.rejected || 0} · 중복 ${sim.duplicated} · 실패 ${sim.failed}`;
     }
 
     // ★실패를 숫자로만 두지 않는다. 마지막 사유를 화면에 올린다.

@@ -252,6 +252,20 @@ def _to_dto(o: PrecheckOutcome) -> PrecheckResult:
 
 @router.post("/prechecks", response_model=PrecheckResult)
 def create_precheck(body: PrecheckRequest) -> PrecheckResult:
+    return _create_precheck(body, record_knowledge_gap=True)
+
+
+def create_precheck_for_registered_agent(body: PrecheckRequest) -> PrecheckResult:
+    """보호 기계 채널용. KCD 원문을 knowledge-gap 로그에 복제하지 않는다."""
+
+    return _create_precheck(body, record_knowledge_gap=False)
+
+
+def _create_precheck(
+    body: PrecheckRequest,
+    *,
+    record_knowledge_gap: bool,
+) -> PrecheckResult:
     """가입일·질병기호로 보장 여부를 미리 본다.
 
     ★근거 조항을 못 대면 `verdict="needs_expert"` 로 답한다(HTTP 200).
@@ -273,7 +287,7 @@ def create_precheck(body: PrecheckRequest) -> PrecheckResult:
         #:   ★`documents_not_confirmed` 는 **넣지 않는다.** 그건 지식이 없는 게 아니라
         #:     확정 작업이 밀린 것이고, 넣으면 같은 문장으로 큐가 넘쳐
         #:     진짜 보강 대상이 묻힌다. 그 현황은 `support-manifest` 가 이미 말한다.
-        if dto.abstained and dto.reason_code == "no_evidence":
+        if record_knowledge_gap and dto.abstained and dto.reason_code == "no_evidence":
             from app.obs.knowledge_gaps import record_gap_safe
 
             record_gap_safe(
@@ -324,7 +338,7 @@ def create_precheck(body: PrecheckRequest) -> PrecheckResult:
         agent_stream.publish(
             "agent.precheck",
             client_ref=body.client_ref or "-",
-            detail={"insurer": body.insurer, "codes": list(body.kcd_codes)[:3],
+            detail={"insurer": body.insurer, "code_count": len(body.kcd_codes),
                     "verdict": dto.verdict, "abstained": dto.abstained,
                     "trace_id": dto.trace_id},
         )
@@ -466,7 +480,7 @@ def submit_observation(body: ExternalCaseSubmission) -> dict:
         "agent.observe",
         client_ref=body.client_ref,
         track="verified_real",
-        detail={"outcome": body.outcome, "codes": list(body.kcd_codes)[:3],
+        detail={"outcome": body.outcome, "code_count": len(body.kcd_codes),
                 "duplicate": res.duplicate},
     )
     return {

@@ -64,6 +64,7 @@ def _call(fn, *args, **kwargs) -> dict:
     """
     from fastapi import HTTPException
     from app.core.errors import AppError
+    from pydantic import ValidationError
 
     try:
         out = fn(*args, **kwargs)
@@ -82,6 +83,13 @@ def _call(fn, *args, **kwargs) -> dict:
             "error_code": e.error_code,
             "error": e.message,
             "retryable": e.http_status >= 500,
+        }
+    except ValidationError as e:
+        return {
+            "ok": False,
+            "http_status": 422,
+            "error": str(e),
+            "retryable": False,
         }
     return out.model_dump() if hasattr(out, "model_dump") else out
 
@@ -104,14 +112,15 @@ def precheck(
     from app.schemas.precheck import PrecheckRequest
 
     return _call(
-        router.create_precheck,
-        PrecheckRequest(
+        lambda: router.create_precheck(
+            PrecheckRequest(
             insurer=insurer,
             enrolled_on=enrolled_on,
             kcd_codes=kcd_codes,
             product_name=product_name or None,
             client_ref="mcp",
-        ),
+            )
+        )
     )
 
 
@@ -129,8 +138,9 @@ def explain_term(
     from app.routers import chat as router
 
     return _call(
-        router.chat_turn,
-        router.ChatRequest(message=message, insurer=insurer or None),
+        lambda: router.chat_turn(
+            router.ChatRequest(message=message, insurer=insurer or None)
+        )
     )
 
 
@@ -190,16 +200,17 @@ def submit_observation(
     from app.schemas.precheck import ExternalCaseSubmission
 
     return _call(
-        router.submit_observation,
-        ExternalCaseSubmission(
-            client_ref=client_ref,
-            insurer=insurer,
-            enrolled_on=enrolled_on,
-            kcd_codes=kcd_codes,
-            outcome=outcome,
-            outcome_reason=outcome_reason,
-            precheck_trace_id=precheck_trace_id or None,
-        ),
+        lambda: router.submit_observation(
+            ExternalCaseSubmission(
+                client_ref=client_ref,
+                insurer=insurer,
+                enrolled_on=enrolled_on,
+                kcd_codes=kcd_codes,
+                outcome=outcome,
+                outcome_reason=outcome_reason,
+                precheck_trace_id=precheck_trace_id or None,
+            )
+        )
     )
 
 

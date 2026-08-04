@@ -38,7 +38,7 @@ def _isolated(tmp_path, monkeypatch):
 
     monkeypatch.setattr(demo, "_SUBMISSIONS", subs)
     monkeypatch.setattr(demo, "_COHORT_EVENTS", syn / "events.jsonl")
-    monkeypatch.setattr(sim, "_RESET_DIRS", (subs, syn))
+    monkeypatch.setattr(demo, "_VERIFICATION_EVENTS", tmp_path / "demo" / "verifications" / "events.jsonl")
     sim._state.__init__()  # type: ignore[misc]
     yield {"subs": subs, "syn": syn, "real": real}
     sim._state.stop_requested = True
@@ -55,8 +55,14 @@ def _fake_post(counter):
 
     def post(base, path, body, timeout=20):
         counter.append(base + path)
-        res = demo.store(body)
-        return 202, {"submission_id": res.submission_id, "duplicate": res.duplicate}
+        res = demo.store(body, auto_validate=bool(body.get("auto_validate")))
+        return 202, {
+            "submission_id": res.submission_id,
+            "duplicate": res.duplicate,
+            "promoted": res.promoted,
+            "verification": res.verification,
+            "reason_codes": list(res.reason_codes),
+        }
 
     return post
 
@@ -87,7 +93,7 @@ def test_시작하면_합성_제출이_쌓이고_상태가_끝난다(monkeypatch
     assert all(c.endswith("/v1/demo/observations") for c in calls)
 
 
-def test_자동승격은_simulated_로_남는다(monkeypatch, _isolated):
+def test_자동모드는_합성정합성_게이트_통과분만_승격한다(monkeypatch, _isolated):
     import json
 
     monkeypatch.setattr(sim, "_post", _fake_post([]))
@@ -98,8 +104,8 @@ def test_자동승격은_simulated_로_남는다(monkeypatch, _isolated):
     assert sim.status()["promoted"] == 4
     lines = (_isolated["syn"] / "events.jsonl").read_text(encoding="utf-8").splitlines()
     methods = {json.loads(x)["verification_method"] for x in lines if x.strip()}
-    assert methods == {"simulated"}, (
-        "시뮬레이터가 만든 표본이 admin_review 로 남으면 사람이 검수한 것처럼 보인다."
+    assert methods == {"simulated_consistency"}, (
+        "합성 정합성 검사를 사람이 검수한 것처럼 기록하면 안 된다."
     )
 
 

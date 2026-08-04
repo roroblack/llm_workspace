@@ -149,6 +149,23 @@ def test_잘못된_data_source_는_예외가_아니라_구조화된_오류다():
     assert out["retryable"] is False
 
 
+def test_잘못된_observation_outcome도_구조화된_422다():
+    from app.mcp.server import mcp
+
+    out = json.loads(_text(_run(mcp.call_tool(
+        "submit_observation",
+        {
+            "client_ref": "mcp-test",
+            "insurer": "가보험",
+            "outcome": "anything",
+            "kcd_codes": ["F32"],
+        },
+    ))))
+    assert out["ok"] is False
+    assert out["http_status"] == 422
+    assert out["retryable"] is False
+
+
 def test_도구는_정확히_네_개다():
     """LLM 용어 설명도 별도 구현 없이 REST 라우터를 그대로 쓴다."""
     from app.mcp.server import mcp

@@ -190,10 +190,10 @@ def build_cohort():
 
     ★어느 저장소를 볼지는 여기서 정한다. DB 적재 후엔 이 줄만 바꾼다.
     """
-    from app.adapters import file_cohort_stats
+    from app.adapters import cohort_stats
     from app.core.usecases.cohort import CohortQuery
 
-    return CohortQuery(file_cohort_stats)
+    return CohortQuery(cohort_stats)
 
 
 def build_glossary():
@@ -206,3 +206,15 @@ def build_glossary():
     from app.adapters import file_glossary_source
 
     return file_glossary_source
+
+
+def build_clause_search_deps() -> dict:
+    """조항 의미검색이 쓸 어댑터를 묶어 준다.
+
+    ★유스케이스(`app/core/usecases/clause_search.py`)는 어댑터를 직접 부르지 않는다
+      (ARCH-002·003 — 의존 방향). 그래서 조립은 여기서 한다.
+    """
+    from app.adapters import pgvector_clause_index
+    from app.adapters.clause_rerank import rerank_hits
+
+    return {"index": pgvector_clause_index, "rerank_fn": rerank_hits}

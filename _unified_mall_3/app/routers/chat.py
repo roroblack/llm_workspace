@@ -41,6 +41,16 @@ def _model():
 
 @router.post("/chat")
 def chat_turn(body: ChatRequest) -> dict:
+    return _chat_turn(body, record_knowledge_gap=True)
+
+
+def chat_turn_for_registered_agent(body: ChatRequest) -> dict:
+    """보호 기계 채널용. 사용자 질문 원문을 knowledge-gap 로그에 복제하지 않는다."""
+
+    return _chat_turn(body, record_knowledge_gap=False)
+
+
+def _chat_turn(body: ChatRequest, *, record_knowledge_gap: bool) -> dict:
     """용어 질문에 **약관 원문 인용으로** 답한다.
 
     ★보장 질문에는 답하지 않는다. 판정 양식으로 안내한다.
@@ -69,7 +79,7 @@ def chat_turn(body: ChatRequest) -> dict:
     #:   **정작 보험 쪽 abstention 이 큐에 닿지 않고 있었다.**
     #:
     #:   용어를 못 찾은 것은 **용어집 보강 대상**이다. 그것이 이 큐의 본래 용도다.
-    if turn.term and not (ex and ex.found):
+    if record_knowledge_gap and turn.term and not (ex and ex.found):
         from app.obs.knowledge_gaps import record_gap_safe
 
         record_gap_safe(f"[용어] {turn.term}")

@@ -27,6 +27,15 @@ REQUIRED = (
     "05D_파인튜닝_모델_설계.md",
     "06_시연영상_시나리오.md",
     "07_프로젝트앱_결과물_인수인계.md",
+    "08_시각화_자료_목록.md",
+)
+
+#: 발표에 띄우는 그림. 링크만이 아니라 **파일 자체**가 있어야 한다.
+REQUIRED_VISUALS = (
+    "docs/delivery/storyboard.html",
+    "docs/delivery/presentation_visuals.html",
+    "docs/handoff/system_diagrams.html",
+    "docs/submission/01_부록_전처리_시각화.html",
 )
 
 
@@ -47,3 +56,21 @@ def test_제출_문서의_상대링크가_전부_살아_있다():
 def test_커머스_워크스루는_금지_목록에_있다():
     #: 금지 목록 자체가 지워지면 검사가 조용히 무력해진다.
     assert "docs/screen_walkthrough.html" in checker.BANNED
+
+
+def test_발표용_시각화_파일이_있다():
+    root = checker.SUBMISSION.parents[1]
+    missing = [p for p in REQUIRED_VISUALS if not (root / p).exists()]
+    assert not missing, f"발표에 쓰는 그림 누락: {missing}"
+
+
+def test_전처리_시각화가_옛_DB_적재_수치를_달고_있지_않다():
+    """★§G 가 손으로 적은 s5 시절 숫자를 달고 있어 「DB 3.5% 적재」로 읽혔다(2026-08-04).
+
+    지금은 `build_preprocess_viz.py` 가 매번 DB 를 조회해 만든다.
+    옛 숫자가 되살아나면 여기서 걸린다.
+    """
+    html = (checker.SUBMISSION / "01_부록_전처리_시각화.html").read_text(
+        encoding="utf-8", errors="replace")
+    stale = [s for s in ("156,946", "고유 내용은 3.5%뿐") if s in html]
+    assert not stale, f"s5 시절 적재 수치가 다시 들어왔다: {stale}"

@@ -222,9 +222,16 @@ python -m scripts.manage migrate
 # 4. 기본 문서 인덱스
 python -m scripts.manage ingest
 
-# 5. PostgreSQL + pgvector 사용 시
-python -m scripts.pg
+# 5. PostgreSQL + pgvector와 합성 검수 DB 사용 시
+python -m scripts.pg start
+python -m scripts.pg init       # 실제 약관/RAG DB
+python -m scripts.pg init-demo  # 분리된 insurance_demo DB
+python -m scripts.pg init-agent # 분리된 insurance_agent 인증·감사 DB
 python -m scripts.index.build_clause_index
+
+# 기존 파일 기반 합성 제출물 이전(먼저 검증, 그다음 적용)
+python -m scripts.migrate_demo_files_to_pg
+python -m scripts.migrate_demo_files_to_pg --apply
 
 # 6. API 실행
 python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
@@ -232,6 +239,18 @@ python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 # 7. 준비 상태 확인
 curl http://127.0.0.1:8000/api/health/ready
 ```
+
+합성 에이전트 제출물을 PostgreSQL에 저장하려면 `.env`에 아래처럼 지정합니다.
+
+```dotenv
+DEMO_STORE_BACKEND=postgres
+DEMO_PG_DSN=host=127.0.0.1 port=5433 user=postgres dbname=insurance_demo
+```
+
+관리자 화면의 **자동 합성 정합성 검사**는 ID·보험사·판매일·KCD 단일 코드·연령대·결과값·증거 형식을
+결정론적 규칙으로 검사한 뒤 통과한 합성 건만 승격합니다. 이는 보험금 지급 여부나 실제 문서의 진실성을
+승인하는 판정기가 아닙니다. 실제 보장 사전판정은 `/v1/prechecks` 및 같은 유스케이스를 호출하는 MCP
+`precheck`가 약관 규칙과 출처를 근거로 별도 수행합니다.
 
 LLM은 `.env`의 `LLM_PROVIDER`로 선택합니다. 실행 스크립트가 이 값을 덮어쓰지 않습니다.
 
@@ -253,6 +272,31 @@ python scripts/mcp_smoke.py
 
 MCP는 `precheck`, `explain_term`, `cohort_stats`, `submit_observation` 4개 도구를 제공합니다.
 `explain_term`은 고객 `/v1/chat` 라우터를 그대로 호출하므로 브라우저와 MCP가 같은 provider·근거·안전 게이트를 사용합니다.
+
+등록 외부 에이전트 REST는 고객 UI와 별도 앱·포트에서 실행합니다.
+
+```bash
+# .env에서 AGENT_HASH_SECRET(32자 이상 별도 난수)을 설정한 뒤
+python -m scripts.pg init-agent
+python -m scripts.agent_clients create --client-id partner-a --name "Partner A" \
+  --scope precheck:read --scope terms:read --scope cohort:read \
+  --scope observations:write --rate-limit 60
+
+# 발급 키를 안전한 비밀 저장소에 옮긴 뒤 명시적으로 활성화
+# AGENT_API_ENABLED=true
+python -m scripts.run_agent_server  # 기본 http://127.0.0.1:8082
+
+# 운영 관리(키 원문은 create/rotate 성공 시 한 번만 출력)
+python -m scripts.agent_clients list
+python -m scripts.agent_clients rotate --client-id partner-a
+python -m scripts.agent_clients disable --client-id partner-a
+python -m scripts.agent_clients prune
+```
+
+보호 경로는 `/v1/agent/*`이며 `Authorization: Bearer <agent-key>`와 개인정보가 아닌
+`X-Agent-Subject` opaque 참조가 필요합니다. observation에는 `Idempotency-Key`도 필수입니다.
+비-loopback bind는 `ALLOW_REMOTE_AGENT_BIND=true`를 명시하기 전에는 기동이 거부됩니다.
+이 옵션은 TLS·방화벽을 대신하지 않습니다. 실제 DNS/TLS 배포와 키 전달은 별도 운영 작업입니다.
 
 프론트엔드 실행:
 

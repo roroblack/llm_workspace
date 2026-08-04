@@ -58,6 +58,21 @@ def check_readiness() -> dict[str, object]:
     if _clause_store_kind() == "pg" and not clause.get("ready"):
         out["ready"] = False
         out["hint"] = clause.get("hint") or "인덱스 A 가 준비되지 않았습니다."
+    from app.adapters.demo_submission_store import backend_name as demo_backend
+
+    if demo_backend() == "postgres":
+        from app.adapters.pg_demo_submission_store import readiness as demo_readiness
+
+        demo = demo_readiness()
+    else:
+        demo = {"backend": "file", "ready": True}
+    out["demo_store"] = demo
+    if not demo.get("ready"):
+        out["ready"] = False
+        out["hint"] = (
+            "합성 PostgreSQL 저장소가 준비되지 않았습니다. "
+            "insurance_demo DB에 demo migration을 적용하세요."
+        )
     return out
 
 

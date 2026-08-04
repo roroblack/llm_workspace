@@ -171,3 +171,7 @@ docs/review/*.html
 #   ★생성물이라 언제든 다시 만든다: `python -m scripts.eval.kcd_catalog`
 #   없으면 API 가 503 + 실행할 명령을 알려 준다(조용히 빈 목록을 주지 않는다).
 data/exports/kcd_catalog.json
+
+# 파인튜닝 어댑터 바이너리 — 합성 데이터 산출물이고 66MB 다.
+# peft save_pretrained 가 베이스 토크나이저(2.3M줄)까지 복사한다. 로컬에만 둔다.
+artifacts/finetune/*/adapter/

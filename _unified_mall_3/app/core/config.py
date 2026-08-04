@@ -67,6 +67,30 @@ class Settings(BaseSettings):
     # 접속 정보(모델ID 아님) — userspace PG(conda pgv env). 미기동이면 접속 실패→명시 오류(무폴백).
     PGVECTOR_DSN: str = "host=127.0.0.1 port=5433 user=postgres dbname=mall_vec"
 
+    # --- 합성 에이전트 트랙 저장소 ---
+    # 테스트/최소 설치는 file, 운영 데모는 postgres를 명시적으로 선택한다.
+    # postgres 선택 후 장애가 나면 파일로 폴백하지 않는다.
+    DEMO_STORE_BACKEND: Literal["file", "postgres"] = "file"
+    DEMO_PG_DSN: str = (
+        "host=127.0.0.1 port=5433 user=postgres dbname=insurance_demo"
+    )
+
+    # --- 등록 외부 에이전트 API ---
+    # 고객 UI와 다른 프로세스·포트·DB를 쓴다. 활성화해 놓고 DB가 끊겨도 공개 API나
+    # 파일 저장소로 폴백하지 않고 503으로 실패한다.
+    AGENT_API_ENABLED: bool = False
+    AGENT_PG_DSN: str = (
+        "host=127.0.0.1 port=5433 user=insurance_agent_runtime dbname=insurance_agent"
+    )
+    AGENT_ADMIN_PG_DSN: str = (
+        "host=127.0.0.1 port=5433 user=insurance_agent_admin dbname=insurance_agent"
+    )
+    AGENT_BIND_HOST: str = "127.0.0.1"
+    AGENT_PORT: int = 8082
+    ALLOW_REMOTE_AGENT_BIND: bool = False
+    # subject·요청·응답·trace의 keyed hash 전용. JWT SECRET_KEY와 재사용하지 않는다.
+    AGENT_HASH_SECRET: str | None = None
+
     # --- 시뮬레이터가 두드릴 고객 웹 주소 ---
     # ★가상 에이전트가 **실제 HTTP 로** 붙게 한다. 관리 프로세스 안에서 저장소를 직접
     #   부르면 "에이전트가 접속해서 쌓는다"는 것이 시연되지 않고, 라우터·검증·멱등을
@@ -92,6 +116,39 @@ class Settings(BaseSettings):
     RERANKER_MAX_LENGTH: int = 768
     RERANKER_OVER_FETCH: int = 20
     RERANKER_TRUST_REMOTE_CODE: bool = False
+
+    # --- 보험 조항 리랭킹 (커머스 RAG 와 **분리**) ---
+    #: ★`RAG_RERANK_ENABLED` 를 재사용하지 않는다. 저건 커머스 `/api/rag` 의 플래그이고
+    #:   그 경로는 걷어낼 잔재다. 같이 쓰면 커머스를 지울 때 보험이 함께 꺼진다.
+    #:   모델 설정(`RERANKER_*`)은 공유하되 **켜고 끄는 스위치와 관측은 나눈다**(코덱스 지적).
+    #:
+    #: ★기본 꺼짐. 4B 리랭커를 요청 안에서 동기로 돌리는 것은 **프로토타입 한정**이다.
+    #:   운영 기본값으로 켜려면 전용 워커·동시성 제한·타임아웃이 먼저 필요하다.
+    INSURANCE_CLAUSE_RERANK_ENABLED: bool = False
+    #: 리랭커에 넣을 후보 상한. 후보가 늘면 지연이 선형으로 는다.
+    CLAUSE_RERANK_MAX_CANDIDATES: int = 40
+    #: 동시에 도는 리랭킹 수. 4B 는 GPU 를 통째로 쓴다 — 겹치면 OOM 이다.
+    CLAUSE_RERANK_CONCURRENCY: int = 1
+
+    #: ★**채점에 무엇을 넣는가.** 실측으로 갈린 값이다(2026-08-05 · 417질의 · Qwen3-4B).
+    #:
+    #:     chunk       조각(`ClauseHit.text`)      hit@1 0.6379
+    #:     full_clause 조 전체(`citable_text`)     hit@1 0.5875   ← 5.04%p 낮다
+    #:
+    #:   가장 크게 갈리는 곳이 **면책을 다른 말로 물었을 때**다(+19.81%p).
+    #:   조 전체에는 여러 주제가 섞여 있어 면책 신호가 묻힌다.
+    #:   `max_length` 를 768→1536 으로 올려도 이 차이는 **그대로다**(절단 탓이 아니다).
+    #:
+    #: ★그래도 **인용·판정은 조 전체를 본다.** 순위 매기기와 뜻 지키기는 다른 일이다 —
+    #:   법률문은 예외가 뒤에 오므로(「…보상합니다. 다만 …」) 근거는 조 전체라야 한다.
+    #:   → 리포트 `docs/reports/2026-08-05_0100_리랭커_붙는자리_실측.md`
+    CLAUSE_RERANK_SCORE_BODY: Literal["chunk", "full_clause"] = "chunk"
+    #: 조항 리랭킹 전용 절단 길이. 커머스 `RERANKER_MAX_LENGTH`(768)와 나눠 둔다.
+    #: ★768 에서는 후보가 전부 같은 앞부분만 남아 `constant scores` 로 멈추는 질의가 있었다.
+    #:   1536 에서 사라졌고, 조각 채점은 **지연이 늘지 않는다**(2,292 → 2,291ms).
+    CLAUSE_RERANK_MAX_LENGTH: int = 1536
+    #: 채점 프롬프트에 넣는 본문 길이 상한(자). 조 전체는 3만 자까지 있다.
+    CLAUSE_RERANK_SCORE_CHARS: int = 1200
 
     # --- ML (감성분석) ---
     SENTIMENT_MODEL: str = "monologg/koelectra-base-finetuned-nsmc"
@@ -204,6 +261,17 @@ class Settings(BaseSettings):
             raise ConfigError("SECRET_KEY가 설정되지 않았습니다. .env에 SECRET_KEY를 넣으세요.")
         return self.SECRET_KEY
 
+    def require_agent_hash_secret(self) -> str:
+        value = (self.AGENT_HASH_SECRET or "").strip()
+        if len(value) < 32:
+            from app.core.errors import ConfigError
+
+            raise ConfigError(
+                "AGENT_HASH_SECRET가 없거나 너무 짧습니다. "
+                "외부 에이전트 API에는 32자 이상의 별도 난수를 설정하세요."
+            )
+        return value
+
     def has_openai_key(self) -> bool:
         return bool(self.OPENAI_API_KEY and self.OPENAI_API_KEY.strip())
 
@@ -229,3 +297,30 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """설정 싱글턴. 테스트에서 환경 변경 시 get_settings.cache_clear() 사용."""
     return Settings()
+
+
+def validate_agent_bind(settings: Settings) -> tuple[str, int]:
+    """원격 노출을 명시적으로 승인했는지 검사하고 bind 값을 돌려준다."""
+
+    import ipaddress
+
+    from app.core.errors import ConfigError
+
+    host = settings.AGENT_BIND_HOST.strip()
+    if not host:
+        raise ConfigError("AGENT_BIND_HOST가 비어 있습니다.")
+    if not (1 <= settings.AGENT_PORT <= 65535):
+        raise ConfigError("AGENT_PORT는 1~65535 범위여야 합니다.")
+
+    loopback = host.lower() == "localhost"
+    try:
+        loopback = loopback or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        # DNS 이름은 실행 시 다른 주소를 가리킬 수 있으므로 원격으로 취급한다.
+        pass
+    if not loopback and not settings.ALLOW_REMOTE_AGENT_BIND:
+        raise ConfigError(
+            "외부 에이전트 서버의 비-loopback bind가 차단됐습니다. "
+            "TLS 종료·방화벽을 준비한 뒤 ALLOW_REMOTE_AGENT_BIND=true를 명시하세요."
+        )
+    return host, settings.AGENT_PORT

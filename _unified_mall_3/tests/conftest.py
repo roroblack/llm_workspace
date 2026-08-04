@@ -18,6 +18,10 @@ os.environ["SECRET_KEY"] = "test-secret-key-do-not-use-in-prod"
 os.environ["LLM_PROVIDER"] = "local"
 # 기본 테스트는 실제 네트워크·모델을 호출하지 않는다. LLM 경로는 전용 Fake 테스트에서 켠다.
 os.environ["LLM_CHAT_ENABLED"] = "false"
+os.environ["DEMO_STORE_BACKEND"] = "file"
+# 등록 에이전트 테스트의 HMAC 전용 고정값. 실제 키가 아니며 테스트 프로세스 밖에 쓰지 않는다.
+os.environ["AGENT_HASH_SECRET"] = "test-only-agent-hash-secret-32-characters"
+os.environ["AGENT_API_ENABLED"] = "true"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
