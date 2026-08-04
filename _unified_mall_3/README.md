@@ -296,6 +296,11 @@ python -m scripts.manage ready
 |---|---|
 | `python -m scripts.manage promote <username>` | USER → ADMIN |
 | `python -m scripts.manage demote <username>` | ADMIN → USER (**마지막 관리자는 거부** — 잠금 방지) |
+| `python -m scripts.manage face-reset <username>` | **등록된 얼굴 해제** — 얼굴 2FA로 잠겼을 때 |
+
+> **얼굴 2FA로 잠겼다면** — 얼굴을 등록하면 다음 로그인부터 얼굴이 필요합니다.
+> 카메라 없는 PC로 옮기거나 조명·외모가 바뀌어 임계값을 못 넘으면 **해제하려면 로그인해야 하고
+> 로그인하려면 얼굴이 필요한** 상태가 됩니다. 그때 `face-reset`으로 풉니다(비밀번호는 그대로).
 
 계정이 하나도 없는 상태에서 관리자 화면(8081)에 접속하면 로그인 게이트만 보입니다.
 그건 고장이 아니라 **인증 전에는 데이터를 요청하지 않는** 설계입니다.

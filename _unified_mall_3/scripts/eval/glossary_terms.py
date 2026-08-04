@@ -82,6 +82,10 @@ _ONLY_DIGIT = re.compile(r"^[0-9]+$")
 #: 조문 참조(`제42조제1항…`)와 서술어 꼬리(`말함`·`이며`·`동등하다고`)는 용어가 아니다.
 _ARTICLE_REF = re.compile(r"제\s*\d+\s*조")
 _PREDICATE = re.compile(r"(하고|하며|이며|이고|한다|합니다|였|했|함|말함|하는|한$)")
+#: ★**관형형 어미**로 끝나는 짧은 낱말은 용어가 아니라 구절 조각이다
+#:   (`따른`·`정한`·`같은`). 조사 목록으로는 안 잡힌다 — 어미는 다른 부류다.
+#:   실측 2026-08-04: `따른` 이 이 구멍으로 통과해 목록에 들어갔다.
+_ADNOMINAL = re.compile(r"(른|던|을|ㄹ)$")
 
 
 def _is_junk(term: str, freq: dict) -> bool:
@@ -95,6 +99,8 @@ def _is_junk(term: str, freq: dict) -> bool:
     if _ARTICLE_REF.search(term):
         return True
     if _PREDICATE.search(term):
+        return True
+    if len(term) <= 4 and _ADNOMINAL.search(term):
         return True
     #: 가운뎃점이 든 것은 표 칸이 통째로 붙은 것이다(`원·병원·치과병원·…`).
     if term.count("·") >= 2:

@@ -933,14 +933,32 @@
     return li;
   }
 
+  //: 서버(`external_submission_store._MIN_BASIS_LEN`)와 **같은 값**이어야 한다.
+  //: 다르면 화면이 통과시킨 것을 서버가 거절해 사용자가 이유를 모른다.
+  const MIN_BASIS_LEN = 5;
+
   async function attestSubmission(submissionId, button) {
-    // ★근거를 받는다. 빈 승인은 나중에 설명할 수 없다(서버도 5자 미만은 거절한다).
-    const basis = window.prompt(
-      "무엇을 보고 이 제보를 납득했습니까?\n" +
-      "(예: 지급통지서 사본 대조 · 통화 확인 · 진료비 영수증 금액 일치)\n\n" +
-      "★이것은 발행처 확인이 아닙니다. admin_attested 등급으로 기록됩니다."
-    );
-    if (basis === null) return;
+    // ★근거를 받는다. 빈 승인은 나중에 설명할 수 없다(서버도 짧으면 거절한다).
+    //
+    // ★★**빈 값으로 확인을 눌러도 그대로 보내고 있었다**(2026-08-04).
+    //   서버가 422 로 막아 주긴 했지만 화면에는 pydantic 오류가 날것으로 찍혔다.
+    //   막는 것과 **왜 막혔는지 알려 주는 것**은 다르다 — 여기서 먼저 확인한다.
+    let basis = null;
+    for (;;) {
+      basis = window.prompt(
+        "무엇을 보고 이 제보를 납득했습니까?\n" +
+        `(${MIN_BASIS_LEN}자 이상 · 예: 지급통지서 사본 대조 · 통화 확인 · 영수증 금액 일치)\n\n` +
+        "★이것은 발행처 확인이 아닙니다. admin_attested 등급으로 기록됩니다.",
+        basis || ""
+      );
+      if (basis === null) return;              // 취소
+      if (basis.trim().length >= MIN_BASIS_LEN) break;
+      window.alert(
+        `검수 근거를 ${MIN_BASIS_LEN}자 이상 적어 주세요.\n\n` +
+        "이 문장은 나중에 \"이 숫자가 어떻게 생겼나\"에 답하는 유일한 기록입니다."
+      );
+    }
+    basis = basis.trim();
 
     button.disabled = true;
     button.textContent = "승인 중";
@@ -1159,12 +1177,53 @@
     await refreshDashboard({ silent: true });
   }
 
+  /*
+   * ★서버 오류를 **사람이 읽을 문장**으로 바꾼다.
+   *
+   *   이 앱의 오류는 두 모양으로 온다 —
+   *     ① AppError 계열: {ok:false, error_code, message}  ← 이미 한국어 문장
+   *     ② FastAPI 입력 검증: {detail:[{type,loc,msg,ctx}, ...]}  ← **배열**
+   *
+   *   ②를 그대로 `JSON.stringify` 하면 화면에
+   *   `[{"type":"string_too_short","loc":["body","basis"],...}]` 가 찍힌다.
+   *   실제로 그렇게 나왔다(2026-08-04, 교차검증 승인). 오류 메시지가 사실을
+   *   잘못 전하는 것보다 낫지도 않다 — 무엇을 고쳐야 하는지 알 수 없다.
+   */
+  const _VALIDATION_HINTS = {
+    string_too_short: (e) => `${_fieldName(e)}이(가) 너무 짧습니다` +
+      (e.ctx && e.ctx.min_length ? ` (${e.ctx.min_length}자 이상)` : ""),
+    string_too_long: (e) => `${_fieldName(e)}이(가) 너무 깁니다`,
+    missing: (e) => `${_fieldName(e)}이(가) 필요합니다`,
+    int_parsing: (e) => `${_fieldName(e)}은(는) 숫자여야 합니다`,
+    greater_than_equal: (e) => `${_fieldName(e)} 값이 너무 작습니다` +
+      (e.ctx && e.ctx.ge !== undefined ? ` (${e.ctx.ge} 이상)` : ""),
+    less_than_equal: (e) => `${_fieldName(e)} 값이 너무 큽니다` +
+      (e.ctx && e.ctx.le !== undefined ? ` (${e.ctx.le} 이하)` : ""),
+  };
+
+  function _fieldName(e) {
+    const loc = Array.isArray(e.loc) ? e.loc : [];
+    return String(loc[loc.length - 1] ?? "입력값");
+  }
+
   function simErrorText(result) {
     const status = result ? result.status : 0;
-    const detail =
-      (result && result.body && (result.body.message || result.body.detail)) ||
-      `HTTP ${status}`;
-    return typeof detail === "string" ? detail : JSON.stringify(detail);
+    const body = result && result.body;
+    if (!body) return `HTTP ${status}`;
+
+    if (typeof body.message === "string" && body.message) return body.message;
+
+    const detail = body.detail;
+    if (typeof detail === "string" && detail) return detail;
+
+    if (Array.isArray(detail)) {
+      const parts = detail.map((e) => {
+        const hint = _VALIDATION_HINTS[e.type];
+        return hint ? hint(e) : `${_fieldName(e)}: ${e.msg || e.type}`;
+      });
+      return parts.join(" · ");
+    }
+    return `HTTP ${status}`;
   }
 
   function renderSimulation(sim) {

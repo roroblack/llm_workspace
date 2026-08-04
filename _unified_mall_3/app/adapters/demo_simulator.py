@@ -32,6 +32,7 @@ import shutil
 import threading
 import urllib.error
 import urllib.request
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -75,6 +76,9 @@ class SimState:
     #: ★멈춘 이유를 남긴다. "그냥 끝남"과 "오류로 끊김"과 "사람이 멈춤"은 다르다.
     last_error: str = ""
     stopped_by: str = ""
+    #: 같은 seed로 다시 실행해도 **새 실행**임을 구분한다. 사례 재시도 멱등성과
+    #: 시뮬레이션 재실행을 같은 것으로 취급하면 두 번째 실행이 전부 중복된다.
+    run_id: str = ""
     params: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -90,6 +94,7 @@ class SimState:
             "stop_requested": self.stop_requested,
             "last_error": self.last_error,
             "stopped_by": self.stopped_by,
+            "run_id": self.run_id,
             "params": self.params,
             "data_source": "synthetic",
             #: ★프로세스 메모리다. 재시작하면 이 상태는 사라진다(데이터는 남는다).
@@ -144,7 +149,7 @@ def _validate(agents: int, cases: int, codes: list[str], delay_ms: int) -> None:
 
 
 def _run(*, base: str, agents: int, cases: int, codes: list[str], delay_ms: int,
-         auto_verify: bool, seed: int) -> None:
+         auto_verify: bool, seed: int, run_id: str) -> None:
     from app.adapters import demo_submission_store as demo
 
     rnd = random.Random(seed)
@@ -153,7 +158,7 @@ def _run(*, base: str, agents: int, cases: int, codes: list[str], delay_ms: int,
     try:
         for i in range(1, agents + 1):
             ref = f"sim-agent-{i:03d}"
-            for _ in range(cases):
+            for case_no in range(1, cases + 1):
                 with _lock:
                     if _state.stop_requested:
                         return
@@ -167,6 +172,10 @@ def _run(*, base: str, agents: int, cases: int, codes: list[str], delay_ms: int,
                     "age_band": rnd.choice(AGE_BANDS),
                     "outcome": rnd.choice(OUTCOMES),
                     "outcome_reason": "시뮬레이션 생성",
+                    # 실행별 ID + 실행 안의 사례 순번이다. 같은 요청을 재전송하면
+                    # 같은 키라 중복 차단되고, 같은 seed로 새로 실행하면 run_id가
+                    # 달라져 새 사례로 접수된다.
+                    "idempotency_key": f"sim-{run_id}-{i:03d}-{case_no:03d}",
                 }
                 status_code, res = _post(base, "/v1/demo/observations", body)
 
@@ -229,6 +238,7 @@ def start(*, base: str, agents: int, cases: int, codes: list[str],
         _state.running = True
         _state.started_at = datetime.now(timezone.utc).isoformat()
         _state.planned = agents * cases
+        _state.run_id = uuid.uuid4().hex[:12]
         _state.params = {
             "base": base, "agents": agents, "cases": cases, "codes": codes,
             "delay_ms": delay_ms, "auto_verify": auto_verify, "seed": seed,
@@ -236,7 +246,8 @@ def start(*, base: str, agents: int, cases: int, codes: list[str],
 
     _thread = threading.Thread(
         target=_run, kwargs=dict(base=base, agents=agents, cases=cases, codes=codes,
-                                 delay_ms=delay_ms, auto_verify=auto_verify, seed=seed),
+                                 delay_ms=delay_ms, auto_verify=auto_verify, seed=seed,
+                                 run_id=_state.run_id),
         name="demo-simulator", daemon=True,
     )
     _thread.start()

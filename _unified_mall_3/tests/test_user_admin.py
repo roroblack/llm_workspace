@@ -175,3 +175,77 @@ def test_규칙은_한_곳에만_있다():
     assert "change_role" in code, "CLI 가 도메인 규칙을 부르지 않습니다."
     #: CLI 가 규칙을 **자기 안에** 다시 갖고 있으면 안 된다.
     assert "마지막 관리자" not in code
+
+
+# ── 얼굴 2FA 잠금 복구 ────────────────────────────────────────────────────
+def test_얼굴_해제로_잠금을_풀_수_있다(client):
+    """★★얼굴 2FA 는 **되돌릴 수 없는 잠금**이 될 수 있다.
+
+    등록하면 다음 로그인부터 얼굴이 필요하고, 해제하려면 로그인해야 한다.
+    카메라 없는 PC 로 옮기거나 얼굴이 안 맞으면 그 계정은 끝이다.
+    실제로 겪었다(2026-08-04) — 그래서 CLI 복구 수단을 만들었다.
+    """
+    from scripts.manage import reset_face
+
+    from app.db.database import SessionLocal
+    from app.db.models import FaceCredential, User
+
+    u, p = _mkuser(client)
+    db = SessionLocal()
+    try:
+        uid = db.query(User).filter(User.username == u).first().id
+        db.add(FaceCredential(user_id=uid, embedding=b"\x00" * 16))
+        db.commit()
+        assert db.query(FaceCredential).filter(FaceCredential.user_id == uid).count() == 1
+    finally:
+        db.close()
+
+    msg = reset_face(u)
+    assert "해제" in msg
+
+    db = SessionLocal()
+    try:
+        assert db.query(FaceCredential).filter(FaceCredential.user_id == uid).count() == 0
+        #: ★비밀번호는 건드리지 않는다 — 얼굴만 지운다.
+        assert db.query(User).filter(User.username == u).first() is not None
+    finally:
+        db.close()
+
+    #: 해제 후에는 비밀번호만으로 들어간다.
+    r = client.post("/auth/login", data={"username": u, "password": p})
+    assert r.status_code == 200 and r.json()["face_2fa_required"] is False
+
+
+def test_얼굴이_없으면_해제는_그렇다고_말한다(client):
+    """조용히 성공한 척하지 않는다."""
+    from scripts.manage import reset_face
+
+    u, _ = _mkuser(client)
+    assert "없습니다" in reset_face(u)
+
+
+def test_없는_계정_얼굴해제는_명시적으로_실패한다():
+    from app.core.errors import NotFoundErr
+    from scripts.manage import reset_face
+
+    with pytest.raises(NotFoundErr):
+        reset_face("nobody_here_at_all")
+
+
+def test_검수근거_최소길이가_화면과_서버에서_같다():
+    """★다르면 화면이 통과시킨 것을 서버가 거절해 사용자가 이유를 모른다.
+
+    실제로 그 반대가 났다(2026-08-04) — 화면이 빈 값을 그대로 보내
+    pydantic 오류가 날것으로 찍혔다.
+    """
+    import pathlib
+    import re
+
+    from app.adapters.external_submission_store import _MIN_BASIS_LEN
+
+    js = pathlib.Path("app/static/admin.js").read_text(encoding="utf-8")
+    m = re.search(r"const MIN_BASIS_LEN = (\d+);", js)
+    assert m, "admin.js 에 MIN_BASIS_LEN 상수가 없습니다."
+    assert int(m.group(1)) == _MIN_BASIS_LEN, (
+        f"화면({m.group(1)})과 서버({_MIN_BASIS_LEN})의 최소 길이가 다릅니다."
+    )

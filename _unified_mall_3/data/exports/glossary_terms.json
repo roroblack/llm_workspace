@@ -1,11 +1,11 @@
 {
  "schema_version": "v1",
- "built_at": "2026-08-04T12:47:30",
+ "built_at": "2026-08-04T13:00:53",
  "source": "data/glossary/passages.jsonl (약관의 용어 정의 구절)",
  "scanned_passages": 3500,
  "scanned_policies": 1147,
- "verified_terms": 171,
- "junk_removed": 140,
+ "verified_terms": 170,
+ "junk_removed": 141,
  "min_policies": 3,
  "★한계": [
   "이건 용어 사전이 아니다 — 뜻은 담지 않는다. 뜻은 챗봇이 약관 원문으로 답한다.",
@@ -93,11 +93,6 @@
    "term": "상해",
    "policies": 1065,
    "passages": 1115
-  },
-  {
-   "term": "따른",
-   "policies": 1063,
-   "passages": 2305
   },
   {
    "term": "주사료",

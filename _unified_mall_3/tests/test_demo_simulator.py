@@ -218,3 +218,30 @@ def test_같은_시드는_같은_결과를_만든다(monkeypatch, _isolated):
     second = run_once()
 
     assert first == second and first, "같은 시드인데 생성 내용이 달라졌다."
+
+
+def test_같은_시드로_두번째_실행해도_전부_중복이_되지_않는다(monkeypatch, _isolated):
+    """seed는 생성 내용 재현용이지 실행 멱등성 키가 아니다.
+
+    이전에는 client_ref와 payload만 해시해 같은 seed의 두 번째 실행 36건이
+    전부 첫 실행의 재전송으로 처리됐다. 실행은 새로 받되, 실행 안의 같은 사례를
+    재전송할 때만 같은 idempotency_key를 사용해야 한다.
+    """
+    monkeypatch.setattr(sim, "_post", _fake_post([]))
+
+    sim.start(base="http://x", agents=3, cases=2, codes=["S72.0"],
+              delay_ms=0, auto_verify=False, seed=20260804)
+    assert _wait_done()
+    first_run_id = sim.status()["run_id"]
+    assert sim.status()["submitted"] == 6
+    assert sim.status()["duplicated"] == 0
+
+    sim.start(base="http://x", agents=3, cases=2, codes=["S72.0"],
+              delay_ms=0, auto_verify=False, seed=20260804)
+    assert _wait_done()
+    second = sim.status()
+
+    assert second["run_id"] != first_run_id
+    assert second["submitted"] == 6
+    assert second["duplicated"] == 0
+    assert len(list(_isolated["subs"].rglob("*.json"))) == 12
