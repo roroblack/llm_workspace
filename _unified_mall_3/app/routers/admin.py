@@ -246,6 +246,74 @@ def admin_demo_verify(body: DemoVerifyRequest, user=Depends(require_admin)) -> d
     return {"promoted": True, "event": event, "counts": demo.counts()}
 
 
+# ── 사용자·권한 관리 ──────────────────────────────────────────────────────
+#
+# ★★**"관리자 가입" 폼은 만들지 않는다.**
+#
+#   누구나 가입해서 스스로 관리자가 되는 화면은 권한 상승 그 자체다.
+#   그래서 **최초 관리자 1명의 부트스트랩은 CLI 로만** 한다
+#   (`python -m scripts.manage promote <username>`).
+#
+#   다만 그 뒤까지 CLI 로만 두는 것은 과했다 — 팀원을 추가하려면 매번
+#   서버에 붙어야 했다. **이미 관리자인 사람이 다른 사람을 올리는 것**은
+#   정상 운영이므로 화면에서 할 수 있게 한다. 규칙(마지막 관리자 강등 금지·감사)은
+#   `app.auth.roles.change_role` 한 곳에 있고 CLI 도 같은 함수를 쓴다.
+
+
+class RoleChangeRequest(BaseModel):
+    role: str = Field(description="ADMIN 또는 USER")
+
+
+@router.get("/users")
+def admin_list_users(db: Session = Depends(get_db)) -> dict:
+    """계정 목록(요약 필드만). **비밀번호 해시는 절대 내보내지 않는다.**"""
+    from app.db.models import FaceCredential, User
+
+    rows = db.query(User).order_by(User.id).all()
+    face_ids = {c.user_id for c in db.query(FaceCredential).all()}
+    admins = sum(1 for u in rows if u.role == "ADMIN")
+    return {
+        "users": [
+            {
+                "id": u.id,
+                "username": u.username,
+                "role": u.role,
+                "face_registered": u.id in face_ids,
+            }
+            for u in rows
+        ],
+        "admin_count": admins,
+        #: ★화면이 "마지막 관리자"를 미리 알아야 강등 버튼을 잠글 수 있다.
+        #:   서버도 거부하지만, 눌러 보고 실패하는 것보다 못 누르게 하는 게 낫다.
+        "note": "최초 관리자 부트스트랩은 CLI 전용입니다: python -m scripts.manage promote <username>",
+    }
+
+
+@router.put("/users/{username}/role")
+def admin_change_user_role(
+    username: str,
+    body: RoleChangeRequest,
+    db: Session = Depends(get_db),
+    user=Depends(require_admin),
+) -> dict:
+    """다른 계정의 역할을 바꾼다. **관리자만** 부를 수 있다(라우터 전역 게이트).
+
+    ★마지막 관리자 강등은 거부된다(잠금 방지) — 규칙은 도메인에 있다.
+    """
+    from app.auth.roles import change_role
+    from app.obs import agent_stream
+
+    actor = getattr(user, "username", "admin")
+    result = change_role(db, username, body.role.strip().upper(), actor=actor)
+    if result["changed"]:
+        agent_stream.publish(
+            "role.change", client_ref=actor,
+            detail={"username": username, "to": result["role"],
+                    "from": result.get("from")},
+        )
+    return result
+
+
 # ── 판정 모드(문서 확정 게이트) ───────────────────────────────────────────
 #
 # ★이 스위치는 **어떤 약관으로 판정할지**를 바꾼다. 시뮬레이션 제어와 성격이 완전히 다르다 —

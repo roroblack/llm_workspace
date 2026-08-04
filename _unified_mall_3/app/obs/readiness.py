@@ -39,6 +39,13 @@ def check_readiness() -> dict[str, object]:
     }
     clause = _clause_index_state()
     out["clause_index"] = clause
+    from app.core.candidate_fact_registry import check_candidate_fact_sources
+
+    candidates = check_candidate_fact_sources()
+    out["candidate_fact_sources"] = candidates
+    if not candidates.get("ready"):
+        out["ready"] = False
+        out["hint"] = "candidate fact 산출물 무결성 검증에 실패했습니다."
     #: ★**지금 쓰는 저장소가 요구하는 것만** 준비 조건에 넣는다.
     #:
     #:   `CLAUSE_STORE=file` 이면 인덱스 A 가 비어도 판정은 돈다 —

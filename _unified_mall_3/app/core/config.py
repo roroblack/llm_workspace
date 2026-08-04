@@ -35,7 +35,13 @@ class Settings(BaseSettings):
     BRAND_NAME: str = "올바른 보험비서"
 
     # --- LLM 프로바이더 선택 ---
+    # 실행 스크립트가 이 값을 덮어쓰지 않는다. `.env`에서 고른 provider가 실제 호출 경로다.
     LLM_PROVIDER: Literal["local", "openai", "gemini"] = "local"
+    # 고객 용어 챗봇에서 검색된 약관 원문을 쉬운 말로 설명할 때 LLM을 실제로 호출한다.
+    # false면 기존 원문 인용·고정 문구 경로만 사용한다.
+    LLM_CHAT_ENABLED: bool = True
+    LLM_REQUEST_TIMEOUT_SECONDS: float = 120.0
+    LLM_HEALTH_TIMEOUT_SECONDS: float = 3.0
 
     # --- 모델 레지스트리(Phase 1) ---
     # 활성 모델 '프로필 선택자'(모델 ID 자체가 아니라 model_registry.yaml의 profile_id).
@@ -43,7 +49,8 @@ class Settings(BaseSettings):
     ACTIVE_MODEL_PROFILE: str = "local_gemma4_e4b"
 
     # --- 로컬(Gemma GGUF, OpenAI 호환 서버) ---
-    LOCAL_BASE_URL: str = "http://127.0.0.1:8000/v1"
+    # 앱 개발 서버(8000)와 충돌하지 않도록 모델 서버는 8002를 쓴다.
+    LOCAL_BASE_URL: str = "http://127.0.0.1:8002/v1"
     LOCAL_MODEL: str = "gemma-4-e4b"
     LOCAL_API_KEY: str = "not-needed"
 
@@ -204,7 +211,11 @@ class Settings(BaseSettings):
         return bool(self.GOOGLE_API_KEY and self.GOOGLE_API_KEY.strip())
 
     def readiness(self) -> dict[str, bool]:
-        """LLM 실호출 없이 '설정/키/경로 존재 여부'만 보고한다 (Codex 합의)."""
+        """LLM 실호출 없이 **설정 여부만** 보고한다.
+
+        실제 연결은 `/api/health/llm`에서 검사한다. 과거 이 값을 `local=true`로만
+        내보내 모델이 실행 중인 것처럼 보였으므로 의미를 명시적으로 제한한다.
+        """
         return {
             "local": self.LLM_PROVIDER == "local" and bool(self.LOCAL_BASE_URL),
             "openai": self.has_openai_key(),

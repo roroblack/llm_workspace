@@ -2,7 +2,6 @@
 
 사용:
     python -m scripts.manage migrate   # 테이블 생성(멱등)
-    python -m scripts.manage seed      # 상품 시딩(멱등)
     python -m scripts.manage ingest    # RAG 인덱스 빌드(없거나 stale일 때)
     python -m scripts.manage ready      # readiness 상태 출력
 
@@ -67,18 +66,6 @@ def cmd_migrate() -> None:
     print("[migrate] 테이블 생성·스키마 검증 완료(멱등).")
 
 
-def cmd_seed() -> None:
-    from app.db.database import SessionLocal
-    from app.db.seed import seed_products
-
-    db = SessionLocal()
-    try:
-        result = seed_products(db)
-    finally:
-        db.close()
-    print(f"[seed] 완료: {result}")
-
-
 def cmd_ingest() -> None:
     from app.rag.build_index import build_index, index_is_current
 
@@ -99,37 +86,21 @@ def cmd_ready() -> None:
 
 
 def set_role(username: str, role: str) -> str:
-    """사용자 역할을 명시적으로 변경한다(멱등). 감사 이벤트를 남긴다.
+    """사용자 역할을 변경한다(멱등). **규칙은 `app.auth.roles.change_role` 한 벌뿐이다.**
 
-    부트스트랩은 이 CLI **하나뿐**이다 — 환경변수·가입 시 자동 승격 같은 암묵 경로를 두면
-    권한 상승 사고가 난다. 마지막 ADMIN 강등은 거부해 잠금(lockout)을 막는다.
+    ★전에는 이 함수가 규칙(마지막 관리자 강등 금지·감사 기록)을 **직접** 들고 있었다.
+      그러다 관리자 화면에서도 역할을 바꾸게 되면서 규칙이 두 곳이 될 뻔했다 —
+      두 곳이면 느슨한 쪽이 실질 규칙이 된다. 그래서 도메인으로 옮기고 여기서는 부른다.
+
+    부트스트랩은 여전히 **이 CLI 하나뿐**이다. 최초 관리자를 화면에서 만들 수 있게 하면
+    가입한 누구나 관리자가 된다(권한 상승). 그 뒤의 추가는 관리자가 화면에서 한다.
     """
-    from app.auth.roles import ROLE_ADMIN, validate_role
-    from app.core.errors import NotFoundErr, ValidationErr
+    from app.auth.roles import change_role
     from app.db.database import SessionLocal
-    from app.db.models import User
-    from app.obs.events import record_event
 
-    validate_role(role)
     db = SessionLocal()
     try:
-        user = db.query(User).filter(User.username == username).first()
-        if user is None:
-            raise NotFoundErr(f"사용자를 찾을 수 없습니다: {username}")
-        before = user.role
-        if before == role:
-            return f"변경 없음(이미 {role}): {username}"
-        if before == ROLE_ADMIN and role != ROLE_ADMIN:
-            remaining = (
-                db.query(User).filter(User.role == ROLE_ADMIN, User.id != user.id).count()
-            )
-            if remaining == 0:
-                raise ValidationErr("마지막 관리자는 강등할 수 없습니다(잠금 방지).")
-        user.role = role
-        db.commit()
-        # 감사 기록: 누가/무엇을 바꿨는지 남긴다(원문·비밀 없음).
-        record_event(db, "role_change", {"username": username, "from": before, "to": role})
-        return f"역할 변경: {username} {before} → {role}"
+        return change_role(db, username, role, actor="cli")["message"]
     finally:
         db.close()
 
@@ -175,7 +146,7 @@ def main(argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description="운영 관리 명령")
     parser.add_argument(
         "command",
-        choices=["migrate", "seed", "ingest", "ready", "promote", "demote", "purge-gaps"],
+        choices=["migrate", "ingest", "ready", "promote", "demote", "purge-gaps"],
     )
     parser.add_argument("target", nargs="?", help="promote/demote의 username")
     parser.add_argument("--days", type=int, default=90, help="purge-gaps 보존기간(일)")
@@ -189,7 +160,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "purge-gaps":
         cmd_purge_gaps(args.days)
         return
-    {"migrate": cmd_migrate, "seed": cmd_seed, "ingest": cmd_ingest, "ready": cmd_ready}[
+    {"migrate": cmd_migrate, "ingest": cmd_ingest, "ready": cmd_ready}[
         args.command
     ]()
 

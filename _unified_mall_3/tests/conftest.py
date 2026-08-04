@@ -15,6 +15,8 @@ _TMP_DB = os.path.join(tempfile.gettempdir(), f"insurance_test_{uuid.uuid4().hex
 os.environ["DATABASE_URL"] = f"sqlite:///{_TMP_DB}"
 os.environ["SECRET_KEY"] = "test-secret-key-do-not-use-in-prod"
 os.environ["LLM_PROVIDER"] = "local"
+# 기본 테스트는 실제 네트워크·모델을 호출하지 않는다. LLM 경로는 전용 Fake 테스트에서 켠다.
+os.environ["LLM_CHAT_ENABLED"] = "false"
 
 import pytest  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402

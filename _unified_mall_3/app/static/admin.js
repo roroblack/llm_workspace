@@ -16,7 +16,8 @@
     simulation: null,
     simTimer: null,
     mode: null,
-    realQueue: null
+    realQueue: null,
+    users: null
   };
 
   const elements = {};
@@ -76,6 +77,11 @@
 
     elements.agentStream = document.getElementById("agentStream");
     elements.streamState = document.getElementById("streamState");
+
+    elements.signupBtn = document.getElementById("signupBtn");
+    elements.usersTableBody = document.getElementById("usersTableBody");
+    elements.usersPanelCount = document.getElementById("usersPanelCount");
+    elements.usersNote = document.getElementById("usersNote");
 
     elements.modeBadge = document.getElementById("modeBadge");
     elements.modeAuto = document.getElementById("modeAuto");
@@ -144,6 +150,9 @@
     }
     if (elements.logoutBtn) {
       elements.logoutBtn.addEventListener("click", handleLogout);
+    }
+    if (elements.signupBtn) {
+      elements.signupBtn.addEventListener("click", handleSignup);
     }
   }
 
@@ -344,7 +353,8 @@
       fetchApi(`/api/admin/cohort-summary?code=${encodeURIComponent(code)}`),
       fetchApi("/api/admin/demo/simulation"),
       fetchApi("/api/admin/precheck-mode"),
-      fetchApi("/api/admin/verifications/queue")
+      fetchApi("/api/admin/verifications/queue"),
+      fetchApi("/api/admin/users")
     ]);
 
     const [
@@ -356,7 +366,8 @@
       cohortResult,
       simResult,
       modeResult,
-      realQueueResult
+      realQueueResult,
+      usersResult
     ] = requests;
 
     const failures = [];
@@ -391,6 +402,15 @@
       renderReviewQueueError();
       failures.push("검수 큐");
       handlePossibleAuthenticationError(queueResult.reason);
+    }
+
+    if (usersResult.status === "fulfilled") {
+      state.users = normalizeObject(usersResult.value);
+      renderUsers(state.users);
+    } else {
+      renderUsersError();
+      failures.push("사용자 목록");
+      handlePossibleAuthenticationError(usersResult.reason);
     }
 
     if (modeResult.status === "fulfilled") {
@@ -646,6 +666,134 @@
 
     row.appendChild(cell);
     return row;
+  }
+
+  /* ── 계정 만들기 ─────────────────────────────────────────────────────
+   *
+   * ★**항상 일반 사용자(USER)로 만든다.** 화면에서 관리자를 만들 수 있으면
+   *   가입한 누구나 관리자가 된다. 승격은 이미 관리자인 사람만 한다.
+   */
+  async function handleSignup() {
+    const username = (elements.adminUsername.value || "").trim();
+    const password = elements.adminPassword.value || "";
+    if (!username || !password) {
+      elements.loginStatus.textContent = "아이디와 비밀번호를 입력하세요.";
+      elements.loginStatus.style.color = "var(--danger)";
+      return;
+    }
+
+    elements.signupBtn.disabled = true;
+    try {
+      const { ok, status, body } = await apiFetch("/auth/signup", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+      });
+      if (!ok) {
+        elements.loginStatus.textContent =
+          (body && (body.message || body.detail)) || `계정 생성 실패 (HTTP ${status})`;
+        elements.loginStatus.style.color = "var(--danger)";
+        return;
+      }
+      // ★만들어졌다고 관리자가 된 것은 아니다. 그 사실을 바로 말해 준다.
+      elements.loginStatus.innerHTML =
+        `계정 <strong>${username}</strong> 생성됨(일반 사용자). ` +
+        `관리자가 <strong>사용자 관리</strong>에서 승격하거나, 최초 1명이면 ` +
+        `<code>python -m scripts.manage promote ${username}</code>`;
+      elements.loginStatus.style.color = "var(--warning)";
+    } catch (err) {
+      elements.loginStatus.textContent = "계정 생성 실패: " + err.message;
+      elements.loginStatus.style.color = "var(--danger)";
+    } finally {
+      elements.signupBtn.disabled = false;
+    }
+  }
+
+  /* ── 사용자 관리 ─────────────────────────────────────────────────── */
+  function renderUsers(payload) {
+    if (!elements.usersTableBody) return;
+    const users = (payload && payload.users) || [];
+    const adminCount = (payload && payload.admin_count) || 0;
+
+    elements.usersPanelCount.textContent =
+      `${formatInteger(users.length)}명 · 관리자 ${formatInteger(adminCount)}명`;
+    elements.usersTableBody.replaceChildren();
+
+    if (users.length === 0) {
+      elements.usersTableBody.appendChild(
+        createTableMessage("계정이 없습니다.", 4)
+      );
+      return;
+    }
+
+    const fragment = document.createDocumentFragment();
+    for (const u of users) {
+      const row = document.createElement("tr");
+      row.appendChild(createCell(valueOrFallback(u.username), "agent-ref"));
+
+      const roleCell = document.createElement("td");
+      const badge = document.createElement("span");
+      const isAdmin = u.role === "ADMIN";
+      badge.className = "status-badge " + (isAdmin ? "status-resolved" : "status-unknown");
+      badge.textContent = isAdmin ? "관리자" : "일반";
+      roleCell.appendChild(badge);
+      row.appendChild(roleCell);
+
+      row.appendChild(createCell(u.face_registered ? "등록됨" : "-"));
+
+      const actionCell = document.createElement("td");
+      actionCell.className = "num";
+      const btn = document.createElement("button");
+      btn.className = "verify-btn";
+      btn.type = "button";
+      btn.textContent = isAdmin ? "해제" : "관리자로";
+      // ★마지막 관리자 해제는 **누르기 전에** 막는다. 서버도 거부하지만
+      //   눌러 보고 실패하는 것보다 못 누르게 하는 편이 낫다.
+      if (isAdmin && adminCount <= 1) {
+        btn.disabled = true;
+        btn.title = "마지막 관리자는 해제할 수 없습니다(잠금 방지).";
+      }
+      btn.addEventListener("click", () =>
+        changeUserRole(u.username, isAdmin ? "USER" : "ADMIN", btn));
+      actionCell.appendChild(btn);
+      row.appendChild(actionCell);
+
+      fragment.appendChild(row);
+    }
+    elements.usersTableBody.appendChild(fragment);
+  }
+
+  function renderUsersError() {
+    elements.usersPanelCount.textContent = "불러오기 실패";
+    elements.usersTableBody.replaceChildren(
+      createTableMessage("사용자 목록을 불러오지 못했습니다.", 4)
+    );
+  }
+
+  async function changeUserRole(username, role, button) {
+    const what = role === "ADMIN" ? "관리자로 승격" : "관리자 권한 해제";
+    if (!window.confirm(`${username} 계정을 ${what}합니다.\n\n계속할까요?`)) return;
+
+    button.disabled = true;
+    const result = await apiFetch(`/api/admin/users/${encodeURIComponent(username)}/role`, {
+      method: "PUT",
+      headers: { ...authHeaders(), "Content-Type": "application/json" },
+      body: JSON.stringify({ role })
+    });
+
+    if (!result || !result.ok) {
+      setUsersNote(simErrorText(result), "error");
+      button.disabled = false;
+      return;
+    }
+    setUsersNote((result.body && result.body.message) || "변경했습니다.", "ok");
+    await refreshDashboard({ silent: true });
+  }
+
+  function setUsersNote(text, tone) {
+    if (!elements.usersNote) return;
+    elements.usersNote.textContent = text || "";
+    elements.usersNote.className = "sim-note" + (tone ? ` is-${tone}` : "");
   }
 
   /* ── 판정 모드 ───────────────────────────────────────────────────────

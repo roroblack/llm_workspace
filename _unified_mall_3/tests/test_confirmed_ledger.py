@@ -134,6 +134,22 @@ def test_판매시점을_모르면_확정해도_못_쓴다(_manifest, _ledger, t
     assert mpr.load_versions() == []
 
 
+def _manifest_or_skip(client):
+    """지원범위 응답. **산출물이 없으면 건너뛴다.**
+
+    ★★신규 클론·팀 CI 에는 `data/structured/` 가 없다(gitignore 대상).
+      그러면 `/v1/support-manifest` 가 503 으로 「승인된 조항 산출물이 없습니다」라고
+      **정확히** 답한다 — 그건 이 시험이 볼 대상이 아니다.
+
+      실측 2026-08-04 — 이 처리를 안 해서 팀 트리에서 이 시험이 깨졌다.
+      **환경 부재를 코드 결함으로 보고하면 그게 거짓 실패**다.
+    """
+    r = client.get("/v1/support-manifest")
+    if r.status_code != 200:
+        pytest.skip(f"지원범위를 낼 수 없는 환경(HTTP {r.status_code}) — 산출물 부재")
+    return r.json()
+
+
 def test_확정_범위를_숨기지_않는다():
     """★10건 확정을 **전량**으로 읽게 두지 않는다.
 
@@ -145,7 +161,7 @@ def test_확정_범위를_숨기지_않는다():
 
     from app.main import app
 
-    m = TestClient(app).get("/v1/support-manifest").json()
+    m = _manifest_or_skip(TestClient(app))
     conf = m.get("confirmation") or {}
     assert "confirmed" in conf and "collected" in conf, "확정 건수의 분모가 없습니다"
     if conf.get("confirmed"):
@@ -179,7 +195,7 @@ def test_확정이_부분이면_판정_응답이_그_사실을_말한다():
     from app.main import app
 
     c = TestClient(app)
-    m = c.get("/v1/support-manifest").json()
+    m = _manifest_or_skip(c)
     conf = m.get("confirmation") or {}
     if not conf.get("confirmed"):
         pytest.skip("확정 0건 — 판본을 고르는 경로 자체가 없다")
@@ -210,7 +226,7 @@ def test_확정_범위_이름이_늘어도_문장에서_빠지지_않는다():
 
     from app.main import app
 
-    m = TestClient(app).get("/v1/support-manifest").json()
+    m = _manifest_or_skip(TestClient(app))
     scopes = (m.get("confirmation") or {}).get("scopes") or {}
     if not scopes:
         pytest.skip("확정 0건")

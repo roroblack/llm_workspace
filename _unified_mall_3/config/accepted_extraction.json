@@ -1,6 +1,7 @@
 {
   "release_id": "r2026-08-04-clause-s7.1-arctic-ko-ocr-approved",
   "supplemental_facts": "config/accepted_s7_1_facts.json",
+  "candidate_fact_registry": "config/candidate_fact_sources.json",
   "_release_id_주의": "★페이지 스키마도 s5 로 올라 `s5_pymupdf-1.28.0` 이 두 층에 다 있다. 이름만으로 구분되지 않아 release_id 를 둔다.",
   "page_tag": "s4_pymupdf-1.28.0",
   "clause_tag": "s6_pymupdf-1.28.0",
