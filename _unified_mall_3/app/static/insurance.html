@@ -89,11 +89,21 @@
     box-shadow: var(--shadow);
   }
 
+  /* ★두 창 모두 `min-height: 0` 이 **필요하다**. 그리드 아이템의 기본 최소 크기는
+       `auto`(=내용 높이)라, 내용이 늘면 창이 스크롤되는 대신 **행 트랙이 늘어난다**.
+       늘어난 행은 고정 높이인 `.workspace` 를 넘고 `overflow: hidden` 이 잘라낸다.
+
+       실측(2026-08-04, 1440x900): 채팅 12개를 넣자 행이 802 → 1427.6px 로 늘고
+       `.chat-scroll` 넘침 0(스크롤 없음) · 입력창 바닥이 y=1504(workspace 바닥 880) 로
+       화면 밖에 잘렸다. `.profile-pane` 은 스크롤 컨테이너라 자기 최소 크기는 0 이지만
+       **행을 chat-pane 과 공유**해서, 행이 부풀면 같이 늘어나 있던 스크롤(넘침 161)까지
+       0 이 됐다. 그래서 한쪽만 고치면 안 된다. */
   .profile-pane {
     position: relative;
     z-index: 2;
     display: flex;
     flex-direction: column;
+    min-height: 0;
     overflow-y: auto;
     border-right: 1px solid var(--line-soft);
     background: #fbfbf9;
@@ -178,7 +188,16 @@
   .scope-card summary { color: #696963; font-size: 12px; font-weight: 700; cursor: pointer; }
   #scopeBody { margin-top: 10px; color: var(--muted); font-size: 12px; }
 
-  .chat-pane { position: relative; min-width: 0; display: flex; flex-direction: column; background: var(--surface); }
+  /* ★`min-height: 0` — 위 `.profile-pane` 주석의 이유가 그대로 여기에 해당한다.
+       이쪽이 근본 원인이다(`overflow: visible` 이라 자동 최소 크기가 그대로 걸린다). */
+  .chat-pane {
+    position: relative;
+    min-width: 0;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    background: var(--surface);
+  }
   .chat-head {
     min-height: 92px;
     display: flex;
@@ -241,6 +260,23 @@
     color: #fff;
   }
   .msg.bot { align-self: flex-start; }
+  .precheck-chat-details {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px solid var(--line-soft);
+  }
+  .precheck-chat-line { margin-top: 8px; }
+  .precheck-chat-warning { margin-top: 8px; color: #8a5b16; }
+  .chat-detail-link {
+    margin-top: 12px;
+    padding: 8px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--black);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+  }
   .cite { margin: 12px 0 0; padding: 10px 0 4px 12px; border-left: 2px solid #b8b8b2; font-size: 12px; }
   .cite .loc { margin-top: 4px; color: var(--muted); font: 11px/1.4 ui-monospace, monospace; }
   .quote { white-space: pre-wrap; }
@@ -520,7 +556,7 @@
   <section class="detail-area" aria-labelledby="detailTitle">
     <h2 class="detail-heading" id="detailTitle">보장 확인 상세</h2>
     <p class="detail-copy">판정 결과와 근거, 비슷한 사례를 한곳에서 확인할 수 있습니다.</p>
-    <div id="result"></div>
+    <div id="result" tabindex="-1"></div>
 
     <div class="split">
       <div class="detail-card" id="cohortReal">

@@ -197,6 +197,36 @@ function bindCandidates() {
     b.addEventListener('click', () => runPrecheck(b.dataset.name)));
 }
 
+function renderPrecheckChat(body) {
+  const [label] = VERDICT_KO[body.verdict] || [body.verdict];
+  const assessments = (body.per_code || []).map((a) => `
+    <div class="precheck-chat-line"><strong>${esc(a.code)}</strong> ·
+      ${esc((VERDICT_KO[a.verdict] || [a.verdict])[0])}
+      ${a.note ? `<br><span class="small">${esc(a.note)}</span>` : ''}
+    </div>`).join('');
+  const warnings = (body.warnings || []).map((w) =>
+    `<div class="small precheck-chat-warning">⚠ ${esc(w)}</div>`).join('');
+  const citationCount = (body.citations || []).length;
+
+  return `<strong>${esc(label)}</strong><br>
+    <div style="margin-top:6px">${esc(body.message || '판정 결과를 확인했습니다.')}</div>
+    ${assessments ? `<div class="precheck-chat-details"><strong>질병기호별 판단</strong>${assessments}</div>` : ''}
+    ${warnings}
+    <div class="small muted" style="margin-top:8px">
+      약관 원문 근거 ${citationCount}건을 아래 상세 결과에 표시했습니다.
+    </div>
+    <button class="chat-detail-link" type="button" data-scroll-result>상세 근거 보기 ↓</button>`;
+}
+
+function bindResultLink(message) {
+  const button = message?.querySelector('[data-scroll-result]');
+  if (!button) return;
+  button.addEventListener('click', () => {
+    $('detailTitle').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    $('result').focus({ preventScroll: true });
+  });
+}
+
 async function runPrecheck(productName) {
   const codes = $('codes').value.split(',').map((s) => s.trim()).filter(Boolean);
   const selectedProduct = productName || $('productName').value.trim();
@@ -222,8 +252,8 @@ async function runPrecheck(productName) {
   if (codes.length) loadCohorts(codes[0]);
 
   if (status === 200 && body) {
-    const [label] = VERDICT_KO[body.verdict] || [body.verdict];
-    bubble('bot', `<strong>${esc(label)}</strong><br>${esc(body.message || '상세 결과를 확인했습니다.')}`);
+    const message = bubble('bot', renderPrecheckChat(body));
+    bindResultLink(message);
   } else {
     bubble('bot', '입력하신 보험정보를 확인하지 못했습니다. 입력값을 다시 확인해주세요.');
   }
@@ -298,8 +328,9 @@ async function sendChat(text) {
   });
   thinking.remove();
 
-  if (status === 503) {
-    bubble('bot', `<span style="color:var(--danger)">용어 색인을 사용할 수 없습니다 — ${esc(body?.detail || '')}</span>`);
+  if (status === 502 || status === 503) {
+    const reason = body?.message || body?.detail || '모델 또는 용어 색인이 준비되지 않았습니다.';
+    bubble('bot', `<span style="color:var(--danger)">AI 설명 서비스를 사용할 수 없습니다 — ${esc(reason)}</span>`);
     return;
   }
   if (status !== 200 || !body) {
@@ -308,6 +339,10 @@ async function sendChat(text) {
   }
 
   let html = esc(body.message).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+
+  if (body.llm?.used) {
+    html += `<div class="small muted" style="margin-top:8px">AI 설명 · ${esc(body.llm.provider)} · ${esc(body.llm.model)}</div>`;
+  }
 
   if (body.found && body.quotes.length) {
     html += `<div class="small muted" style="margin-top:8px">정의 구절 ${body.total_passages}개 · 보험사 ${body.insurers.length}곳</div>`;
