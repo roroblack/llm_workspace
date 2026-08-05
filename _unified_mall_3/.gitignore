@@ -186,3 +186,10 @@ artifacts/finetune/*/adapter/
 #   재생성: scripts/eval/fill_fulltext.py 로 로컬 PG 에서 다시 채운다.
 data/eval/*fulltext*.json
 data/eval/*_top20_rerank_fulltext.json
+
+# 스캔 산출물 — 전처리 조사용 임시 출력이고 재생성된다(최대 949KB).
+scan_grid_ok.json
+scan_hits.json
+scan_line_hits.json
+scan_selfpay_pages.json
+scan_selfpay_tables.json
