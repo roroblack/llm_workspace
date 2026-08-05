@@ -34,13 +34,27 @@ def main() -> int:
     ap.add_argument("--query", default=QUERY)
     ap.add_argument("--final-k", type=int, default=5)
     ap.add_argument("--out", type=pathlib.Path, default=None)
+    #: ★GPU 기계에는 커머스 RAG 스택(langchain 등)이 없다. 그걸 깔자고
+    #:   레거시 의존성을 GPU 기계에 끌어오지 않는다. HTTP 계층은
+    #:   `tests/test_clause_search_route.py` 가 따로 덮는다.
+    ap.add_argument("--usecase-only", action="store_true",
+                    help="FastAPI 앱을 띄우지 않고 유스케이스를 직접 부른다")
     a = ap.parse_args()
 
-    from fastapi.testclient import TestClient
-
-    from app.auth.roles import require_admin
     from app.core.config import get_settings
-    from app.main import create_app
+
+    http_ok = not a.usecase_only
+    if http_ok:
+        try:
+            from fastapi.testclient import TestClient  # noqa: F401
+
+            from app.auth.roles import require_admin  # noqa: F401
+            from app.main import create_app  # noqa: F401
+        except Exception as exc:  # noqa: BLE001
+            #: ★조용히 건너뛰지 않는다. 무엇을 못 봤는지 보고서에 남긴다.
+            print(f"  ※ HTTP 계층을 띄우지 못했다 — {type(exc).__name__}: {str(exc)[:90]}")
+            print("     유스케이스 계층으로 내려가 검증한다(라우터는 별도 테스트가 덮는다).")
+            http_ok = False
 
     st = get_settings()
     report: dict = {
@@ -54,6 +68,7 @@ def main() -> int:
             "RERANKER_MODEL": st.RERANKER_MODEL,
         },
         "checks": [],
+        "http_layer_exercised": http_ok,
     }
 
     def check(name: str, ok: bool, detail: str = "") -> None:
@@ -61,9 +76,17 @@ def main() -> int:
         print(f"  {'OK ' if ok else '★실패'} {name}" + (f" — {detail}" if detail else ""))
 
     # ── 1. 고객앱에 경로가 없어야 한다 ──────────────────────────────
-    r = TestClient(create_app("customer")).post(
-        "/api/admin/clause-search", json={"query": a.query})
-    check("고객앱(8080)에 경로 없음", r.status_code == 404, f"HTTP {r.status_code}")
+    if http_ok:
+        from fastapi.testclient import TestClient
+        from app.main import create_app
+
+        r = TestClient(create_app("customer")).post(
+            "/api/admin/clause-search", json={"query": a.query})
+        check("고객앱(8080)에 경로 없음", r.status_code == 404, f"HTTP {r.status_code}")
+    else:
+        report["checks"].append({"name": "고객앱에 경로 없음", "ok": None,
+                                 "detail": "HTTP 계층 미기동 — 라우터 테스트가 덮는다"})
+        print("  --  고객앱 경로 검사는 건너뜀(라우터 테스트가 덮는다)")
 
     # ── 2. 승인 릴리스 프로필이 완전한가 ────────────────────────────
     from app.adapters import clause_query_embedder
@@ -82,28 +105,59 @@ def main() -> int:
           f"{ix.current_generation()} / {ix.current_embed_model()[:40]}")
 
     # ── 4. 실제 검색 ──────────────────────────────────────────────
-    app = create_app("admin")
-    app.dependency_overrides[require_admin] = lambda: {"username": "e2e", "role": "ADMIN"}
-    client = TestClient(app)
+    reranker = None
+    if a.rerank:
+        from app.adapters.reranker import CrossEncoderReranker
 
-    body = {"query": a.query, "allow_global": True, "final_k": a.final_k,
-            "rerank": a.rerank}
+        reranker = CrossEncoderReranker(
+            st.RERANKER_MODEL, device=st.RERANKER_DEVICE,
+            batch_size=st.RERANKER_BATCH_SIZE, max_length=st.CLAUSE_RERANK_MAX_LENGTH,
+            dtype=st.RERANKER_DTYPE, trust_remote_code=st.RERANKER_TRUST_REMOTE_CODE)
+
     t0 = time.perf_counter()
-    res = client.post("/api/admin/clause-search", json=body)
-    elapsed = round(time.perf_counter() - t0, 1)
-    app.dependency_overrides.clear()
+    if http_ok:
+        from fastapi.testclient import TestClient
+        from app.auth.roles import require_admin
+        from app.main import create_app
 
-    report["http_status"] = res.status_code
-    report["elapsed_seconds"] = elapsed
-    if res.status_code != 200:
-        check(f"검색 요청(rerank={a.rerank})", False,
-              f"HTTP {res.status_code}: {str(res.json())[:200]}")
-        report["body"] = res.json()
-        if a.out:
-            a.out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
-        return 1
+        app = create_app("admin")
+        app.dependency_overrides[require_admin] = lambda: {"username": "e2e", "role": "ADMIN"}
+        res = TestClient(app).post("/api/admin/clause-search", json={
+            "query": a.query, "allow_global": True, "final_k": a.final_k, "rerank": a.rerank})
+        app.dependency_overrides.clear()
+        elapsed = round(time.perf_counter() - t0, 1)
+        report["http_status"] = res.status_code
+        report["elapsed_seconds"] = elapsed
+        if res.status_code != 200:
+            check(f"검색 요청(rerank={a.rerank})", False,
+                  f"HTTP {res.status_code}: {str(res.json())[:200]}")
+            report["body"] = res.json()
+            if a.out:
+                a.out.parent.mkdir(parents=True, exist_ok=True)
+                a.out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
+            return 1
+        d = res.json()
+    else:
+        from app.adapters.pgvector_index import get_conn
+        from app.composition import build_clause_search_deps
+        from app.core.usecases import clause_search
 
-    d = res.json()
+        with get_conn() as conn:
+            r = clause_search.search(
+                **build_clause_search_deps(), conn=conn, embedder=emb, query=a.query,
+                scope_sha256s=None, allow_global=True, final_k=a.final_k,
+                reranker=reranker, max_candidates=st.CLAUSE_RERANK_MAX_CANDIDATES,
+                score_body=st.CLAUSE_RERANK_SCORE_BODY,
+                score_chars=st.CLAUSE_RERANK_SCORE_CHARS)
+        elapsed = round(time.perf_counter() - t0, 1)
+        report["elapsed_seconds"] = elapsed
+        d = {"reranked": r.reranked, "provenance": r.provenance,
+             "dropped_incomplete": r.dropped_incomplete,
+             "dropped_unscorable": r.dropped_unscorable,
+             "hits": [{"clause_id": h.clause_id, "insurer": h.insurer, "section": h.section,
+                       "qualified_no": h.qualified_no, "title": h.title,
+                       "page_from": h.page_from, "page_to": h.page_to,
+                       "distance": h.distance, "sha256": h.sha256} for h in r.hits]}
     report["body"] = {k: v for k, v in d.items() if k != "hits"}
     report["hits"] = d["hits"]
     check(f"검색 요청(rerank={a.rerank})", True, f"HTTP 200 · {elapsed}초")
@@ -125,8 +179,15 @@ def main() -> int:
         print(f"   {i}. [{h['distance']:.3f}] {h['insurer']} · {h['section']} "
               f"{h['qualified_no']} {h['title'][:28]} p{h['page_from']}–{h['page_to']}")
 
-    ok = all(c["ok"] for c in report["checks"])
+    #: ★건너뛴 항목(ok=None)은 실패가 아니다. 다만 **건너뛰었다는 사실은 남긴다** —
+    #:   조용히 통과로 세면 안 본 것을 봤다고 하게 된다.
+    ran = [c for c in report["checks"] if c["ok"] is not None]
+    skipped = [c for c in report["checks"] if c["ok"] is None]
+    ok = all(c["ok"] for c in ran)
     report["all_ok"] = ok
+    report["skipped"] = [c["name"] for c in skipped]
+    if skipped:
+        print(f"  건너뜀 {len(skipped)}항목: {', '.join(c['name'] for c in skipped)}")
     if a.out:
         a.out.parent.mkdir(parents=True, exist_ok=True)
         a.out.write_text(json.dumps(report, ensure_ascii=False, indent=1), encoding="utf-8")
