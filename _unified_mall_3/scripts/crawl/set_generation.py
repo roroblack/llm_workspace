@@ -68,7 +68,18 @@ def _ymd(s: str | None) -> str:
 
 
 def product_line(name: str, profiles: dict) -> str:
-    """상품 라인(standard / senior / simplified_issue / travel)."""
+    """상품 라인(standard / senior / simplified_issue / travel).
+
+    ★★**공백을 지우고 본다.**
+
+        보험사가 「무배당수호천사온라인 **실손 의료비**보장보험」처럼 낱말 사이에
+        공백을 넣는다. 표지가 `실손의료비` 라 그대로 대조하면 안 걸리고,
+        그러면 세대 축이 없는 `unknown` 으로 빠진다.
+        실측 2026-08-05 — 동양생명 3건이 이 공백 하나로 분류 실패했다.
+    """
+    import re as _re
+
+    name = _re.sub(r"\s+", "", name or "")
     types = profiles["product_types"]
     #: ★일반 실손보다 **특수 라인을 먼저** 본다.
     #:   `노후실손의료비보험` 은 `실손의료비` 도 포함하므로 순서가 중요하다.
@@ -208,6 +219,21 @@ def main() -> None:
 
             r["generation"] = g["generation"]
             r["generation_label"] = g["label"]
+            #: ★★**근거를 값 옆에 남긴다**(CLAUDE.md §1 — 채운다면 무엇을 근거로 채웠는지).
+            #:
+            #:   `generation_confidence` 는 **날짜 정확도**만 말한다. 그것만으로는
+            #:   「이 상품라인에 이 세대 축을 적용해도 되는가」라는 **다른 판단**이 안 보인다.
+            #:   실측 2026-08-05 — 유병력자실손 173건에 세대를 붙였는데
+            #:   `generation_note` 가 0건이었다. 무엇을 근거로 붙였는지 어디에도 없었다.
+            basis = [f"{line} 라인 · sale_start={start}({r.get('date_source') or '출처미상'})"]
+            by_line = g.get("effective_from_by_line") or {}
+            if line in by_line:
+                #: ★라인별 시작일은 **표준 구간을 그대로 쓴 것이 아니다.** 그 사실을 적는다.
+                basis.append(f"이 라인의 {g['generation']}세대 시작 {by_line[line]}")
+            note = g.get(f"note_{line}")
+            if note:
+                basis.append(note)
+            r["generation_basis"] = " | ".join(basis)
             date_conf = r.get("date_confidence", "exact")
             if date_conf == "month" and start[:6] in boundary:
                 gc = "ambiguous"
