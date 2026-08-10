@@ -146,6 +146,26 @@ def main() -> None:
             for k in ("generation", "generation_label", "generation_note"):
                 r.pop(k, None)
 
+            #: ★★**문서 근거로 정정한 세대는 지우지 않는다.**
+            #:
+            #:   판매일이 「판매월 2026.05」처럼 **월까지만** 알려진 문서가 있다.
+            #:   5세대 시행일이 2026-05-06 이라 1일인지 6일 이후인지로 세대가 갈리는데,
+            #:   그 날짜를 지어내면 안 된다(§1 지어내지 않는다).
+            #:
+            #:   대신 **약관 본문이 세대를 말해 준다** — 5세대는 비급여를 중증/비중증으로
+            #:   나눈다. 실측 2026-08-05: NH농협생명·NH농협손해보험 6건이 본문에
+            #:   「비중증」을 19~22회 담고 있는데 매니페스트는 4세대였다.
+            #:
+            #:   ★그래서 `generation_override` 를 두고 **근거를 함께** 적는다.
+            #:     날짜는 모르는 채로 두고, 세대만 근거를 대고 고친다.
+            ov = r.get("generation_override")
+            if ov:
+                r["generation"] = ov
+                r["generation_label"] = f"{ov}세대"
+                r["generation_confidence"] = "exact"
+                dist[f"{ov}세대(문서근거 정정)"] += 1
+                continue
+
             start = (r.get("sale_start") or "").strip()
             if not start or len(start) < 8 or start == "00000000":
                 r["generation_confidence"] = "unknown"
