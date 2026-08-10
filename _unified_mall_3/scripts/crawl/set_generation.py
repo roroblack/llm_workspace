@@ -89,7 +89,19 @@ def generation_of(sale_start: str, line: str, profiles: dict) -> dict | None:
     for g in profiles["generations"]:
         if line not in g.get("applies_to", []):
             continue
-        lo = _ymd(g.get("effective_from"))
+        #: ★★**상품라인마다 세대 시작일이 다를 수 있다.**
+        #:
+        #:   유병력자(간편)실손은 **2018-04 출시**라 표준실손 3세대 시작(2017-04-01)을
+        #:   그대로 쓰면 출시 전 구간이 열린다. 1·2세대는 아예 없다.
+        #:   4·5세대 경계는 표준실손과 **같다**(2021-07-01 · 2026-05-06).
+        #:
+        #:   근거: https://myside.kr/insurance/1660 (유병자 실손 세대별 정리) ·
+        #:   우리 데이터 173건 중 2018-04 이전 **0건**으로 출시일과 일치.
+        #:
+        #:   ★`senior`(노후실손)는 여기 넣지 않았다 — 2014-08 출시는 확인됐지만
+        #:     「노후실손 3·4·5세대」라는 공식 구간을 못 찾았다. 모르면 안 붙인다(§0).
+        by_line = g.get("effective_from_by_line") or {}
+        lo = _ymd(by_line.get(line) or g.get("effective_from"))
         hi = _ymd(g.get("effective_to"))
         if lo and sale_start < lo:
             continue
@@ -171,8 +183,19 @@ def main() -> None:
                 r["generation_confidence"] = "unknown"
                 dist["날짜모름"] += 1
                 continue
-            if line != "standard":
-                #: ★특수 라인은 일반 실손의 세대 축이 아니다.
+            #: ★★**어느 라인에 세대 축이 있는지는 프로필이 정한다.**
+            #:
+            #:   전에는 `line != "standard"` 를 코드에 박아 두어 유병력자실손 173건이
+            #:   통째로 `not_applicable` 이었다. 그런데 **유병자실손에도 세대가 있다** —
+            #:   3세대(2018-04~) · 4세대(2021-07~) · 5세대(2026-05-06~)이고
+            #:   4·5세대 경계는 표준실손과 같다.
+            #:   근거: https://myside.kr/insurance/1660 · 우리 데이터 173건 중
+            #:   2018-04 이전 0건(출시일과 일치).
+            #:
+            #:   ★`senior`(노후실손)는 여전히 축이 없다 — 공식 구간을 못 찾았다.
+            #:     프로필의 `applies_to` 에 안 넣었으므로 여기서 자동으로 걸린다.
+            #:     코드에 라인 이름을 박지 않으니, 근거가 생기면 **프로필만** 고치면 된다.
+            if not any(line in g.get("applies_to", []) for g in profiles["generations"]):
                 r["generation_confidence"] = "not_applicable"
                 dist[f"{line}(세대축 아님)"] += 1
                 continue
