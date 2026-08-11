@@ -211,15 +211,32 @@ _IDENTITY_QUALIFIERS = ("계약전환용", "전환계약용", "단체전환용",
 _INSERTIONS = ("보험", "보장", "특별약관", "비")
 
 
+#: 「배지형」 조각 줄로 볼 최대 길이 · 최대 이어붙일 줄 수.
+#:
+#:   실측 2026-08-11(흥국화재) — 표지가 제목과 부기를 **낱말 하나짜리 배지**로
+#:   쪼개 여러 줄에 흩어 놓는다 —
+#:
+#:       무배당흥국화재실손의료보험 | 계약전환용 | 갱신형 | ( | _1904)( | ) | 약관
+#:
+#:   인접 두 줄로는 못 묶는다. ☠★그렇다고 창을 무작정 넓히면 안 된다 — 본문
+#:   문장은 한 줄이 훨씬 길다. **짧은 줄만** 이어붙이면 본문에는 안 걸리고
+#:   이런 배지형 조판에만 걸린다.
+_FRAGMENT_MAX = 12
+_FRAGMENT_RUN_MAX = 8
+
+
 def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str]]:
-    """표지 후보 — **한 줄, 그리고 인접 두 줄.**
+    """표지 후보 — **한 줄, 인접 두 줄, 그리고 짧은 조각이 이어지는 구간.**
 
     ★왜 「한 줄」인가. 문서 전체에서 토큰이 다 나오는 것으로는 부족하다는 것을
       이미 재 봤다 — 확정 1,115건 중 **798건(71.6%)** 이 다른 상품명과도 일치했다.
       약관집에는 적용대상 목록·비교표가 실린다. 제목은 한 줄에 있다.
 
     ★왜 「인접 두 줄」까지인가. 표지가 긴 상품명을 두 줄로 접는다. 세 줄까지 넓히면
-      제목과 그 아래 안내문이 붙어 버린다.
+      제목과 그 아래 안내문이 붙어 버린다 — **긴 줄**을 무작정 묶지는 않는다.
+
+    ★☠「짧은 조각 구간」은 별개다. 배지형 조판(위 주석)에서는 제목 뒤로 **짧은
+      줄만** 이어진다. 길이 상한을 두므로 본문 문장은 안 걸린다.
     """
     out: list[tuple[int, str]] = []
     for page_no, text in enumerate(page_texts[:pages], start=1):
@@ -228,6 +245,12 @@ def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str]
             out.append((page_no, line))
             if i + 1 < len(lines):
                 out.append((page_no, f"{line} {lines[i + 1]}"))
+            #: 이 줄부터 뒤로 **짧은 줄**이 이어지면 하나의 창으로 묶는다.
+            j = i + 1
+            while j < len(lines) and j - i <= _FRAGMENT_RUN_MAX and len(_norm(lines[j])) <= _FRAGMENT_MAX:
+                j += 1
+            if j > i + 1:
+                out.append((page_no, " ".join(lines[i:j])))
     return out
 
 

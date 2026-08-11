@@ -131,10 +131,18 @@ def test_아무_낱말이나_끼워_넣지는_않는다():
 
 # ── ⑤ 대조 범위 ────────────────────────────────────────────────────────
 def test_표지_창은_한_줄과_인접_두_줄이다():
-    w = [x for _, x in cover_windows(["가나\n다라\n마바"])]
-    assert "가나" in w and "가나 다라" in w and "다라 마바" in w
-    #: ★세 줄은 묶지 않는다 — 제목과 그 아래 안내문이 붙어 버린다.
-    assert "가나 다라 마바" not in w
+    #: ★이 문장들은 「짧은 조각」 상한(12자)을 넘겨야 배지형 이어붙이기(⑨)에
+    #:   걸리지 않는다 — 인접-두-줄 메커니즘만 순수하게 시험한다.
+    #:   ★글자 수를 직접 세지 않는다 — 한 번 세다 12자로 착각해 시험이 거짓으로 통과했다.
+    a, b, c = "가" * 20, "나" * 20, "다" * 20
+    from scripts.confirm.identify_documents import _FRAGMENT_MAX, _norm as _n
+    assert len(_n(b)) > _FRAGMENT_MAX and len(_n(c)) > _FRAGMENT_MAX
+    w = [x for _, x in cover_windows([f"{a}\n{b}\n{c}"])]
+    assert a in w
+    assert f"{a} {b}" in w
+    assert f"{b} {c}" in w
+    #: ★세 줄은 **인접 메커니즘으로는** 묶지 않는다 — 제목과 안내문이 붙어 버린다.
+    assert f"{a} {b} {c}" not in w
 
 
 def test_표지_쪽수를_넘기면_보지_않는다():
@@ -247,3 +255,35 @@ def test_종별은_생략_허용하지_않는다():
     #: ☠「1~2종」은 자기부담금이 달라지는 **다른 상품**이다. 분류어와 다르다.
     assert not cover_match("무배당 어떤실손의료보험(범용_1704)_1~2종",
                            "무배당 어떤실손의료보험(범용)1704")
+
+
+# ── ⑨ 배지형 조판 — 짧은 조각이 여러 줄에 흩어진다 ─────────────────────────
+#
+# ★★실측 2026-08-11(흥국화재) — 표지가 제목과 부기를 낱말 하나짜리 배지로
+#   쪼개 놓는다. 인접 두 줄로는 못 묶는다.
+_BADGE_PAGE = "무배당흥국화재실손의료보험\n계약전환용\n갱신형\n(\n_1904)(\n)\n약관\n흥국화재해상보험주식회사"
+
+
+def test_배지형_조판의_짧은_조각들을_이어붙인다():
+    name = "무배당 흥국화재 실손의료보험(계약전환용_1904)(갱신형)"
+    wins = cover_windows([_BADGE_PAGE])
+    assert any(cover_match(name, w, page=_BADGE_PAGE) for _, w in wins)
+
+
+def test_긴_본문_문장은_배지형_이어붙이기에_걸리지_않는다():
+    #: ☠본문 문장은 한 줄이 훨씬 길다(짧은 조각 상한 12자를 넘는다).
+    #:   길이가 아니라 **줄 수**로 확인한다 — 인접-두-줄 창은 원래도 길 수 있다.
+    body = ("이 약관은 보험계약의 내용을 규정한 것으로서 계약자와 보험회사\n"
+            "사이의 권리와 의무에 관한 사항을 정하고 있습니다\n"
+            "제1조 목적 이 특별약관은 다음과 같은 사항을 정합니다\n")
+    wins = cover_windows([body])
+    #: 세 줄이 전부 한 창에 이어 붙으면 안 된다 — 그건 배지형 이어붙이기가
+    #:   긴 문장에도 잘못 걸린 것이다.
+    assert not any(w.count(" ") >= 15 for _, w in wins)
+
+
+def test_짧은_조각_구간에도_판본_불변식이_그대로_적용된다():
+    other_version = _BADGE_PAGE.replace("1904", "1701")
+    name = "무배당 흥국화재 실손의료보험(계약전환용_1904)(갱신형)"
+    wins = cover_windows([other_version])
+    assert not any(cover_match(name, w, page=other_version) for _, w in wins)
