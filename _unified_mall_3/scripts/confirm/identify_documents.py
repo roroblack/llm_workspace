@@ -147,9 +147,201 @@ def _norm(s: str) -> str:
 _NAME_DATE_PREFIX = re.compile(r"^\d{4}-\d{2}-\d{2}_")
 
 
+#: 상품명 **끝**에 붙은 수집·공시 표기. 상품명이 아니다.
+#:
+#:   실측 2026-08-11 —
+#:     「…(단체전환용_25.07)_20250901」        수집일
+#:     「…(계약전환용_26.05)(갱신형)_20260701이후」  ★「그 날 이후 판매분」이라는 **공시 구분**
+#:
+#:   표지에는 당연히 없다. 이걸 이름의 일부로 요구하면 흥국화재가 통째로 막힌다.
+_COLLECT_DATE_SUFFIX = re.compile(r"_\d{8}\s*(?:이후|이전|부터)?$")
+
+
 def full_name_key(product_name: str) -> str:
-    """상품명 **전체**를 기호·공백 없이 한 덩어리로. 제목이 줄바꿈으로 갈려도 이어 붙는다."""
-    return _norm(_NAME_DATE_PREFIX.sub("", product_name or ""))
+    """상품명 **전체**를 기호·공백 없이 한 덩어리로. 제목이 줄바꿈으로 갈려도 이어 붙는다.
+
+    ★수집일 접미사는 뗀다. **원본 필드는 건드리지 않는다** — 비교용 열쇠에서만 뺀다.
+    """
+    name = _COLLECT_DATE_SUFFIX.sub("", _NAME_DATE_PREFIX.sub("", product_name or ""))
+    return _norm(name)
+
+
+#: 판본 토큰 — `2404` · `26.05` · `Hi2404` 를 모두 `2404`·`2605` 로 읽는다.
+#: ★YY 는 두 자리, MM 은 01~12 만. 그래야 「1111」·「2222」 같은 예시 숫자를 안 먹는다.
+_VERSION = re.compile(r"(?<!\d)(?:[A-Za-z]{1,3})?(\d{2})[.\-]?(0[1-9]|1[0-2])(?!\d)")
+
+
+def version_tokens(text: str) -> set[str]:
+    """이 글에 적힌 **판본**들. `26.05` 와 `2605` 를 같은 것으로 본다.
+
+    ★★이것이 이 도구의 **불변식**이다. `2507` 과 `2510` 을 가르는 유일한 선이고,
+      다른 표기 차이(낱말 삽입·괄호 부기·순서)를 아무리 허용해도 이것만은 안 흔든다.
+
+      실측 2026-08-11 — 「실손의료비보장 안정화 할인 특별약관2507」 행에 붙은 문서의
+      표지가 「…특별약관2510」이었다. 이름은 글자 하나까지 같고 판본만 다르다.
+      **2507 가입자에게 2510 약관으로 답하게 된다.**
+    """
+    return {f"{m.group(1)}{m.group(2)}"
+            for m in _VERSION.finditer(unicodedata.normalize("NFKC", text or ""))}
+
+
+#: 표지가 **생략하곤 하는** 부기 — 판매채널·감독 분류어이지 상품 정체성이 아니다.
+#:
+#:   `CM`·`TM`  판매채널(사이버·텔레)
+#:
+#: ☠여기에 **종별(`1~2종`)이나 형태(`기본형`)를 넣지 말 것.** 그건 자기부담금이
+#:   달라지는 **다른 상품**이다.
+_OPTIONAL_QUALIFIERS = frozenset({"cm", "tm"})
+
+#: ★표지가 안 쓰는 **감독 분류어**. 낱말 경계 없이 붙어 나오므로 부분 문자열로 뗀다.
+#:
+#:   「제도성 특별약관」은 제도(무사고할인·중지재개 등)에 따른 특약이라는 **분류**이지
+#:   상품을 가르는 말이 아니다. 실측 — 표지 「요양실손 보장한도 변경 특별약관」 ↔
+#:   공시 「…제도성 특별약관」. 빠진 토큰 집계에서 제도성 계열이 12건이었다.
+_OPTIONAL_WORDS = re.compile(r"제도성\s*")
+
+#: ☠표지에 **반드시 있어야 하는** 부기 — 이걸 빼면 다른 상품이 된다.
+#:   코덱스 지적(2026-08-11) — 「(계약전환용)2404」와 「2404」는 가입 대상이 다르다.
+#:   내 실측으로는 반증이 0건이었지만, 그건 통계지 **정체성 논증이 아니다.**
+_IDENTITY_QUALIFIERS = ("계약전환용", "전환계약용", "단체전환용", "개인재개용",
+                        "개인단체연계용", "만기재가입", "유병력자용")
+
+#: 표지가 **더 쓰는** 연결 낱말 — 공시 목록 이름에는 없는 일이 있다.
+#:   실측: 「…실손의료비(기본납입형)1304」 ↔ 표지 「…실손의료비**보험**(기본납입형)1304」
+_INSERTIONS = ("보험", "보장", "특별약관", "비")
+
+
+def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str]]:
+    """표지 후보 — **한 줄, 그리고 인접 두 줄.**
+
+    ★왜 「한 줄」인가. 문서 전체에서 토큰이 다 나오는 것으로는 부족하다는 것을
+      이미 재 봤다 — 확정 1,115건 중 **798건(71.6%)** 이 다른 상품명과도 일치했다.
+      약관집에는 적용대상 목록·비교표가 실린다. 제목은 한 줄에 있다.
+
+    ★왜 「인접 두 줄」까지인가. 표지가 긴 상품명을 두 줄로 접는다. 세 줄까지 넓히면
+      제목과 그 아래 안내문이 붙어 버린다.
+    """
+    out: list[tuple[int, str]] = []
+    for page_no, text in enumerate(page_texts[:pages], start=1):
+        lines = [x.strip() for x in (text or "").splitlines() if x.strip()]
+        for i, line in enumerate(lines):
+            out.append((page_no, line))
+            if i + 1 < len(lines):
+                out.append((page_no, f"{line} {lines[i + 1]}"))
+    return out
+
+
+#: 표지 줄에서 확인해야 하는 **최소 길이**. 접두를 쪽 단위로 봐주는 대신,
+#: 이름의 **알맹이**는 반드시 한 줄 안에 있어야 한다.
+_COVER_CORE_MIN = 8
+
+
+def family_key(product_name: str) -> str:
+    """판본·채널·수집 표기를 **뺀** 이름 — 「같은 상품군」의 열쇠.
+
+    ★판본이 없는 이름을 어떻게 확정하나(실측 55건)에 대한 답이다. 판본 불변식을
+      그냥 면제하면 안 되고, **가릴 것이 애초에 없을 때**만 면제한다 —
+      같은 보험사에 같은 상품군이 **하나뿐**이면 판본으로 가릴 대상이 없다.
+    """
+    v = unicodedata.normalize("NFKC", product_name or "")
+    v = _COLLECT_DATE_SUFFIX.sub("", v)
+    v = _VERSION.sub(" ", v)
+    v = re.sub(r"\(\s*(?:CM|TM)\s*\)", " ", v, flags=re.I)
+    return _norm(v)
+
+
+def cover_match(product_name: str, window: str, *, page: str = "",
+                lone_in_family: bool = False) -> bool:
+    """이 표지 줄이 **이 상품**을 가리키는가.
+
+    공시 목록 이름과 표지 이름이 다르다는 것을 전수로 확인했다(2026-08-11) —
+
+        매니페스트: 무배당 프로미라이프 실손의료비(기본납입형)1304
+        표지      : 무배당 프로미라이프 실손의료비**보험**(기본납입형)1304
+
+    286건 중 **147건이 괄호 부기 차이**, 79건이 낱말 하나, 38건이 글자 하나였다.
+    같은 상품을 두 곳이 다르게 적는 것이지 다른 상품이 아니다.
+
+    ★그래서 흔들어도 되는 것과 안 되는 것을 가른다 —
+
+        흔들어도 됨   `(CM)`·`(TM)` 생략 · 「보험/보장」 삽입 · 공백
+        ☠안 됨        판본 토큰 · 정체성 부기(계약전환용·단체전환용…)
+
+      코덱스가 정체성 부기를 못박았다(2026-08-11): 「(계약전환용)2404」와 「2404」는
+      **가입 대상이 다른 상품**이다. 내 실측으로는 반증이 0건이었지만 통계로
+      정체성을 정할 수는 없다.
+    """
+    mine = version_tokens(product_name)
+    #: ★판본을 모르면 자동 확정하지 않는다. 「모른다」를 「맞다」로 바꾸지 않는다.
+    #:
+    #: ★★단 하나의 예외 — **가릴 것이 애초에 없을 때**(`lone_in_family`).
+    #:   같은 보험사에 같은 상품군이 하나뿐이면 판본으로 구별할 대상이 없다.
+    #:   판본 불변식은 「2507 과 2510 을 가르기」 위한 것이지 그 자체가 목적이 아니다.
+    #:   ☠호출하는 쪽이 상품군 크기와 날짜 정합을 **먼저 확인**해야 한다(`verify()`).
+    if not mine and not lone_in_family:
+        return False
+    #: ☠불변식 — **내 판본이 이 줄에 적혀 있어야 한다.**(판본이 있을 때)
+    #:
+    #:   ★집합이 **같아야** 한다고 두었더니 시험이 잡았다. 표지에는 계좌번호 예시
+    #:     「1111-2222」 같은 숫자가 흔한데 `1111` 은 YY=11·MM=11 로 판본과 **모양이 같다.**
+    #:     어휘로는 못 가린다. 그래서 같음이 아니라 **포함**을 요구한다 —
+    #:     그래도 2507 ⊄ {2510} 이라 판본 충돌은 그대로 막힌다.
+    if mine and not mine <= version_tokens(window):
+        return False
+
+    win = _norm(window)
+    #: 정체성 부기는 **표지에 있어야** 한다.
+    for q in _IDENTITY_QUALIFIERS:
+        if q in (product_name or "") and _norm(q) not in win:
+            return False
+
+    #: 남은 토큰이 **순서를 지키며** 이 줄 안에 이어져야 한다.
+    #:
+    #: ☠★판본을 **먼저 떼고** 자른다. 토큰에 판본이 붙어 있다고 그 토큰을 통째로
+    #:   건너뛰면(처음 그렇게 썼다) 「어떤실손의료보험2404」가 한 덩어리일 때
+    #:   **이름 전체가 검사에서 빠진다.** 시험이 잡았다 — 「비슷하면 통과」의 문이다.
+    #: ★수집·공시 접미사를 먼저 뗀다. `full_name_key()` 에서만 떼면 여기가 새어
+    #:   「_20260701이후」를 표지에서 찾다가 실패한다(실측 84건).
+    stem = _COLLECT_DATE_SUFFIX.sub("", unicodedata.normalize("NFKC", product_name or ""))
+    stem = _OPTIONAL_WORDS.sub("", _VERSION.sub(" ", stem))
+    pos = 0
+    core = 0        #: 이 **줄 안에서** 확인한 글자 수 — 알맹이가 줄에 있어야 한다
+    started = False  #: 줄 대조가 시작됐나. 시작 전이면 접두로 본다
+    for tok in re.split(r"[\s()\[\],_/]+", stem):
+        key = _norm(tok)
+        if len(key) < 2 or _FILENAME_DATE.match(tok):
+            continue
+        if key.lower() in _OPTIONAL_QUALIFIERS:
+            continue
+        hit = win.find(key, pos)
+        if hit >= 0:
+            pos, started, core = hit + len(key), True, core + len(key)
+            continue
+        #: 표지가 연결 낱말을 더 쓴 경우만 봐준다 — 토큰 **가운데**에 끼어든 것.
+        for ins in _INSERTIONS:
+            for cut in range(1, len(key)):
+                spliced = key[:cut] + _norm(ins) + key[cut:]
+                hit = win.find(spliced, pos)
+                if hit >= 0:
+                    pos, started, core = hit + len(spliced), True, core + len(key)
+                    break
+            else:
+                continue
+            break
+        else:
+            #: ★★**아직 줄 대조가 시작되기 전**이면 접두로 본다 — 같은 쪽에 있으면 된다.
+            #:
+            #:   표지는 회사명·브랜드를 **로고 자리**로 뺀다. 그건 언제나 이름 **앞부분**이다.
+            #:   브랜드 목록을 코드에 박는 대신 **위치**로 규정한다 —
+            #:   「프로미라이프」가 DB손해보험 브랜드라는 것을 코드가 알 필요가 없다.
+            #:
+            #:   ☠대신 **알맹이는 줄에 있어야 한다**(`_COVER_CORE_MIN`). 안 그러면
+            #:     「앞부분이 다 쪽 어딘가에 있다」로 이름 전체가 새어 나간다.
+            if not started and key in _norm(page):
+                continue
+            return False
+    #: ☠줄에서 확인한 글자가 너무 적으면 그건 이름을 맞춘 것이 아니다.
+    return core >= _COVER_CORE_MIN
 
 
 def _rivals(row: dict, flat_doc: str, siblings: list[dict]) -> tuple[list[str], list[str]]:
@@ -246,15 +438,41 @@ def load_manifest_rows() -> list[dict]:
     return rows
 
 
-def _artifact_text(sha12: str, page_tag: str) -> tuple[str, int]:
-    """페이지 산출물 앞부분 본문. 없으면 `("", 0)`."""
+def _artifact_text(sha12: str, page_tag: str) -> tuple[str, int, list[str]]:
+    """페이지 산출물 앞부분 본문. 없으면 `("", 0, [])`.
+
+    ★★**페이지 경계를 잃지 않는다.** 예전에는 전부 이어 붙여 돌려주었는데,
+      그러면 「1쪽 표지의 이름」과 「4쪽 본문의 이름」을 구분할 수 없다(코덱스 지적).
+      표지 대조를 하려면 쪽 단위가 남아 있어야 한다.
+    """
     hits = list((_ROOT / "data" / "extracted").glob(f"*/{page_tag}/{sha12}.json"))
     if not hits:
-        return "", 0
+        return "", 0, []
     d = json.loads(hits[0].read_text(encoding="utf-8"))
     pages = d.get("pages") or []
     keep = pages if _SCAN_PAGES is None else pages[:_SCAN_PAGES]
-    return "\n".join((p.get("text") or "") for p in keep), len(pages)
+    texts = [(p.get("text") or "") for p in keep]
+
+    #: ★★글꼴 매핑이 깨진 문서는 **되살려서** 본다.
+    #:
+    #:   실측 2026-08-11 — 표지가 「⯝G G G 㵜」로 나오는 문서가 5건 있었다.
+    #:   처음엔 「추출 실패라 자동으로 못 푼다」고 적었는데 **게으른 결론**이었다.
+    #:   `ToUnicode` 없는 CID 글꼴이라 글리프 번호가 일정한 거리만큼 밀린 것뿐이고,
+    #:   계산으로 되돌아온다(`app/core/domain/glyph_recovery.py`). 5건 모두 복원됐다.
+    #:
+    #:   ☠**되살린 글은 식별에만 쓴다.** 조항 산출물(`s6`)은 여전히 깨진 채이므로
+    #:     `extraction_blocked` 는 그대로 둔다 — 식별과 인용은 다른 층이다.
+    from app.core.domain.glyph_recovery import looks_broken, recover
+
+    joined = "\n".join(texts)
+    if looks_broken(joined):
+        rec = recover(joined)
+        if rec.recovered:
+            #: 쪽 경계를 지키며 되살린다 — 표지 대조가 쪽 단위를 쓴다.
+            texts = [recover(t, offsets=[rec.offset]).text if looks_broken(t, min_chars=40)
+                     else t for t in texts]
+            joined = "\n".join(texts)
+    return joined, len(pages), texts
 
 
 def _parse_status(sha12: str, clause_tag: str) -> str | None:
@@ -310,7 +528,7 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     out["parse_status"] = ps
     out["extraction_blocked"] = ps != "ok"
 
-    text, n_pages = _artifact_text(sha12, page_tag)
+    text, n_pages, page_texts = _artifact_text(sha12, page_tag)
     out["pages"] = n_pages
     if not text:
         out["reasons"].append(f"페이지 산출물이 없다({page_tag})")
@@ -328,9 +546,78 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     miss = [t for t in toks if not _token_in(t, flat)]
     out["name_match"] = f"{len(toks) - len(miss)}/{len(toks)}"
     out["name_missing"] = miss
+    #: ── ①-b 표지 대조 — **공시 이름과 표지 이름은 다르다** ──
+    #:
+    #: ★★전수 실측 2026-08-11 — 「한 덩어리로 안 나온다」 286건의 정체는
+    #:   조판도 추출 실패도 아니었다. **이름 출처가 둘**이다.
+    #:     매니페스트 = 보험사 **공시 목록** 표기
+    #:     문서       = 약관 **표지** 표기
+    #:
+    #:     147건 괄호 부기 차이 · 79건 낱말 하나 · 38건 글자 하나 · 22건 판본 관련
+    #:
+    #: ★그래서 표지 한 줄(또는 인접 두 줄)에서 **승인된 변형만** 허용해 다시 본다.
+    #:   ☠판본 토큰과 정체성 부기는 안 흔든다 — `cover_match()` 주석 참조.
+    windows = cover_windows(page_texts)
+
+    #: ★판본이 없는 이름(실측 55건)은 **가릴 것이 없을 때만** 확정한다.
+    #:
+    #:   코덱스 설계(2026-08-11)를 그대로 지킨다 — 같은 보험사에 같은 상품군이
+    #:   하나뿐이고, 그 하나가 **나 자신**이며, 판매시점을 알 때에 한한다.
+    #:   ☠하나라도 어긋나면 예외를 주지 않는다. 「판본이 없으니 봐주자」가 아니라
+    #:     「판본으로 구별할 대상이 애초에 없다」라야 한다.
+    fam = family_key(out["product_name"])
+    kin = [o for o in (siblings or [])
+           if family_key(o.get("product_name") or "") == fam
+           and o.get("sha256") != row.get("sha256")]
+    lone = (not version_tokens(out["product_name"])
+            and not kin
+            and (row.get("date_confidence") or "") in ("exact", "month"))
+
+    hit = next(((pg, w) for pg, w in windows
+                if cover_match(out["product_name"], w,
+                               page=page_texts[pg - 1], lone_in_family=lone)), None)
+    if hit and lone:
+        out["lone_in_family"] = True
+    out["cover_page"] = hit[0] if hit else None
+    out["cover_name"] = hit[1][:120] if hit else None
+
+    #: ☠판본 충돌 — 이름은 같은데 판본만 다르면 **문서가 잘못 붙은 것**이다.
+    #:   실측: 「…안정화 할인 특별약관2507」 행에 표지 「…특별약관2510」 문서.
+    #:   이름 대조가 아무리 좋아도 통과시키면 안 된다.
+    my_ver = version_tokens(out["product_name"])
+    if my_ver and not hit:
+        #: 이름에서 판본만 뺀 줄기가 표지에 그대로 있는데 판본이 다르면, 같은 상품의 **다른 판본**이다.
+        #:
+        #: ☠★처음엔 `\(?\b\d{2}[.\-]?\d{2}\b\)?` 로 판본을 뗐는데 **아무것도 떼지 못했다.**
+        #:   「특별약관2507」에서 `관` 과 `2` 는 **둘 다 낱말 문자**라 `\b` 가 성립하지 않는다.
+        #:   그래서 줄기에 판본이 남았고, 충돌 검사가 조용히 0건을 내놓았다.
+        #:   ★이미 만들어 둔 `_VERSION` 을 쓴다 — 같은 개념을 두 번 쓰지 않는다.
+        stem = _norm(_VERSION.sub(" ", out["product_name"]))
+        for _, w in windows:
+            wv = version_tokens(w)
+            if not wv or wv == my_ver or len(stem) < 8 or stem not in _norm(w):
+                continue
+            #: ★원천까지 추적해 둔다. 실측(2026-08-11, DB손해보험) — 매니페스트가 아니라
+            #:   **원천 공시 사이트 자체**가 `product_code` 가 다른 두 파일에 같은 이름을
+            #:   붙여 놓았다(9184 vs 10002, 판매일 2025-07 vs 2025-10). 「사람이 열어서
+            #:   고른다」가 아니라 **어느 근거가 무엇을 가리키는지**까지 적어 둔다.
+            out["version_conflict"] = {
+                "매니페스트_이름": sorted(my_ver),
+                "표지_판본": sorted(wv),
+                "product_code": row.get("product_code"),
+                "sale_start": row.get("sale_start"),
+                "date_source": row.get("date_source"),
+            }
+            out["reasons"].append(
+                f"판본 충돌: 매니페스트 이름은 {sorted(my_ver)} 인데 표지는 {sorted(wv)} 다"
+                f" — product_code={row.get('product_code')} · sale_start={row.get('sale_start')}."
+                f" 같은 이름을 가진 다른 product_code 가 있는지 확인할 것"
+                f"(원천 목록 자체가 잘못 붙였을 수 있다)")
+            break
+
     if not me:
         out["reasons"].append("상품명이 비어 있어 대조할 수 없다")
-    elif me not in flat:
+    elif me not in flat and not hit:
         detail = f", 빠진 토큰 {miss[:3]}" if miss else " — 토큰은 다 있으나 흩어져 있다"
         out["reasons"].append(
             f"전체 상품명이 문서에 한 덩어리로 나오지 않는다(토큰 {out['name_match']}{detail})")
@@ -416,8 +703,19 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     #: ★이름이 맞는 것과 **그 이름만 맞는 것**은 다르다. 약관집에 본약관과 특약이
     #:   같이 실리므로, 같은 보험사의 다른 **본약관**까지 통째로 나오면 자동 확정하지 않는다.
     #:   (특약만 상대인 경우는 정상 — `resolve()` 가 본약관을 우선한다.)
-    out["rivals"], out["shadowed_by"] = (
-        _rivals(row, flat, siblings or []) if (me and me in flat) else ([], []))
+    #:
+    #: ★★**근거의 범위를 맞춘다**(코덱스 지적 2026-08-11). 이름을 표지에서 맞췄는데
+    #:   경쟁 검사만 문서 전체로 하면 「내 근거는 한 줄, 상대 근거는 100쪽」이 된다.
+    #:   그 비대칭은 표지로 맞춘 건을 거의 다 모호로 떨어뜨린다 — 기준이 아니라 **자의**다.
+    if me and me in flat:
+        #: 문서 전체에서 내 이름이 통째로 확인된 경우 — 상대도 문서 전체에서 본다.
+        out["rivals"], out["shadowed_by"] = _rivals(row, flat, siblings or [])
+    elif hit:
+        #: 표지 한 줄로 맞춘 경우 — 상대도 **같은 표지 줄들** 안에서만 본다.
+        out["rivals"], out["shadowed_by"] = _rivals(
+            row, _norm(" ".join(w for _, w in windows)), siblings or [])
+    else:
+        out["rivals"], out["shadowed_by"] = [], []
     if out["shadowed_by"]:
         #: ☠이름 대조 자체가 성립하지 않는다. 확정률보다 **먼저** 막는다.
         out["reasons"].append(
@@ -432,11 +730,16 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     #: ★근거 등급. 문서 안에서 판매일까지 확인되면 한 단 강하다.
     if not out["ok"]:
         #: ☠「삼켜짐」은 모호와 다르다 — 모호는 둘 중 고르는 것이고 이건 대조가 안 된 것이다.
-        out["evidence"] = ("shadowed" if out["shadowed_by"]
+        out["evidence"] = ("version_conflict" if out.get("version_conflict")
+                           else "shadowed" if out["shadowed_by"]
                            else "ambiguous" if out["rivals"] else "-")
     elif out["extraction_blocked"]:
         #: 식별은 됐지만 **인용은 못 한다.** 판정 쪽이 이 사실을 말할 수 있어야 한다.
         out["evidence"] = "extraction_blocked"
+    elif me not in flat:
+        #: ★표지 이름으로 맞춘 것은 **그렇다고 적는다.** 공시 이름으로 맞춘 것과
+        #:   같은 등급으로 뭉치면, 나중에 이 규칙이 틀렸을 때 어느 건이 영향받는지 모른다.
+        out["evidence"] = "cover_name"
     else:
         out["evidence"] = "name+date" if out["doc_dates"] else "name_only"
     return out
