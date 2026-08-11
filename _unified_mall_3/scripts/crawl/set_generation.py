@@ -46,6 +46,7 @@ import collections
 import json
 from pathlib import Path
 
+from app.core.domain.policy_naming import is_rider
 from app.core.errors import InfraError
 
 _ROOT = Path(__file__).resolve().parents[2]
@@ -184,16 +185,69 @@ def main() -> None:
             ov = r.get("generation_override")
             if ov:
                 r["generation"] = ov
-                r["generation_label"] = f"{ov}세대"
+                #: ★정정분도 라인을 밝힌다 — 아래 일반 경로와 같은 규칙을 쓴다.
+                ko = profiles["product_types"].get(line, {}).get("label_ko") or line
+                r["generation_label"] = f"{ov}세대" if line == "standard" else f"{ov}세대 {ko}"
                 r["generation_confidence"] = "exact"
+                #: ★★**정정분도 태그를 단다.** 안 달면 「분류가 비어 있는」 행이 생기고,
+                #:   그러면 세는 쪽이 그걸 어디에 넣을지 몰라 또 뭉뚱그린다.
+                #:   실측 2026-08-05 — 이 분기가 `continue` 로 빠져 8건이 무태그였다.
+                r["generation_semantics"] = (
+                    "official_generation" if line == "standard" else "shared_reform_epoch")
                 dist[f"{ov}세대(문서근거 정정)"] += 1
                 continue
 
             start = (r.get("sale_start") or "").strip()
             if not start or len(start) < 8 or start == "00000000":
                 r["generation_confidence"] = "unknown"
+                #: ★「세대 축이 없다」가 아니라 **「판매일을 몰라 못 정했다」** 이다.
+                r["generation_semantics"] = "date_unknown"
                 dist["날짜모름"] += 1
                 continue
+            #: ★★**특약 판정이 상품라인 판정보다 먼저다.**
+            #:
+            #:   전에는 뒤에 있었다. 그랬더니 「무배당 임신출산질환실손입원의료비
+            #:   …보장 **특별약관**」처럼 **상품라인을 못 정한 특약**이
+            #:   `line_unclassified` 로 빠졌다 — 실측 2026-08-05, 9건 중 6건이 그랬다.
+            #:   특약인지는 **상품라인과 무관하게** 정해진다.
+            #:
+            #: ★★**특약은 자기 세대를 갖지 않는다** (코덱스 교차검증 2026-08-05).
+            #:
+            #:   금융위 5세대 보도자료 https://www.fsc.go.kr/no010101/86831 —
+            #:     「선택형 할인 특약은 기존 **1·2세대 계약을 유지한 상태에서**
+            #:      보험료를 할인하는 특약」
+            #:     「무사고 할인과 비급여 보험료차등제를 **5세대 특약에서도** 적용」
+            #:
+            #:   즉 특약은 **본계약의 세대에 붙는다.** 「2세대 계약에 붙는 할인특약」이지
+            #:   「2세대 특약」이 아니다.
+            #:
+            #:   ★그런데 전에는 특약도 자기 판매일로 세대를 계산해 붙였다(212건 중 186건).
+            #:     `generation=2` 가 「2세대 계약에 붙는다」가 아니라
+            #:     「2015년에 발행됐다」는 뜻이 되어 **의미가 충돌**한다.
+            #:     화면은 `generation_label` 을 그대로 보여 주므로 사용자는
+            #:     그 특약 자체가 2세대 상품인 줄 안다.
+            #:
+            #:   → `generation` 은 **비운다.** 대신 —
+            #:       applicable_generations  이 특약이 붙는 **본계약 세대**(문서 근거)
+            #:       sale_epoch              판매 시점이 어느 세대 시기였나(참고용)
+            #:
+            #:   ★`generation` 을 남기고 `generation_semantics` 로만 구분하는 안은
+            #:     코덱스가 반대했다 — **세대값을 읽는 코드가 이미 여럿**이고
+            #:     그들이 semantics 를 정확히 검사한다는 보장이 없다.
+            if is_rider(name):
+                epoch = generation_of(start, line, profiles)
+                r["generation_confidence"] = "not_applicable"
+                r["generation_semantics"] = "rider_of_base_contract"
+                r["generation_label"] = "특약(본계약 세대에 붙음)"
+                if epoch:
+                    #: ★세대가 아니라 **발행 시기**다. 이름으로 그 뜻을 못박는다.
+                    r["sale_epoch"] = epoch["generation"]
+                    r["sale_epoch_note"] = (
+                        f"판매 시점({start})이 표준실손 {epoch['generation']}세대 시기였다는 뜻일 뿐, "
+                        "이 특약이 그 세대 상품이라는 뜻이 아니다")
+                dist["특약(본계약 세대에 붙음)"] += 1
+                continue
+
             #: ★★**어느 라인에 세대 축이 있는지는 프로필이 정한다.**
             #:
             #:   전에는 `line != "standard"` 를 코드에 박아 두어 유병력자실손 173건이
@@ -208,6 +262,17 @@ def main() -> None:
             #:     코드에 라인 이름을 박지 않으니, 근거가 생기면 **프로필만** 고치면 된다.
             if not any(line in g.get("applies_to", []) for g in profiles["generations"]):
                 r["generation_confidence"] = "not_applicable"
+                #: ★★**`not_applicable` 하나로 뭉치면 서로 다른 것이 섞인다.**
+                #:
+                #:   실측 2026-08-05 — `not_applicable` 163건 안에
+                #:   **노후실손 154 + 상품라인 미확인 9** 가 함께 있었다.
+                #:   앞의 것은 「세대 축이 없는 상품군」이고 뒤의 것은 「분류를 못 했다」다.
+                #:   신뢰도만 보는 코드는 이 둘을 구분할 수 없다.
+                #:
+                #:   ★금감원 「2024년 실손의료보험 사업실적」도 1~4세대와
+                #:     **그 외(유병력자·노후실손)** 를 나눠 집계한다. 그 축을 그대로 쓴다.
+                r["generation_semantics"] = (
+                    "separate_product_line" if line != "unknown" else "line_unclassified")
                 dist[f"{line}(세대축 아님)"] += 1
                 continue
 
