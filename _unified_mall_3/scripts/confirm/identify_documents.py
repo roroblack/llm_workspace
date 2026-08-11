@@ -225,8 +225,10 @@ _FRAGMENT_MAX = 12
 _FRAGMENT_RUN_MAX = 8
 
 
-def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str]]:
+def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str, bool]]:
     """표지 후보 — **한 줄, 인접 두 줄, 그리고 짧은 조각이 이어지는 구간.**
+
+    반환: `(쪽 번호, 창 글, 순서를 지키는가)`
 
     참고 — 왜 「한 줄」인가. 문서 전체에서 토큰이 다 나오는 것으로는 부족하다는 것을
       이미 재 봤다 — 확정 1,115건 중 **798건(71.6%)** 이 다른 상품명과도 일치했다.
@@ -237,20 +239,32 @@ def cover_windows(page_texts: list[str], pages: int = 2) -> list[tuple[int, str]
 
     참고 — 위험 — 「짧은 조각 구간」은 별개다. 배지형 조판(위 주석)에서는 제목 뒤로 **짧은
       줄만** 이어진다. 길이 상한을 두므로 본문 문장은 안 걸린다.
+
+      위험 — 그리고 짧은 조각 구간은 **거짓 닻**에 걸리기 쉽다. 실측(농협생명) —
+      「[제도성특약]…」에서 「제도성」을 뗀 잔여물 「특약」이 뒤쪽의 다른 낱말
+      「안정화**할인특약**」 안에 우연히 걸린다. 순서를 지키며 찾으면 그 우연한
+      자리에서 커서가 멈춰 진짜 제목을 놓친다. 그래서 짧은 조각 구간만
+      `ordered=False` 로 표시해 순서를 풀고 다시 찾게 한다(실측 6건 해소) —
+      한 줄·인접 두 줄은 실제 문장이므로 순서를 그대로 요구한다.
+
+      위험 — 숫자+한글이 붙은 식별 토큰(`1~2종`)은 이걸로도 못 잡는다. 표지가
+      「종」을 숫자보다 먼저 적어 토큰 자체가 쪼개져야 하는데, 억지로 쪼개면
+      「12」 같은 약한 두 자리 숫자로 대조하게 되어 「1~3종」(자기부담금이 다른
+      상품)과 헷갈릴 위험이 있다. 그래서 이건 풀지 않는다 — 사람 검토로 남긴다.
     """
-    out: list[tuple[int, str]] = []
+    out: list[tuple[int, str, bool]] = []
     for page_no, text in enumerate(page_texts[:pages], start=1):
         lines = [x.strip() for x in (text or "").splitlines() if x.strip()]
         for i, line in enumerate(lines):
-            out.append((page_no, line))
+            out.append((page_no, line, True))
             if i + 1 < len(lines):
-                out.append((page_no, f"{line} {lines[i + 1]}"))
+                out.append((page_no, f"{line} {lines[i + 1]}", True))
             #: 이 줄부터 뒤로 **짧은 줄**이 이어지면 하나의 창으로 묶는다.
             j = i + 1
             while j < len(lines) and j - i <= _FRAGMENT_RUN_MAX and len(_norm(lines[j])) <= _FRAGMENT_MAX:
                 j += 1
             if j > i + 1:
-                out.append((page_no, " ".join(lines[i:j])))
+                out.append((page_no, " ".join(lines[i:j]), False))
     return out
 
 
@@ -274,7 +288,7 @@ def family_key(product_name: str) -> str:
 
 
 def cover_match(product_name: str, window: str, *, page: str = "",
-                lone_in_family: bool = False) -> bool:
+                lone_in_family: bool = False, ordered: bool = True) -> bool:
     """이 표지 줄이 **이 상품**을 가리키는가.
 
     공시 목록 이름과 표지 이름이 다르다는 것을 전수로 확인했다(2026-08-11) —
@@ -293,6 +307,11 @@ def cover_match(product_name: str, window: str, *, page: str = "",
       코덱스가 정체성 부기를 못박았다(2026-08-11): 「(계약전환용)2404」와 「2404」는
       **가입 대상이 다른 상품**이다. 내 실측으로는 반증이 0건이었지만 통계로
       정체성을 정할 수는 없다.
+
+    `ordered=False` 는 **배지형 조판**(`cover_windows` 의 짧은 조각 구간) 전용이다.
+    배지는 태그 묶음이지 문장이 아니라서 조판 순서가 이름 순서와 다를 수 있다
+    (실측: 「범용」·「종」·판본이 이름과 다른 순서로 추출됨). 한 줄·인접 두 줄은
+    실제 문장이므로 기본값(`True`)으로 순서를 그대로 요구한다.
     """
     mine = version_tokens(product_name)
     #: 참고 — 판본을 모르면 자동 확정하지 않는다. 「모른다」를 「맞다」로 바꾸지 않는다.
@@ -336,17 +355,24 @@ def cover_match(product_name: str, window: str, *, page: str = "",
             continue
         if key.lower() in _OPTIONAL_QUALIFIERS:
             continue
-        hit = win.find(key, pos)
+        #: 위험 — 배지형(`ordered=False`)은 시작점을 안 옮긴다. 태그 순서가 이름
+        #:   순서와 다를 수 있어 「직전 토큰 뒤에서부터」 찾으면 못 찾는다 — 창 전체에서
+        #:   매번 다시 찾는다. 대신 **모든 토큰이 이 창 안에 있어야** 하는 건 그대로다.
+        hit = win.find(key, pos if ordered else 0)
         if hit >= 0:
-            pos, started, core = hit + len(key), True, core + len(key)
+            started, core = True, core + len(key)
+            if ordered:
+                pos = hit + len(key)
             continue
         #: 표지가 연결 낱말을 더 쓴 경우만 봐준다 — 토큰 **가운데**에 끼어든 것.
         for ins in _INSERTIONS:
             for cut in range(1, len(key)):
                 spliced = key[:cut] + _norm(ins) + key[cut:]
-                hit = win.find(spliced, pos)
+                hit = win.find(spliced, pos if ordered else 0)
                 if hit >= 0:
-                    pos, started, core = hit + len(spliced), True, core + len(key)
+                    started, core = True, core + len(key)
+                    if ordered:
+                        pos = hit + len(spliced)
                     break
             else:
                 continue
@@ -596,9 +622,9 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
             and not kin
             and (row.get("date_confidence") or "") in ("exact", "month"))
 
-    hit = next(((pg, w) for pg, w in windows
-                if cover_match(out["product_name"], w,
-                               page=page_texts[pg - 1], lone_in_family=lone)), None)
+    hit = next(((pg, w) for pg, w, ordered in windows
+                if cover_match(out["product_name"], w, page=page_texts[pg - 1],
+                               lone_in_family=lone, ordered=ordered)), None)
     if hit and lone:
         out["lone_in_family"] = True
     out["cover_page"] = hit[0] if hit else None
@@ -616,7 +642,7 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
         #:   그래서 줄기에 판본이 남았고, 충돌 검사가 조용히 0건을 내놓았다.
         #:   참고 — 이미 만들어 둔 `_VERSION` 을 쓴다 — 같은 개념을 두 번 쓰지 않는다.
         stem = _norm(_VERSION.sub(" ", out["product_name"]))
-        for _, w in windows:
+        for _, w, _ordered in windows:
             wv = version_tokens(w)
             if not wv or wv == my_ver or len(stem) < 8 or stem not in _norm(w):
                 continue
@@ -736,7 +762,7 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     elif hit:
         #: 표지 한 줄로 맞춘 경우 — 상대도 **같은 표지 줄들** 안에서만 본다.
         out["rivals"], out["shadowed_by"] = _rivals(
-            row, _norm(" ".join(w for _, w in windows)), siblings or [])
+            row, _norm(" ".join(w for _, w, _ordered in windows)), siblings or [])
     else:
         out["rivals"], out["shadowed_by"] = [], []
     if out["shadowed_by"]:

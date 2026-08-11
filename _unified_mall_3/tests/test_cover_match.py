@@ -137,7 +137,7 @@ def test_표지_창은_한_줄과_인접_두_줄이다():
     a, b, c = "가" * 20, "나" * 20, "다" * 20
     from scripts.confirm.identify_documents import _FRAGMENT_MAX, _norm as _n
     assert len(_n(b)) > _FRAGMENT_MAX and len(_n(c)) > _FRAGMENT_MAX
-    w = [x for _, x in cover_windows([f"{a}\n{b}\n{c}"])]
+    w = [x for _, x, _ordered in cover_windows([f"{a}\n{b}\n{c}"])]
     assert a in w
     assert f"{a} {b}" in w
     assert f"{b} {c}" in w
@@ -147,13 +147,13 @@ def test_표지_창은_한_줄과_인접_두_줄이다():
 
 def test_표지_쪽수를_넘기면_보지_않는다():
     pages = ["1쪽", "2쪽", "3쪽"]
-    assert all("3쪽" not in w for _, w in cover_windows(pages, pages=2))
+    assert all("3쪽" not in w for _, w, _ordered in cover_windows(pages, pages=2))
 
 
 def test_두_줄로_접힌_제목을_잇는다():
     assert cover_match("무배당 프로미라이프 실손의료비보험2605",
                        "무배당 프로미라이프 실손의료비보험2605")
-    w = [x for _, x in cover_windows(["무배당 프로미라이프\n실손의료비보험2605"])]
+    w = [x for _, x, _ordered in cover_windows(["무배당 프로미라이프\n실손의료비보험2605"])]
     assert any(cover_match("무배당 프로미라이프 실손의료비보험2605", x) for x in w)
 
 
@@ -267,7 +267,8 @@ _BADGE_PAGE = "무배당흥국화재실손의료보험\n계약전환용\n갱신�
 def test_배지형_조판의_짧은_조각들을_이어붙인다():
     name = "무배당 흥국화재 실손의료보험(계약전환용_1904)(갱신형)"
     wins = cover_windows([_BADGE_PAGE])
-    assert any(cover_match(name, w, page=_BADGE_PAGE) for _, w in wins)
+    assert any(cover_match(name, w, page=_BADGE_PAGE, ordered=ordered)
+              for _, w, ordered in wins)
 
 
 def test_긴_본문_문장은_배지형_이어붙이기에_걸리지_않는다():
@@ -279,11 +280,70 @@ def test_긴_본문_문장은_배지형_이어붙이기에_걸리지_않는다()
     wins = cover_windows([body])
     #: 세 줄이 전부 한 창에 이어 붙으면 안 된다 — 그건 배지형 이어붙이기가
     #:   긴 문장에도 잘못 걸린 것이다.
-    assert not any(w.count(" ") >= 15 for _, w in wins)
+    assert not any(w.count(" ") >= 15 for _, w, _ordered in wins)
 
 
 def test_짧은_조각_구간에도_판본_불변식이_그대로_적용된다():
     other_version = _BADGE_PAGE.replace("1904", "1701")
     name = "무배당 흥국화재 실손의료보험(계약전환용_1904)(갱신형)"
     wins = cover_windows([other_version])
-    assert not any(cover_match(name, w, page=other_version) for _, w in wins)
+    assert not any(cover_match(name, w, page=other_version, ordered=ordered)
+                  for _, w, ordered in wins)
+
+
+# ── ⑩ 짧은 조각 구간은 「거짓 닻」에 걸리지 않는다 ─────────────────────────
+#
+# 핵심 — 실측 2026-08-11(농협생명) — 「[제도성특약]실손의료비보험 안정화할인특약_2101」
+#   에서 「제도성」을 뗀 나머지 「특약」이, **다른 낱말** 「안정화**할인특약**」 안에
+#   우연히 걸린다. 순서를 지키며 찾으면 그 우연한 자리에서 커서가 멈춰,
+#   그 뒤에 있는 진짜 제목 「실손의료비보험」을 놓친다 — 물리적으로 순서가
+#   바뀐 게 아니라 **먼저 찾은 자리가 거짓 닻**인 것이다. 짧은 조각 구간에서는
+#   순서를 풀어 다시 찾게 한다 — 실측으로 6건이 이 하나로 풀렸다.
+#
+#   위험 — 「무배당 흥국화재 실손의료보험(범용_1708)_1~2종」처럼 숫자와 한글이
+#   붙은 식별 토큰(`1~2종`)은 순서를 풀어도 못 잡는다. 표지에는 「종」이
+#   숫자보다 먼저 나오는데, 토큰 자체가 「12종」으로 붙어 있어 한 덩어리로만
+#   찾기 때문이다. 억지로 풀려면 「12」 같은 약한 두 자리 숫자로 대조해야
+#   하는데, 그러면 「1~3종」(자기부담금이 다른 상품)과 헷갈릴 수 있다 —
+#   **그래서 이건 풀지 않는다.** 사람 검토로 남기는 게 맞다.
+_FALSE_ANCHOR_PAGE = "실손의료비보험 안정화할인특약_2101\n약       관\n농협생명보험주식회사"
+
+
+def test_거짓_닻_뒤의_진짜_제목을_짧은_조각_구간에서_찾는다():
+    name = "[제도성특약]실손의료비보험 안정화할인특약_2101"
+    wins = cover_windows([_FALSE_ANCHOR_PAGE])
+    assert any(cover_match(name, w, page=_FALSE_ANCHOR_PAGE, ordered=ordered)
+              for _, w, ordered in wins)
+
+
+def test_순서_무관_대조도_판본_불변식은_지킨다():
+    #: 위험 — 순서를 풀어 준다고 판본까지 흔들리면 안 된다.
+    other = _FALSE_ANCHOR_PAGE.replace("2101", "2201")
+    name = "[제도성특약]실손의료비보험 안정화할인특약_2101"
+    wins = cover_windows([other])
+    assert not any(cover_match(name, w, page=other, ordered=ordered)
+                  for _, w, ordered in wins)
+
+
+def test_한_줄_인접_두_줄은_순서_무관하지_않다():
+    #: 위험 — 순서 완화는 **짧은 조각 구간에만** 적용된다. 문장형 창(한 줄·인접
+    #:   두 줄)은 여전히 `ordered=True` 다 — `cover_windows` 가 그렇게 태그한다.
+    for _, w, ordered in cover_windows([_FALSE_ANCHOR_PAGE]):
+        if w == "실손의료비보험안정화할인특약2101":
+            assert ordered is True  #: 첫 줄 자체는 문장형 창이다
+        if "농협생명보험주식회사" in w and "실손의료비보험" in w:
+            assert ordered is False  #: 짧은 조각 구간은 순서를 안 지킨다
+
+
+# 위험 — 숫자+한글 복합 식별 토큰은 순서 완화로도 못 잡는다 (의도된 한계).
+_SPECIES_BADGE = "무배당흥국화재\n실손의료보험범용\n종\n(\n_1708)_1~2\n약관\n흥국화재해상보험주식회사"
+
+
+def test_숫자_한글_복합_토큰은_순서_완화로도_안_잡힌다():
+    #: 위험 — 억지로 잡으려면 「12」 같은 약한 두 자리 숫자로 대조해야 하고,
+    #:   그러면 「1~3종」(다른 자기부담금의 다른 상품)과 헷갈릴 수 있다.
+    #:   그래서 이건 의도적으로 사람 검토에 남긴다 — 실패가 정상이다.
+    name = "무배당 흥국화재 실손의료보험(범용_1708)_1~2종"
+    wins = cover_windows([_SPECIES_BADGE])
+    assert not any(cover_match(name, w, page=_SPECIES_BADGE, ordered=ordered)
+                  for _, w, ordered in wins)
