@@ -111,6 +111,56 @@ def _applicable_period_months(text: str) -> set[str]:
     squeezed = (text or "").replace(" ", "")
     return {f"{m.group(1)}{int(m.group(2)):02d}" for m in _APPLICABLE_PERIOD.finditer(squeezed)}
 
+
+#: 원천 사이트가 파일 자체에 붙인 날짜/판본 — 파일명 **끝**에서만 찾는다.
+#:
+#:   실측 2026-08-12(DB손해보험·현대해상) — 상품명 문자열의 판본은 낡았는데
+#:   원천 URL은 최신 판본으로 갱신돼 있었다 —
+#:
+#:     상품명: 실손의료비보장 안정화 할인 특별약관2507
+#:     URL   : …ACU(00)_20251013.pdf                    ← 파일명 자체가 2510(10월)
+#:     sale_start: 20251013                              ← 매니페스트 필드는 이미 맞다
+#:
+#:   위험 — 상품코드·게시물 번호 같은 **긴 숫자열**을 판본으로 오인하면 안 된다
+#:   (`data/gongsi/goods/150277466...` 류). 그래서 **파일명 끝, `.pdf` 바로 앞**만 본다.
+_URL_TAIL_DATE = re.compile(r"_(\d{8})\.pdf$", re.I)
+_URL_TAIL_CODE = re.compile(r"\(([A-Za-z]{1,3}\d{4})\)[^/\\]*\.pdf$", re.I)
+
+
+def url_tail_ym(row: dict) -> str | None:
+    """이 문서의 `url`/`saved_as` **파일명 끝**에서 읽은 YYMM. 못 찾으면 `None`.
+
+    위험 — 두 문자열을 공백으로 이어 붙여 하나로 검사하면 안 된다. `$` 는
+      **글 전체의 끝**에서만 서므로, 뒤에 빈 `saved_as` 를 이어 붙이는 것만으로도
+      `.pdf` 뒤에 공백이 남아 `$` 고정이 깨진다(실측 — 시험이 잡았다). 따로 본다.
+    """
+    import urllib.parse
+
+    for raw in (row.get("url") or "", row.get("saved_as") or ""):
+        text = urllib.parse.unquote(raw)
+        m = _URL_TAIL_DATE.search(text)
+        if m:
+            return m.group(1)[2:6]
+        m = _URL_TAIL_CODE.search(text)
+        if m:
+            digits = re.sub(r"\D", "", m.group(1))
+            if len(digits) == 4:
+                return digits
+    return None
+
+
+def url_confirmed_qualifiers(row: dict, product_name: str) -> frozenset[str]:
+    """매니페스트 이름의 정체성 부기 중 **원천 URL/저장 파일명에도 실제로 있는** 것.
+
+    표지가 생략했어도, 사이트가 다운로드 파일 자체에 그 낱말을 박아 뒀다면
+    짐작이 아니라 **원천이 직접 밝힌 것**이다.
+    """
+    import urllib.parse
+
+    text = urllib.parse.unquote(row.get("url") or "") + " " + (row.get("saved_as") or "")
+    tn = _norm(text)
+    return frozenset(q for q in _IDENTITY_QUALIFIERS if q in (product_name or "") and _norm(q) in tn)
+
 #: `config/generation_profiles.json` 의 시행 구간. 코드에 박지 않고 읽어 온다.
 def _generation_ranges() -> list[tuple[int, str | None, str | None]]:
     prof = json.loads((_ROOT / "config" / "generation_profiles.json").read_text(encoding="utf-8"))
@@ -342,7 +392,9 @@ def family_key(product_name: str) -> str:
 
 
 def cover_match(product_name: str, window: str, *, page: str = "",
-                lone_in_family: bool = False, ordered: bool = True) -> bool:
+                lone_in_family: bool = False, ordered: bool = True,
+                expected_version: set[str] | None = None,
+                identity_confirmed: frozenset[str] = frozenset()) -> bool:
     """이 표지 줄이 **이 상품**을 가리키는가.
 
     공시 목록 이름과 표지 이름이 다르다는 것을 전수로 확인했다(2026-08-11) —
@@ -366,8 +418,14 @@ def cover_match(product_name: str, window: str, *, page: str = "",
     배지는 태그 묶음이지 문장이 아니라서 조판 순서가 이름 순서와 다를 수 있다
     (실측: 「범용」·「종」·판본이 이름과 다른 순서로 추출됨). 한 줄·인접 두 줄은
     실제 문장이므로 기본값(`True`)으로 순서를 그대로 요구한다.
+
+    `expected_version` · `identity_confirmed` 는 **매니페스트 이름이 낡았다는 게
+    독립적으로 증명됐을 때만** 쓴다(`verify()` 의 URL 대조 참조). 실측 2026-08-12 —
+    DB손해보험 5건·현대해상 1건이 상품명엔 옛 판본이 박혀 있는데, 원천 사이트가
+    파일에 붙인 URL 날짜와 매니페스트 `sale_start` 가 **서로 독립적으로** 새 판본에
+    일치했다. 표지 하나만 보고 판단하는 게 아니라 **두 출처가 맞아떨어질 때만** 쓴다.
     """
-    mine = version_tokens(product_name)
+    mine = expected_version if expected_version is not None else version_tokens(product_name)
     #: 참고 — 판본을 모르면 자동 확정하지 않는다. 「모른다」를 「맞다」로 바꾸지 않는다.
     #:
     #: 핵심 — 단 하나의 예외 — **가릴 것이 애초에 없을 때**(`lone_in_family`).
@@ -386,9 +444,10 @@ def cover_match(product_name: str, window: str, *, page: str = "",
         return False
 
     win = _norm(window)
-    #: 정체성 부기는 **표지에 있어야** 한다.
+    #: 정체성 부기는 **표지에 있어야** 한다. 단 `identity_confirmed` 에 있으면
+    #: (원천 URL이 직접 밝힌 것만) 표지에 없어도 넘어간다 — 통계·짐작이 아니다.
     for q in _IDENTITY_QUALIFIERS:
-        if q in (product_name or "") and _norm(q) not in win:
+        if q in (product_name or "") and q not in identity_confirmed and _norm(q) not in win:
             return False
 
     #: 남은 토큰이 **순서를 지키며** 이 줄 안에 이어져야 한다.
@@ -403,11 +462,18 @@ def cover_match(product_name: str, window: str, *, page: str = "",
     pos = 0
     core = 0        #: 이 **줄 안에서** 확인한 글자 수 — 알맹이가 줄에 있어야 한다
     started = False  #: 줄 대조가 시작됐나. 시작 전이면 접두로 본다
+    identity_confirmed_norm = {_norm(q) for q in identity_confirmed}
     for tok in re.split(r"[\s()\[\],_/]+", stem):
         key = _norm(tok)
         if len(key) < 2 or _FILENAME_DATE.match(tok):
             continue
         if key.lower() in _OPTIONAL_QUALIFIERS:
+            continue
+        #: 위험 — 정체성 부기를 원천이 확인해 줬으면, 이름 대조 루프에서도 건너뛴다.
+        #:   위의 「표지에 있어야 한다」 관문만 봐주고 여기서 다시 찾으면 어차피 막힌다
+        #:   (표지에 정말 없으니까) — 시험이 잡았다.
+        if key in identity_confirmed_norm:
+            started, core = True, core + len(key)
             continue
         #: 위험 — 배지형(`ordered=False`)은 시작점을 안 옮긴다. 태그 순서가 이름
         #:   순서와 다를 수 있어 「직전 토큰 뒤에서부터」 찾으면 못 찾는다 — 창 전체에서
@@ -684,9 +750,37 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
                      and (row.get("date_confidence") or "") in ("exact", "month")
                      and ss[:6] in _applicable_period_months(text))
 
+    #: 참고 — 원천 URL이 상품명의 판본보다 **더 정확할 때가 있다.** 실측 2026-08-12 —
+    #:   상품명은 낡은 판본을 달고 있는데, 원천 사이트가 파일에 붙인 URL 날짜와
+    #:   매니페스트 `sale_start` 가 서로 독립적으로 일치했다(6건). 표지 하나만 보고
+    #:   판단하지 않는다 — **두 출처가 맞아떨어질 때만** 판본을 정정한다.
+    my_name_ver = version_tokens(out["product_name"])
+    url_ym = url_tail_ym(row)
+    #: 위험 — `url_ym` 은 YY+MM(4자리) 다. `ss[:6]` 은 YYYY+MM(6자리) — 자릿수가
+    #:   달라 **항상 거짓**이었다(오늘 세 번째 같은 실수 — `_gen_splits_month`·
+    #:   `date_anchor_gain.py` 에서도 겪었다). `ss[2:6]` 이라야 같은 자릿수로 맞는다.
+    url_corrects_version = bool(my_name_ver and url_ym and url_ym not in my_name_ver and url_ym == ss[2:6])
+    identity_confirmed = url_confirmed_qualifiers(row, out["product_name"])
+
+    #: 위험 — 먼저 **URL 보정 없이** 시도한다. 「URL이 확인해 줬다」와 「URL이 없어도
+    #:   이미 통과했다」를 못 가르면, 이미 통과하던 수백 건까지 잘못 「url_anchored」로
+    #:   찍는다(실측 211건 — 실제로 필요했던 건 8건뿐이었다). 기본 경로가 실패할 때만
+    #:   보정을 쓴다.
     hit = next(((pg, w) for pg, w, ordered in windows
                 if cover_match(out["product_name"], w, page=page_texts[pg - 1],
                                lone_in_family=(lone or date_anchored), ordered=ordered)), None)
+    if not hit and (url_corrects_version or identity_confirmed):
+        hit = next(((pg, w) for pg, w, ordered in windows
+                    if cover_match(out["product_name"], w, page=page_texts[pg - 1],
+                                   lone_in_family=(lone or date_anchored), ordered=ordered,
+                                   expected_version=({url_ym} if url_corrects_version else None),
+                                   identity_confirmed=identity_confirmed)), None)
+        if hit:
+            out["url_anchored"] = {
+                "정정판본": url_ym if url_corrects_version else None,
+                "확인된부기": sorted(identity_confirmed) or None,
+                "url": row.get("url"),
+            }
     if hit and lone:
         out["lone_in_family"] = True
     if hit and date_anchored and kin:
@@ -852,6 +946,10 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     elif out.get("date_anchored"):
         #: 참고 — 판매기간 진술로 유일하게 식별된 것도 **그렇다고 적는다.**
         out["evidence"] = "date_anchored"
+    elif out.get("url_anchored"):
+        #: 참고 — 원천 URL로 상품명의 낡은 판본을 정정했거나 정체성 부기를 확인한 것도
+        #:   **그렇다고 적는다** — 표지 문구만으로 맞춘 것과 같은 등급이 아니다.
+        out["evidence"] = "url_anchored"
     elif me not in flat:
         #: 참고 — 표지 이름으로 맞춘 것은 **그렇다고 적는다.** 공시 이름으로 맞춘 것과
         #:   같은 등급으로 뭉치면, 나중에 이 규칙이 틀렸을 때 어느 건이 영향받는지 모른다.

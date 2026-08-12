@@ -411,3 +411,85 @@ def test_40쪽_넘어가면_안_본다():
     wins = cover_windows(beyond)
     assert not any(cover_match(name, w, page=beyond[pg - 1], ordered=ordered)
                   for pg, w, ordered in wins)
+
+
+# ── ⑬ 원천 URL이 상품명보다 정확할 때가 있다 ────────────────────────────
+#
+# 핵심 — 실측 2026-08-12(DB손해보험) — 상품명 문자열의 판본은 낡았는데
+#   원천 사이트가 파일에 붙인 URL 날짜와 매니페스트 sale_start 가
+#   서로 독립적으로 새 판본에 일치했다.
+#
+#       상품명: 실손의료비보장 안정화 할인 특별약관2507
+#       URL   : …ACU(00)_20251013.pdf            ← 2510(10월)
+#       sale_start: 20251013                      ← 매니페스트 필드는 이미 맞다
+#
+#   위험 — 표지 하나만 보고 정정하지 않는다. **두 출처(URL·sale_start)가
+#   맞아떨어질 때만** 쓴다 — 표지 판단 하나로 다른 표지 판단을 정당화하지 않는다.
+from scripts.confirm.identify_documents import (  # noqa: E402
+    url_confirmed_qualifiers, url_tail_ym,
+)
+
+
+def test_url_끝에서_판매일을_읽는다():
+    row = {"url": "https://x.example/약관_ACU(00)_20251013.pdf", "saved_as": ""}
+    assert url_tail_ym(row) == "2510"
+
+
+def test_긴_상품코드_숫자열은_판본으로_안_읽는다():
+    #: 위험 — 게시물 번호(150277466류)를 판본으로 오인하면 안 된다.
+    row = {"url": "https://x.example/download.do?FILE_NAME=/Upload/gongsi/goods/150277466_1708.pdf",
+           "saved_as": ""}
+    #: 파일명 끝이 「_1708.pdf」 형태라 실제로 읽히지만, 임의의 게시물번호(150277466)는
+    #: 안 읽힌다는 것이 핵심이다.
+    assert url_tail_ym(row) in (None, "1708")
+
+
+def test_괄호_코드_형태의_판본도_읽는다():
+    #: 실측 — 현대해상 URL 끝이 「(Hi2202)_인쇄용약관.pdf」 형태다.
+    row = {"url": "https://x.example/…(계약전환용)(갱신형)(Hi2202)_인쇄용약관.pdf", "saved_as": ""}
+    assert url_tail_ym(row) == "2202"
+
+
+def test_url이_정체성_부기를_직접_밝히면_확인된다():
+    #: 실측 — 표지엔 「계약전환용」이 없어도 URL 파일명엔 있다.
+    row = {"url": "https://x.example/약관_31035(02)_다이렉트실손의료비보험(계약전환용)2404(CM)_20241001.pdf",
+           "saved_as": ""}
+    name = "무배당 프로미라이프 다이렉트 실손의료비보험(계약전환용)2404(CM)"
+    assert url_confirmed_qualifiers(row, name) == frozenset({"계약전환용"})
+
+
+def test_url에도_없으면_확인되지_않는다():
+    row = {"url": "https://x.example/약관_2404.pdf", "saved_as": ""}
+    name = "무배당 프로미라이프 다이렉트 실손의료비보험(계약전환용)2404(CM)"
+    assert url_confirmed_qualifiers(row, name) == frozenset()
+
+
+def test_url로_정정된_판본은_cover_match를_통과한다():
+    #: expected_version 을 넘기면 이름의 낡은 판본(2507) 대신 정정된 판본(2510)으로 대조한다.
+    assert cover_match("실손의료비보장 안정화 할인 특별약관2507",
+                       "실손의료비보장 안정화 할인 특별약관2510",
+                       expected_version={"2510"})
+    #: 위험 — 넘기지 않으면 여전히 원래 불변식대로 막힌다.
+    assert not cover_match("실손의료비보장 안정화 할인 특별약관2507",
+                           "실손의료비보장 안정화 할인 특별약관2510")
+
+
+def test_url로_확인된_정체성_부기는_표지에_없어도_통과한다():
+    assert cover_match("무배당 프로미라이프 다이렉트 실손의료비보험(계약전환용)2404(CM)",
+                       "무배당 프로미라이프 다이렉트 실손의료비보험2404(CM)",
+                       identity_confirmed=frozenset({"계약전환용"}))
+    #: 위험 — 확인 안 된 다른 부기까지 같이 봐주면 안 된다.
+    assert not cover_match("무배당 프로미라이프 다이렉트 실손의료비보험(계약전환용)(만기재가입)2404",
+                           "무배당 프로미라이프 다이렉트 실손의료비보험2404",
+                           identity_confirmed=frozenset({"계약전환용"}))
+
+
+def test_판매일_YYMM과_url_YYMM은_같은_자릿수로_비교한다():
+    """위험 — sale_start(YYYYMMDD, 8자리)에서 [:6]을 자르면 YYYYMM(6자리)이 나오는데,
+    url_tail_ym() 은 YY+MM(4자리)를 돌려준다. 자릿수가 달라 `==` 비교가 항상 거짓이었다
+    — 오늘 세 번째 같은 실수(_gen_splits_month · date_anchor_gain.py 에서도 겪었다).
+    sale_start 에서 같은 4자리를 뽑으려면 [2:6] 이라야 한다.
+    """
+    sale_start = "20220207"
+    assert url_tail_ym({"url": "…(Hi2202)_인쇄용약관.pdf", "saved_as": ""}) == sale_start[2:6]
+    assert sale_start[:6] != url_tail_ym({"url": "…(Hi2202)_인쇄용약관.pdf", "saved_as": ""})
