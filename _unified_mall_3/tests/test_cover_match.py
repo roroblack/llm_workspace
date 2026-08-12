@@ -375,3 +375,39 @@ def test_적용기간_패턴은_전역_날짜_판정과_섞이지_않는다():
     #:   이미 통과하던 문서를 되돌릴 수 있어 일부러 합치지 않았다.
     text = "보험업감독규정 제7-63조에 따라 2020년 1월 1일부터 시행합니다. 2026년 7월 1일부터 2026년 9월 30일까지 판매하는"
     assert _applicable_period_months(text) == {"202607"}
+
+
+# ── ⑫ 진짜 표지가 목차 뒤에 있다 ─────────────────────────────────────────
+#
+# 핵심 — 실측 2026-08-12(롯데손해보험) — 「무배당 롯데 실손의료보험」이
+#   2~122쪽 전체의 반복 머리말로 박혀 있는데(판본 없이), 판본 「(1501)」은
+#   **29쪽에 단 한 번** 나온다. 1~28쪽은 회사 안내·목차이고 29쪽이 진짜
+#   약관 표지다 — 「무배당」·「롯데 실손의료보험 (1501)」·「약 관」 세 줄뿐.
+#   이 저장소가 예전에 전체 텍스트 대조에서 겪은 것과 같은 실수
+#   (_SCAN_PAGES 를 3→15→전체로 넓힌 이력)를 cover_windows 가 되풀이했다.
+_TOC_THEN_TITLE = (["2 \n무배당 롯데 실손의료보험\n목   차\n가입자 유의사항"] * 28
+                  + ["무배당\n롯데 실손의료보험 (1501)\n약   관"])
+
+
+def test_목차_뒤_29쪽의_진짜_표지를_찾는다():
+    name = "(무) 롯데 실손의료보험(1501)"
+    wins = cover_windows(_TOC_THEN_TITLE)
+    assert any(cover_match(name, w, page=_TOC_THEN_TITLE[pg - 1], ordered=ordered)
+              for pg, w, ordered in wins)
+
+
+def test_앞_2쪽만_보면_못_찾는다():
+    #: 위험 — 고치기 전 결함을 회귀로 남긴다. `pages=2` 로 좁히면 다시 놓친다.
+    name = "(무) 롯데 실손의료보험(1501)"
+    wins = cover_windows(_TOC_THEN_TITLE, pages=2)
+    assert not any(cover_match(name, w, page=_TOC_THEN_TITLE[pg - 1], ordered=ordered)
+                  for pg, w, ordered in wins)
+
+
+def test_40쪽_넘어가면_안_본다():
+    #: 위험 — 근거 없이 계속 늘리지 않는다. 41쪽째에 있으면 못 찾아야 한다.
+    beyond = ["2 \n무배당 롯데 실손의료보험\n목   차"] * 40 + ["무배당\n롯데 실손의료보험 (9999)\n약   관"]
+    name = "(무) 롯데 실손의료보험(9999)"
+    wins = cover_windows(beyond)
+    assert not any(cover_match(name, w, page=beyond[pg - 1], ordered=ordered)
+                  for pg, w, ordered in wins)
