@@ -85,6 +85,32 @@ _DATE_PATTERNS = (
     (re.compile(r"(\d{4})년(\d{1,2})월\d{0,2}일?시행"), "시행"),
 )
 
+#: 참고 — 「신계약 적용대상」 조항의 **판매기간** 진술. `_DATE_PATTERNS` 와 합치지 않는다.
+#:
+#:   실측 2026-08-11(현대해상) — 판본 없는 이름의 리더(특약)가 분기마다 재발행되는데,
+#:   표지는 매번 똑같은 문구다. 대신 본문 2쪽이 스스로 적용기간을 밝힌다 —
+#:
+#:     sha 00eb260bb1c1 (sale_start 20260701): 「2026년 7월 1일부터 …까지 판매하는」
+#:     sha 1a6a51c47465 (sale_start 20260401): 「2026년 4월 1일부터 …까지 판매하는」
+#:
+#:   위험 — `_DATE_PATTERNS` 에 합치지 않는 이유는 그쪽의 「개정 판정」 로직이
+#:   **찾은 것 중 가장 이른 날짜**를 쓰기 때문이다. 같은 페이지의 무관한 법령
+#:   인용일(「…규정…2020년1월1일부터시행」 따위)이 섞여 들어가면 그 최솟값이
+#:   앞당겨져 이미 통과하던 문서를 「판매시점이 앞선다」로 되돌릴 수 있다.
+#:   여기는 **가족 안 유일 식별**에만 쓰는 별도 신호다.
+#:
+#:   위험 — 처음엔 `…부터[\s\S]{0,60}?판매` 로 썼는데 시험이 거짓임을 잡았다.
+#:   마침표를 건너뛰어 「2020년1월1일부터**시행합니다.** 2026년7월1일부터…판매」
+#:   에서 **앞쪽 무관한 날짜**가 걸렸다. 「까지…판매」 형태로 좁히고 마침표를
+#:   건너뛰지 못하게 했다 — 실제 문구는 항상 「…부터 …까지 판매하는」이다.
+_APPLICABLE_PERIOD = re.compile(r"(\d{4})년(\d{1,2})월\d{1,2}일부터[^.。]{0,40}?까지[^.。]{0,10}?판매")
+
+
+def _applicable_period_months(text: str) -> set[str]:
+    """이 글이 스스로 밝힌 **판매기간**(YYYYMM). 「…부터 …까지 판매하는」 조항만 본다."""
+    squeezed = (text or "").replace(" ", "")
+    return {f"{m.group(1)}{int(m.group(2)):02d}" for m in _APPLICABLE_PERIOD.finditer(squeezed)}
+
 #: `config/generation_profiles.json` 의 시행 구간. 코드에 박지 않고 읽어 온다.
 def _generation_ranges() -> list[tuple[int, str | None, str | None]]:
     prof = json.loads((_ROOT / "config" / "generation_profiles.json").read_text(encoding="utf-8"))
@@ -622,11 +648,21 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
             and not kin
             and (row.get("date_confidence") or "") in ("exact", "month"))
 
+    #: 참고 — 형제가 있어도 **이 문서 자신이 자기 판매기간을 밝히고**, 그 기간이
+    #:   매니페스트의 `sale_start` 와 정확히 같은 달이면 유일하게 식별된 것이다.
+    #:   실측 2026-08-11 — 판본 없음+형제 있음 37건 중 9건이 이걸로 풀렸다
+    #:   (현대해상 「실손의료비보장 보험료 안정화 할인 특별약관」 분기별 재발행).
+    date_anchored = (not version_tokens(out["product_name"])
+                     and (row.get("date_confidence") or "") in ("exact", "month")
+                     and ss[:6] in _applicable_period_months(text))
+
     hit = next(((pg, w) for pg, w, ordered in windows
                 if cover_match(out["product_name"], w, page=page_texts[pg - 1],
-                               lone_in_family=lone, ordered=ordered)), None)
+                               lone_in_family=(lone or date_anchored), ordered=ordered)), None)
     if hit and lone:
         out["lone_in_family"] = True
+    if hit and date_anchored and kin:
+        out["date_anchored"] = True
     out["cover_page"] = hit[0] if hit else None
     out["cover_name"] = hit[1][:120] if hit else None
 
@@ -785,6 +821,9 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     elif out["extraction_blocked"]:
         #: 식별은 됐지만 **인용은 못 한다.** 판정 쪽이 이 사실을 말할 수 있어야 한다.
         out["evidence"] = "extraction_blocked"
+    elif out.get("date_anchored"):
+        #: 참고 — 판매기간 진술로 유일하게 식별된 것도 **그렇다고 적는다.**
+        out["evidence"] = "date_anchored"
     elif me not in flat:
         #: 참고 — 표지 이름으로 맞춘 것은 **그렇다고 적는다.** 공시 이름으로 맞춘 것과
         #:   같은 등급으로 뭉치면, 나중에 이 규칙이 틀렸을 때 어느 건이 영향받는지 모른다.

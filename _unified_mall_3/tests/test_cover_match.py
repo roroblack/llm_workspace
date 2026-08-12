@@ -347,3 +347,31 @@ def test_숫자_한글_복합_토큰은_순서_완화로도_안_잡힌다():
     wins = cover_windows([_SPECIES_BADGE])
     assert not any(cover_match(name, w, page=_SPECIES_BADGE, ordered=ordered)
                   for _, w, ordered in wins)
+
+
+# ── ⑪ 판매일 닻 — 형제가 있어도 자기 판매기간을 밝히면 유일하다 ─────────────
+#
+# 핵심 — 실측 2026-08-11(현대해상) — 판본 없는 이름의 리더가 분기마다
+#   재발행되는데 표지는 매번 똑같다. 대신 본문 2쪽이 스스로 적용기간을
+#   밝힌다 — 「2026년 7월 1일부터 …까지 판매하는」. 이게 매니페스트의
+#   sale_start(20260701)와 정확히 같은 달이면 유일하게 식별된 것이다.
+#   판본 없음+형제 있음 37건 중 9건이 이걸로 풀렸다.
+from scripts.confirm.identify_documents import _applicable_period_months  # noqa: E402
+
+
+def test_적용기간_진술에서_판매월을_읽는다():
+    text = "1. 안정화 할인 적용 대상 가. 신계약 (1) 2026년 7월 1일부터 2026년 9월 30일까지 판매하는 실손의료비 보장"
+    assert _applicable_period_months(text) == {"202607"}
+
+
+def test_적용기간이_없으면_빈_집합이다():
+    assert _applicable_period_months("이 약관은 보험계약의 내용을 규정한 것입니다") == set()
+
+
+def test_적용기간_패턴은_전역_날짜_판정과_섞이지_않는다():
+    #: 위험 — 같은 페이지에 무관한 법령 인용일(「…2020년1월1일부터시행」)이 있어도
+    #:   `_applicable_period_months` 는 「…부터…판매」 조항만 본다. `_DATE_PATTERNS`
+    #:   의 「개정 판정」(최솟값 사용)과 섞이면, 이 무관한 날짜가 최솟값을 앞당겨
+    #:   이미 통과하던 문서를 되돌릴 수 있어 일부러 합치지 않았다.
+    text = "보험업감독규정 제7-63조에 따라 2020년 1월 1일부터 시행합니다. 2026년 7월 1일부터 2026년 9월 30일까지 판매하는"
+    assert _applicable_period_months(text) == {"202607"}
