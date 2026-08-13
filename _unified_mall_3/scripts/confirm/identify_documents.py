@@ -527,6 +527,40 @@ def cover_match(product_name: str, window: str, *, page: str = "",
     return core >= _COVER_CORE_MIN
 
 
+def _legacy_same_family_rivals(product_name: str, rivals: list[str]) -> list[str]:
+    """상대 중 **같은 상품군의, 판본이 나보다 전부 낮은** 것 — 구판 잔존 문구 후보.
+
+    참고 — 자동 확정에 쓰지 않는다. 코덱스 교차검증(2026-08-12)이 반대했다 —
+
+        「내 판본이 더 높다」는 신판의 증거가 아니라 **부재 증거 추론**이다.
+        매니페스트 이름 자체가 오표기일 수 있고(2507/2510 실측), 판본 체계가
+        다를 수 있고(상품판·특약판·지점 번호), 상대가 잔존 문구가 아니라
+        **구약관 전체가 부록으로 포함된 것**일 수도 있다 — `_rivals()` 는
+        문맥(개정연혁·구약관 표제) 정보 없이 `flat_doc` 하나만 받아 그 구분을
+        할 수 없다.
+
+    참고 — 그래서 이건 **관찰용 표시**다. 사람이 93건을 검토할 때 「내 판본이
+      더 높은 것」부터 먼저 보라는 순서 힌트일 뿐, 확정 여부를 바꾸지 않는다.
+      실측 2026-08-12 — 93건 중 25건이 같은 상품군+판본 비교 가능이고,
+      그중 19건이 이 조건에 해당했다(현대해상 Hi2108 사례로 스팟체크).
+    """
+    my_ver = version_tokens(product_name)
+    if not my_ver:
+        return []
+    my_fam = family_key(product_name)
+    out = []
+    for rival in rivals:
+        if family_key(rival) != my_fam:
+            continue
+        riv_ver = version_tokens(rival)
+        #: 위험 — 상대 판본이 없으면(범용 이름) 비교 자체가 안 된다 — 넣지 않는다.
+        if not riv_ver:
+            continue
+        if all(rv < mv for rv in riv_ver for mv in my_ver):
+            out.append(rival)
+    return out
+
+
 def _rivals(row: dict, flat_doc: str, siblings: list[dict]) -> tuple[list[str], list[str]]:
     """이 문서 안에서 **같은 보험사의 다른 상품명**도 통째로 확인되는가.
 
@@ -952,6 +986,11 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
         out["reasons"].append(
             f"같은 문서에서 다른 본약관 {len(out['rivals'])}건도 확인된다 — 사람이 골라야 한다"
             f": {out['rivals'][:2]}")
+        #: 참고 — 관찰용 표시일 뿐 확정 여부는 안 바꾼다. `_legacy_same_family_rivals()`
+        #: 주석 참조 — 코덱스가 자동 확정에는 반대했다. 검토 순서 힌트만 남긴다.
+        legacy = _legacy_same_family_rivals(out["product_name"], out["rivals"])
+        if legacy:
+            out["legacy_rivals"] = legacy
 
     out["ok"] = not out["reasons"]
     #: 참고 — 근거 등급. 문서 안에서 판매일까지 확인되면 한 단 강하다.
