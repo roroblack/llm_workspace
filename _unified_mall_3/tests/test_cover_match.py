@@ -493,3 +493,40 @@ def test_판매일_YYMM과_url_YYMM은_같은_자릿수로_비교한다():
     sale_start = "20220207"
     assert url_tail_ym({"url": "…(Hi2202)_인쇄용약관.pdf", "saved_as": ""}) == sale_start[2:6]
     assert sale_start[:6] != url_tail_ym({"url": "…(Hi2202)_인쇄용약관.pdf", "saved_as": ""})
+
+
+# ── ⑭ 코덱스 교차검증이 잡은 반례들 ──────────────────────────────────────
+#
+# 핵심 — 2026-08-12, ⑬을 만든 직후 코덱스에게 독립 검증을 시켰다. 「내가
+#   맞았다고 안심시키지 말고 반례를 찾아라」라고 시켰더니 실제로 넷을 찾았다.
+def test_없는_달은_판본으로_안_읽는다():
+    #: 위험 — 13월도 자리 형태만 보면 통과했다(코덱스 반례).
+    row = {"url": "https://x.example/약관_20251399.pdf", "saved_as": ""}
+    assert url_tail_ym(row) is None
+
+
+def test_괄호_코드의_13월도_안_읽는다():
+    row = {"url": "https://x.example/(Hi2213)_약관.pdf", "saved_as": ""}
+    assert url_tail_ym(row) is None
+
+
+def test_쿼리스트링이_붙어도_읽는다():
+    #: 위험 — `.pdf` 뒤에 `?download=1` 이 붙으면 `$` 고정이 깨져 놓쳤다(코덱스 반례).
+    row = {"url": "https://x.example/약관_20251013.pdf?download=1", "saved_as": ""}
+    assert url_tail_ym(row) == "2510"
+
+
+def test_경로의_낱말은_확인으로_안_친다():
+    #: 위험 — URL 전체를 뒤지면 이 파일과 무관한 디렉터리 이름에 그 낱말이
+    #:   있어도 「확인됨」으로 잘못 읽는다(코덱스 반례). 파일명만 본다.
+    row = {"url": "https://x.example/InsProduct/계약전환용목록/실손의료비보험2404.pdf",
+           "saved_as": ""}
+    name = "무배당 실손의료비보험(계약전환용)2404"
+    assert url_confirmed_qualifiers(row, name) == frozenset()
+
+
+def test_파일명_자체에_있으면_확인된다():
+    row = {"url": "https://x.example/InsProduct/실손의료비보험(계약전환용)2404.pdf",
+           "saved_as": ""}
+    name = "무배당 실손의료비보험(계약전환용)2404"
+    assert url_confirmed_qualifiers(row, name) == frozenset({"계약전환용"})

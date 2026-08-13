@@ -123,8 +123,12 @@ def _applicable_period_months(text: str) -> set[str]:
 #:
 #:   위험 — 상품코드·게시물 번호 같은 **긴 숫자열**을 판본으로 오인하면 안 된다
 #:   (`data/gongsi/goods/150277466...` 류). 그래서 **파일명 끝, `.pdf` 바로 앞**만 본다.
-_URL_TAIL_DATE = re.compile(r"_(\d{8})\.pdf$", re.I)
-_URL_TAIL_CODE = re.compile(r"\(([A-Za-z]{1,3}\d{4})\)[^/\\]*\.pdf$", re.I)
+#:
+#:   위험 — 코덱스 교차검증(2026-08-12)이 반례를 냈다. 자리 형태만 보고 **월(MM)이
+#:   유효한지 안 봐서** `_20251399.pdf`(13월)나 `(AB1234)`(상품 내부 코드) 같은
+#:   것도 판본으로 읽었다. 월을 `01`~`12` 로 못박아 정규식 단계에서 거른다.
+_URL_TAIL_DATE = re.compile(r"_(\d{4})(0[1-9]|1[0-2])\d{2}\.pdf(?:[?#]|$)", re.I)
+_URL_TAIL_CODE = re.compile(r"\(([A-Za-z]{1,3})(\d{2})(0[1-9]|1[0-2])\)[^/\\]*\.pdf(?:[?#]|$)", re.I)
 
 
 def url_tail_ym(row: dict) -> str | None:
@@ -133,6 +137,9 @@ def url_tail_ym(row: dict) -> str | None:
     위험 — 두 문자열을 공백으로 이어 붙여 하나로 검사하면 안 된다. `$` 는
       **글 전체의 끝**에서만 서므로, 뒤에 빈 `saved_as` 를 이어 붙이는 것만으로도
       `.pdf` 뒤에 공백이 남아 `$` 고정이 깨진다(실측 — 시험이 잡았다). 따로 본다.
+
+    위험 — `.pdf` 뒤에 `?download=1` 같은 쿼리스트링이 붙으면 예전엔 놓쳤다
+      (코덱스 지적). `[?#]` 도 끝으로 허용한다.
     """
     import urllib.parse
 
@@ -140,25 +147,32 @@ def url_tail_ym(row: dict) -> str | None:
         text = urllib.parse.unquote(raw)
         m = _URL_TAIL_DATE.search(text)
         if m:
-            return m.group(1)[2:6]
+            return f"{m.group(1)[2:]}{m.group(2)}"
         m = _URL_TAIL_CODE.search(text)
         if m:
-            digits = re.sub(r"\D", "", m.group(1))
-            if len(digits) == 4:
-                return digits
+            return f"{m.group(2)}{m.group(3)}"
     return None
 
 
 def url_confirmed_qualifiers(row: dict, product_name: str) -> frozenset[str]:
-    """매니페스트 이름의 정체성 부기 중 **원천 URL/저장 파일명에도 실제로 있는** 것.
+    """매니페스트 이름의 정체성 부기 중 **원천 파일명에도 실제로 있는** 것.
 
-    표지가 생략했어도, 사이트가 다운로드 파일 자체에 그 낱말을 박아 뒀다면
-    짐작이 아니라 **원천이 직접 밝힌 것**이다.
+    표지가 생략했어도, 사이트가 다운로드 파일 **이름 자체**에 그 낱말을 박아
+    뒀다면 짐작이 아니라 원천이 직접 밝힌 것이다.
+
+    위험 — 코덱스 지적(2026-08-12) — 처음엔 URL **전체**(경로·쿼리스트링 포함)를
+      뒤졌다. 그러면 이 파일과 무관한 디렉터리 이름(예: `/InsProduct/계약전환용목록/`)
+      에 그 낱말이 있어도 「확인됨」으로 잘못 읽는다. **파일명만** 본다 — `/` 뒤,
+      `?`·`#` 앞.
     """
     import urllib.parse
 
-    text = urllib.parse.unquote(row.get("url") or "") + " " + (row.get("saved_as") or "")
-    tn = _norm(text)
+    names = []
+    for raw in (row.get("url") or "", row.get("saved_as") or ""):
+        decoded = urllib.parse.unquote(raw)
+        tail = re.split(r"[?#]", decoded)[0]
+        names.append(tail.rsplit("/", 1)[-1].rsplit("\\", 1)[-1])
+    tn = _norm(" ".join(names))
     return frozenset(q for q in _IDENTITY_QUALIFIERS if q in (product_name or "") and _norm(q) in tn)
 
 #: `config/generation_profiles.json` 의 시행 구간. 코드에 박지 않고 읽어 온다.
@@ -759,7 +773,13 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
     #: 위험 — `url_ym` 은 YY+MM(4자리) 다. `ss[:6]` 은 YYYY+MM(6자리) — 자릿수가
     #:   달라 **항상 거짓**이었다(오늘 세 번째 같은 실수 — `_gen_splits_month`·
     #:   `date_anchor_gain.py` 에서도 겪었다). `ss[2:6]` 이라야 같은 자릿수로 맞는다.
-    url_corrects_version = bool(my_name_ver and url_ym and url_ym not in my_name_ver and url_ym == ss[2:6])
+    #:
+    #:   위험 — 코덱스 지적(2026-08-12) — `ss` 가 정말 `YYYYMMDD` 8자리인지 그때까지
+    #:   확인 안 했다. `"2202"` 처럼 짧거나 숫자가 아닌 값이 들어오면 `[2:6]` 이
+    #:   조용히 엉뚱한 조각을 잘라 우연히 일치할 수 있다. **형태부터 확인한다.**
+    ss_is_ymd = bool(re.fullmatch(r"\d{8}", ss))
+    url_corrects_version = bool(
+        ss_is_ymd and my_name_ver and url_ym and url_ym not in my_name_ver and url_ym == ss[2:6])
     identity_confirmed = url_confirmed_qualifiers(row, out["product_name"])
 
     #: 위험 — 먼저 **URL 보정 없이** 시도한다. 「URL이 확인해 줬다」와 「URL이 없어도
