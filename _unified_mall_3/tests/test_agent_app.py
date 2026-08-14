@@ -165,6 +165,38 @@ def _client(scopes, *, registry=None, facade=None):
     return TestClient(app), registry, facade
 
 
+def test_agent_public_readiness_does_not_expose_database_details(monkeypatch):
+    from app import agent_main
+    from app.adapters import pg_agent_access
+
+    settings = SimpleNamespace(
+        BRAND_NAME="test",
+        AGENT_API_ENABLED=True,
+        AGENT_PG_DSN="postgresql://runtime:top-secret@db.internal/agent",
+    )
+
+    class FakeAccess:
+        def __init__(self, _dsn):
+            pass
+
+        def readiness(self):
+            return {
+                "ready": False,
+                "database": "internal_agent",
+                "reason": "top-secret at db.internal",
+            }
+
+    monkeypatch.setattr(agent_main, "get_settings", lambda: settings)
+    monkeypatch.setattr(pg_agent_access, "PgAgentAccess", FakeAccess)
+
+    response = TestClient(agent_main.create_agent_app()).get("/api/health/ready")
+
+    assert response.status_code == 200
+    assert response.json() == {"enabled": True, "ready": False}
+    assert "top-secret" not in response.text
+    assert "db.internal" not in response.text
+
+
 def _request(client: TestClient, endpoint: str):
     headers = {"X-Agent-Subject": _SUBJECT}
     if endpoint == "support":

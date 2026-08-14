@@ -7,10 +7,12 @@ migration/ingest(scripts/manage.py) 후 이 readiness가 준비 상태를 보고
 
 from __future__ import annotations
 
-from sqlalchemy import inspect
+import sqlite3
+from pathlib import Path
+
+from sqlalchemy.engine import make_url
 
 from app.core.config import get_settings
-from app.db.database import engine
 
 # migration으로 생성돼야 하는 핵심 테이블(존재로 준비 여부 판정)
 #: ★보험 서비스가 **쇼핑몰 테이블 때문에 "준비 안 됨"** 이 되고 있었다.
@@ -35,15 +37,46 @@ def _required_sqlite_tables(settings) -> tuple[str, ...]:
     return tuple(sorted(required))
 
 
+def _existing_sqlite_tables(settings, required: tuple[str, ...]) -> set[str]:
+    """Inspect an active legacy DB without creating a missing SQLite file."""
+    if not required or not getattr(settings, "SQLITE_LEGACY_ENABLED", True):
+        return set()
+
+    try:
+        url = make_url(str(settings.DATABASE_URL))
+    except Exception:  # noqa: BLE001 - invalid configuration is reported as missing
+        return set()
+    if url.get_backend_name() != "sqlite":
+        return set()
+
+    database = url.database
+    if database in (None, "", ":memory:"):
+        return set()
+
+    path = Path(database)
+    if not path.is_file():
+        return set()
+    uri = f"file:{path.resolve().as_posix()}?mode=ro"
+    try:
+        with sqlite3.connect(uri, uri=True, timeout=1) as conn:
+            return {
+                str(row[0])
+                for row in conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table'"
+                )
+            }
+    except sqlite3.Error:
+        # A concurrent quarantine/removal is simply not ready. mode=ro ensures
+        # the readiness probe cannot recreate the file while reporting it.
+        return set()
+
+
 def check_readiness() -> dict[str, object]:
     """DB 테이블·RAG 인덱스 준비 상태를 보고한다(실 모델 호출 없음)."""
     settings = get_settings()
     sqlite_enabled = getattr(settings, "SQLITE_LEGACY_ENABLED", True)
     required_sqlite_tables = _required_sqlite_tables(settings)
-    if sqlite_enabled:
-        existing = set(inspect(engine).get_table_names())
-    else:
-        existing = set()
+    existing = _existing_sqlite_tables(settings, required_sqlite_tables)
     missing_tables = [t for t in required_sqlite_tables if t not in existing]
     sqlite_configuration_error = not sqlite_enabled and bool(required_sqlite_tables)
     vector_dir = settings.VECTOR_DIR
@@ -66,7 +99,17 @@ def check_readiness() -> dict[str, object]:
         "vector_index_ready": index_ready,
         "hint": readiness_hint,
     }
-    clause = _clause_index_state()
+    from app.composition import _clause_store_kind
+
+    clause_store = _clause_store_kind()
+    if clause_store == "pg":
+        clause = _clause_index_state()
+    else:
+        clause = {
+            "backend": clause_store,
+            "checked": False,
+            "required": False,
+        }
     out["clause_index"] = clause
     from app.core.candidate_fact_registry import check_candidate_fact_sources
 
@@ -82,9 +125,7 @@ def check_readiness() -> dict[str, object]:
     #:   반대로 `pg` 인데 색인이 어긋나면 **검색이 전부 실패**하므로
     #:   `ready:true` 라고 말하면 거짓이다.
     #:   실측 2026-08-03: 하위는 false 인데 상위가 true 였다.
-    from app.composition import _clause_store_kind
-
-    if _clause_store_kind() == "pg" and not clause.get("ready"):
+    if clause_store == "pg" and not clause.get("ready"):
         out["ready"] = False
         out["hint"] = clause.get("hint") or "인덱스 A 가 준비되지 않았습니다."
     from app.adapters.demo_submission_store import backend_name as demo_backend
@@ -103,6 +144,32 @@ def check_readiness() -> dict[str, object]:
             "insurance_demo DB에 demo migration을 적용하세요."
         )
     return out
+
+
+def public_readiness() -> dict[str, object]:
+    """Expose only boolean component health on the unauthenticated endpoint."""
+    status = check_readiness()
+
+    def component(name: str) -> bool | None:
+        value = status.get(name)
+        if not isinstance(value, dict) or value.get("required") is False:
+            return None
+        ready = value.get("ready")
+        return ready if isinstance(ready, bool) else False
+
+    return {
+        "ready": bool(status.get("ready")),
+        "db_tables_ready": bool(status.get("db_tables_ready")),
+        "vector_index_ready": bool(status.get("vector_index_ready")),
+        "components": {
+            "clause_index": component("clause_index"),
+            "candidate_fact_sources": component("candidate_fact_sources"),
+            "demo_store": component("demo_store"),
+            "insurance_postgres": component("insurance_postgres"),
+            "agent_postgres": component("agent_postgres"),
+            "ops_postgres": component("ops_postgres"),
+        },
+    }
 
 
 def _clause_index_state() -> dict[str, object]:
@@ -146,7 +213,12 @@ def _clause_index_state() -> dict[str, object]:
                 conn.close()
     except Exception as exc:  # noqa: BLE001
         #: ★"확인 못 함"과 "준비됨"을 **구분해서** 적는다. 섞으면 그게 폴백이다.
-        return {"checked": False, "reason": f"{type(exc).__name__}: {exc}"[:200]}
+        return {
+            "backend": "pg",
+            "checked": False,
+            "required": True,
+            "reason": f"clause index readiness check failed ({type(exc).__name__})",
+        }
     st["checked"] = True
     if not st["ready"]:
         st["hint"] = ("승인 릴리스와 색인이 어긋납니다. "

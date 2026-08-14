@@ -41,10 +41,15 @@ def create_agent_app() -> FastAPI:
         from app.adapters.pg_agent_access import PgAgentAccess
 
         current = get_settings()
-        result = PgAgentAccess(current.AGENT_PG_DSN).readiness()
-        result["enabled"] = current.AGENT_API_ENABLED
-        result["ready"] = bool(result.get("ready") and current.AGENT_API_ENABLED)
-        return result
+        try:
+            result = PgAgentAccess(current.AGENT_PG_DSN).readiness()
+            database_ready = result.get("ready") is True
+        except Exception:  # noqa: BLE001 - public health must not expose setup errors
+            database_ready = False
+        return {
+            "enabled": bool(current.AGENT_API_ENABLED),
+            "ready": bool(database_ready and current.AGENT_API_ENABLED),
+        }
 
     @application.get("/llms.txt", include_in_schema=False)
     def llms_txt() -> PlainTextResponse:

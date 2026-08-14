@@ -194,3 +194,7 @@ scan_line_hits.json
 scan_selfpay_pages.json
 scan_selfpay_tables.json
 backups/manifests_*/
+
+# 격리된 SQLite에는 비밀번호 해시·얼굴 임베딩·운영 이벤트가 들어 있다.
+# 파일명/확장자에 기대지 말고 보관소 전체를 커밋 대상에서 제외한다.
+/data/db/_quarantine/**

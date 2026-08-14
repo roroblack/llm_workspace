@@ -24,14 +24,21 @@ def get_conn(dsn: str | None = None):
     from app.core.errors import InfraError
 
     dsn = dsn or get_settings().PGVECTOR_DSN
+    conn = None
     try:
-        conn = psycopg.connect(dsn)
-    except psycopg.OperationalError as exc:
+        conn = psycopg.connect(dsn, connect_timeout=5)
+        register_vector(conn)
+        return conn
+    except Exception as exc:  # noqa: BLE001 - connection setup is one public boundary
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:  # noqa: BLE001 - preserve the sanitized setup failure
+                pass
         raise InfraError(
-            f"pgvector(PostgreSQL)에 연결할 수 없습니다: {dsn}. 먼저 PG를 기동하세요(scripts/pg.py)."
+            "pgvector(PostgreSQL)에 연결할 수 없습니다. "
+            "연결 설정과 서버 상태를 확인하세요."
         ) from exc
-    register_vector(conn)
-    return conn
 
 
 def ensure_schema(conn) -> None:

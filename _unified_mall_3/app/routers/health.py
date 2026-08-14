@@ -39,7 +39,7 @@ def llm_health() -> dict:
 
 @router.get("/health/ready")
 def ready() -> dict:
-    """데이터 준비 상태(DB 테이블·RAG 인덱스). 미준비면 명시적으로 알린다(REQ-OPS-01)."""
-    from app.obs.readiness import check_readiness
+    """민감한 DB 구성은 숨기고 구성요소별 준비 여부만 공개한다."""
+    from app.obs.readiness import public_readiness
 
-    return check_readiness()
+    return public_readiness()
