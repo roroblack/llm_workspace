@@ -120,6 +120,43 @@ def test_sale_start_형식이_이상하면_정정하지_않는다(root, bad_sale
     assert "url_anchored" not in out
 
 
+#: 위험 — 표지 글에 상품명을 **그대로** 넣으면 더 앞선(전체문서 대조) 관문이
+#:   먼저 통과해 버려 date_anchored 경로를 실제로는 안 탄다(처음 그렇게 썼다가
+#:   「범위 밖인데도 통과」로 시험이 잡았다). 「보험」 삽입으로 살짝 어긋나게 —
+#:   cover_match 의 `_INSERTIONS` 는 봐주지만 전체문서 축자 대조는 안 통과한다.
+_ANCHOR_NAME = "실손의료비보장 안정화 할인 특약"
+_ANCHOR_COVER = "실손의료비보험보장 안정화 할인 특약"
+
+
+def test_sale_end_범위_안이면_판매기간_닻이_통한다(root):
+    #: 참고 — 실측 2026-08-14. 처음엔 sale_start **시작월과 정확히 같을 때만**
+    #:   인정했다. sale_end 를 그때까지 안 썼다(매니페스트에 734건 있었는데도).
+    #:   범위로 넓히니 실제 4건이 충돌 없이 풀렸다.
+    row = _row(product_name=_ANCHOR_NAME, sale_start="20220101", sale_end="20220331",
+              url="https://x.example/약관_20220101.pdf")
+    _write_pages(root, "테스트화재", row["sha256"][:12], [
+        "1. 안정화 할인 적용 대상 가. 신계약 (1) 2022년 1월 1일부터 2022년 3월 31일까지 "
+        f"판매하는 실손의료비 보장이 부가된 보험\n{_ANCHOR_COVER}\n약관"])
+    #: 형제(kin)를 하나 심어 `lone` 경로가 아니라 `date_anchored` 경로를 타게 한다.
+    sibling = _row(product_name=_ANCHOR_NAME, sha256="c" * 64)
+    out = idm.verify(row, page_tag=_PAGE_TAG, clause_tag=_CLAUSE_TAG, siblings=[row, sibling])
+    assert out["ok"], out["reasons"]
+    assert out["evidence"] == "date_anchored"
+
+
+def test_sale_end_범위_밖이면_판매기간_닻이_안_통한다(root):
+    #: 위험 — 문서가 밝힌 기간이 sale_start~sale_end 범위를 벗어나면 막는다.
+    row = _row(product_name=_ANCHOR_NAME, sale_start="20220101", sale_end="20220331",
+              url="https://x.example/약관_20220101.pdf")
+    _write_pages(root, "테스트화재", row["sha256"][:12], [
+        "1. 안정화 할인 적용 대상 가. 신계약 (1) 2022년 7월 1일부터 2022년 9월 30일까지 "
+        f"판매하는 실손의료비 보장이 부가된 보험\n{_ANCHOR_COVER}\n약관"])
+    sibling = _row(product_name=_ANCHOR_NAME, sha256="c" * 64)
+    out = idm.verify(row, page_tag=_PAGE_TAG, clause_tag=_CLAUSE_TAG, siblings=[row, sibling])
+    assert not out["ok"]
+    assert "date_anchored" not in out.get("evidence", "")
+
+
 def test_정체성_부기도_기본_경로_실패_시에만_url로_보충한다(root):
     row = _row(product_name="무배당 테스트 실손의료비보험(계약전환용)2404(CM)",
               sale_start="20240401",

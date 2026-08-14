@@ -791,12 +791,24 @@ def verify(row: dict, *, page_tag: str, clause_tag: str,
             and (row.get("date_confidence") or "") in ("exact", "month"))
 
     #: 참고 — 형제가 있어도 **이 문서 자신이 자기 판매기간을 밝히고**, 그 기간이
-    #:   매니페스트의 `sale_start` 와 정확히 같은 달이면 유일하게 식별된 것이다.
+    #:   매니페스트의 `sale_start~sale_end` **범위 안**이면 유일하게 식별된 것이다.
     #:   실측 2026-08-11 — 판본 없음+형제 있음 37건 중 9건이 이걸로 풀렸다
     #:   (현대해상 「실손의료비보장 보험료 안정화 할인 특별약관」 분기별 재발행).
+    #:
+    #:   참고 — 실측 2026-08-14 — 처음엔 `sale_start` **시작월과 정확히 같을 때만**
+    #:   인정했다. `sale_end` 를 그때까지 한 번도 안 썼다 — 매니페스트에 이미
+    #:   734건에 채워져 있었는데도. 범위로 넓히니 4건이 추가로, **충돌 없이** 풀렸다.
+    #:   `sale_end` 가 없으면 시작월 하나로 좁혀져 기존 동작과 같다.
+    #:   위험 — `all()` 이다. **문서가 찾은 기간 중 하나라도** 범위 밖이면 막는다 —
+    #:   여러 기간이 나오는 문서는 여러 판을 담고 있을 수 있어, `any()` 로 느슨하게
+    #:   두면 약한 증거 하나로 통과시키게 된다(검증 스크립트도 `all()` 로 재서 충돌 0건이었다).
+    se = row.get("sale_end") or ""
+    se6 = se[:6] if se else ss[:6]
+    found_periods = _applicable_period_months(text)
     date_anchored = (not version_tokens(out["product_name"])
                      and (row.get("date_confidence") or "") in ("exact", "month")
-                     and ss[:6] in _applicable_period_months(text))
+                     and bool(found_periods)
+                     and all(ss[:6] <= ym <= se6 for ym in found_periods))
 
     #: 참고 — 원천 URL이 상품명의 판본보다 **더 정확할 때가 있다.** 실측 2026-08-12 —
     #:   상품명은 낡은 판본을 달고 있는데, 원천 사이트가 파일에 붙인 URL 날짜와
